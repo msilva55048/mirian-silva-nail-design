@@ -56,7 +56,7 @@ const fallbackServices: Service[] = [
         priceCents: 7000,
     },
     {
-        name: "Reparo de Unha",
+        name: "Reparo de Unha (Unitário)",
         description:
             "Reparo rápido e cuidadoso para recuperar uma unha danificada.",
         duration: "20 min",
@@ -145,7 +145,6 @@ function PublicSite() {
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
-    const [clientEmail, setClientEmail] = useState("");
     const [selectedService, setSelectedService] = useState("");
     const [selectedDate, setSelectedDate] = useState("");
     const [selectedTime, setSelectedTime] = useState("");
@@ -464,7 +463,6 @@ function PublicSite() {
         setBookingStep(1);
         setClientName("");
         setClientPhone("");
-        setClientEmail("");
         setSelectedService("");
         setSelectedDate("");
         setSelectedTime("");
@@ -582,7 +580,7 @@ function PublicSite() {
                 .insert({
                     client_name: clientName.trim(),
                     client_phone: clientPhone.trim(),
-                    client_email: clientEmail.trim() || null,
+                    client_email: null,
                     service_name: selectedServiceInformation.name,
                     appointment_date: selectedDate,
                     start_time: selectedTime,
@@ -600,7 +598,7 @@ function PublicSite() {
                 id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
                 clientName: clientName.trim(),
                 clientPhone: clientPhone.trim(),
-                clientEmail: clientEmail.trim(),
+                clientEmail: "",
                 serviceName: selectedServiceInformation.name,
                 date: selectedDate,
                 startTime: selectedTime,
@@ -709,30 +707,6 @@ function PublicSite() {
             </section>
 
             <section className="booking" id="agendamento">
-                <div className="booking__information">
-                    <span className="section-label">Agendamento online</span>
-                    <h2>Reserve seu horário de forma rápida e fácil</h2>
-                    <p>Informe seus dados e escolha o serviço desejado. Depois, você poderá selecionar a data e o
-                        horário do atendimento.</p>
-
-                    <div className="booking__steps">
-                        <div className="booking__step"><span>01</span>
-                            <div><strong>Preencha seus dados</strong><p>Informe seu nome e telefone para contato.</p>
-                            </div>
-                        </div>
-                        <div className="booking__step"><span>02</span>
-                            <div><strong>Escolha a data</strong><p>Selecione qualquer data futura.</p>
-                            </div>
-                        </div>
-                        <div className="booking__step"><span>03</span>
-                            <div><strong>Escolha o horário</strong><p>Selecione uma das opções disponíveis.</p></div>
-                        </div>
-                    </div>
-
-                    <div className="booking__notice"><span>✦</span><p>O tempo necessário será reservado automaticamente
-                        de acordo com o serviço escolhido.</p></div>
-                </div>
-
                 <div className="booking__form-container">
                     <div className="booking__form-header"><span>Solicitação de agendamento</span><h3>Vamos começar?</h3>
                         <p>Preencha seus dados para escolher o dia e o horário.</p></div>
@@ -758,13 +732,6 @@ function PublicSite() {
                                 setBookingError("");
                             }} aria-describedby="client-phone-help" required/><small id="client-phone-help">Digite o DDD
                             e o número. A formatação é automática.</small></div>
-                        <div className="form-group"><label htmlFor="client-email">E-mail — opcional</label><input
-                            id="client-email" name="client-email" type="email" inputMode="email"
-                            placeholder="seuemail@exemplo.com" autoComplete="email" maxLength={120} value={clientEmail}
-                            onChange={(event) => {
-                                setClientEmail(event.target.value);
-                                setBookingError("");
-                            }}/></div>
                         <div className="form-group"><label htmlFor="service">Escolha o serviço</label><select
                             id="service" name="service" value={selectedService}
                             onChange={(event) => selectService(event.target.value)} required>
