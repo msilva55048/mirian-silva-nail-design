@@ -3854,6 +3854,15 @@ function AdminPanel() {
     async function createManualAppointment(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setManualError("");
+        const now = new Date();
+        const today = formatDateForInput(now);
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        if (manualDate === today && timeToMinutes(manualTime) <= currentMinutes) {
+            setManualError("Não é possível criar um agendamento para um horário que já passou.");
+            return;
+        }
+
         setManualSuccess("");
 
         const service = adminServices.find((item) => item.name === manualServiceName);
@@ -5033,8 +5042,30 @@ function AdminPanel() {
                                     <label>Nome da cliente<input value={manualClientName} onChange={(event) => setManualClientName(event.target.value)} required/></label>
                                     <label>Telefone<input value={manualClientPhone} onChange={(event) => setManualClientPhone(formatBrazilianPhone(event.target.value))} maxLength={15} inputMode="numeric" required/></label>
                                     <label>Serviço<select value={manualServiceName} onChange={(event) => setManualServiceName(event.target.value)}>{adminServices.map((service) => <option key={service.id} value={service.name}>{service.name} — {service.duration_minutes} min</option>)}</select></label>
-                                    <label>Data<input type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} required/></label>
-                                    <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)}>{allDayTimes.map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
+                                    <label>Data<input type="date" value={manualDate} onChange={(event) => {
+                                        const nextDate = event.target.value;
+                                        setManualDate(nextDate);
+                                        const now = new Date();
+                                        const today = formatDateForInput(now);
+                                        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                                        if (nextDate === today && manualTime && timeToMinutes(manualTime) <= currentMinutes) {
+                                            setManualTime("");
+                                        }
+                                        setManualError("");
+                                    }} required/></label>
+                                    <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)}>
+                                        {allDayTimes.map((time) => {
+                                            const now = new Date();
+                                            const today = formatDateForInput(now);
+                                            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                                            const isPastToday = manualDate === today && timeToMinutes(time) <= currentMinutes;
+                                            return (
+                                                <option key={time} value={time} disabled={isPastToday}>
+                                                    {time}{isPastToday ? " — horário passado" : ""}
+                                                </option>
+                                            );
+                                        })}
+                                    </select></label>
                                     <div className="admin-manual-form__actions"><button className="admin-manual-form__save" type="submit" disabled={isSavingManualAppointment}>{isSavingManualAppointment ? "Criando..." : "Criar agendamento"}</button><button className="admin-manual-form__cancel" type="button" onClick={() => setShowManualForm(false)}>Cancelar</button></div>
                                     {manualError && <p className="admin-manual-form__error">{manualError}</p>}
                                     {manualSuccess && <p className="admin-manual-form__success">{manualSuccess}</p>}
