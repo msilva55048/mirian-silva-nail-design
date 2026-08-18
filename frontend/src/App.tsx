@@ -2606,7 +2606,7 @@ function getAppointmentDateTime(appointment: AdminAppointment) {
 }
 
 
-type WhatsAppNotificationType = "booking-confirmation" | "attendance-confirmation" | "two-hour-reminder";
+type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
 
 function formatAppointmentDateForMessage(date: string) {
     return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
@@ -2624,10 +2624,6 @@ function buildWhatsAppMessage(
     const date = formatAppointmentDateForMessage(appointment.appointment_date);
     const time = String(appointment.start_time).slice(0, 5);
 
-    if (type === "booking-confirmation") {
-        return `Olá, ${firstName}! Seu agendamento com a Mirian Silva Nail Design foi realizado com sucesso.\n\nServiço: ${appointment.service_name}\nData: ${date}\nHorário: ${time}\n\nAguardamos você! 💅`;
-    }
-
     if (type === "attendance-confirmation") {
         return `Olá, ${firstName}! Seu atendimento com a Mirian Silva Nail Design está marcado para amanhã, dia ${date}, às ${time}.\n\nPoderia confirmar seu comparecimento?`;
     }
@@ -2636,7 +2632,6 @@ function buildWhatsAppMessage(
 }
 
 function getWhatsAppNotificationLabel(type: WhatsAppNotificationType) {
-    if (type === "booking-confirmation") return "Enviar confirmação";
     if (type === "attendance-confirmation") return "Solicitar confirmação";
     return "Enviar lembrete";
 }
@@ -4576,10 +4571,6 @@ function AdminPanel() {
         const hour = 60 * 60 * 1000;
         const types: WhatsAppNotificationType[] = [];
 
-        if (difference > 0) {
-            types.push("booking-confirmation");
-        }
-
         if (difference > 2 * hour && difference <= 24 * hour) {
             types.push("attendance-confirmation");
         }
@@ -4755,7 +4746,7 @@ function AdminPanel() {
                         return (
                             <a
                                 key={type}
-                                className={`${type !== "booking-confirmation" ? "is-due" : ""}${wasOpened ? " is-opened" : ""}`.trim()}
+                                className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
                                 href={getWhatsAppUrl(appointment, type)}
                                 target="_blank"
                                 rel="noopener noreferrer"
