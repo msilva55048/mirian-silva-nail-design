@@ -3858,7 +3858,17 @@ function AdminPanel() {
         const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-        if (manualDate === today && timeToMinutes(manualTime) <= currentMinutes) {
+        if (!manualDate) {
+            setManualError("Selecione uma data para o agendamento.");
+            return;
+        }
+
+        if (manualDate < today) {
+            setManualError("Não é possível criar um agendamento para uma data que já passou.");
+            return;
+        }
+
+        if (manualDate === today && (!manualTime || timeToMinutes(manualTime) <= currentMinutes)) {
             setManualError("Não é possível criar um agendamento para um horário que já passou.");
             return;
         }
@@ -5042,18 +5052,35 @@ function AdminPanel() {
                                     <label>Nome da cliente<input value={manualClientName} onChange={(event) => setManualClientName(event.target.value)} required/></label>
                                     <label>Telefone<input value={manualClientPhone} onChange={(event) => setManualClientPhone(formatBrazilianPhone(event.target.value))} maxLength={15} inputMode="numeric" required/></label>
                                     <label>Serviço<select value={manualServiceName} onChange={(event) => setManualServiceName(event.target.value)}>{adminServices.map((service) => <option key={service.id} value={service.name}>{service.name} — {service.duration_minutes} min</option>)}</select></label>
-                                    <label>Data<input type="date" value={manualDate} onChange={(event) => {
-                                        const nextDate = event.target.value;
-                                        setManualDate(nextDate);
-                                        const now = new Date();
-                                        const today = formatDateForInput(now);
-                                        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-                                        if (nextDate === today && manualTime && timeToMinutes(manualTime) <= currentMinutes) {
-                                            setManualTime("");
-                                        }
-                                        setManualError("");
-                                    }} required/></label>
-                                    <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)}>
+                                    <label>Data<input
+                                        type="date"
+                                        min={formatDateForInput(new Date())}
+                                        value={manualDate}
+                                        onChange={(event) => {
+                                            const nextDate = event.target.value;
+                                            const now = new Date();
+                                            const today = formatDateForInput(now);
+                                            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+                                            if (nextDate < today) {
+                                                setManualDate(today);
+                                                setManualTime("");
+                                                setManualError("Não é possível selecionar uma data que já passou.");
+                                                return;
+                                            }
+
+                                            setManualDate(nextDate);
+
+                                            if (nextDate === today && manualTime && timeToMinutes(manualTime) <= currentMinutes) {
+                                                setManualTime("");
+                                            }
+
+                                            setManualError("");
+                                        }}
+                                        required
+                                    /></label>
+                                    <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)} required>
+                                        <option value="" disabled>Selecione um horário</option>
                                         {allDayTimes.map((time) => {
                                             const now = new Date();
                                             const today = formatDateForInput(now);
