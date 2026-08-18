@@ -5031,7 +5031,7 @@ function AdminPanel() {
                             {showManualForm && (
                                 <form className="admin-manual-form" onSubmit={createManualAppointment}>
                                     <label>Nome da cliente<input value={manualClientName} onChange={(event) => setManualClientName(event.target.value)} required/></label>
-                                    <label>Telefone<input value={manualClientPhone} onChange={(event) => setManualClientPhone(event.target.value)} required/></label>
+                                    <label>Telefone<input value={manualClientPhone} onChange={(event) => setManualClientPhone(formatBrazilianPhone(event.target.value))} maxLength={15} inputMode="numeric" required/></label>
                                     <label>Serviço<select value={manualServiceName} onChange={(event) => setManualServiceName(event.target.value)}>{adminServices.map((service) => <option key={service.id} value={service.name}>{service.name} — {service.duration_minutes} min</option>)}</select></label>
                                     <label>Data<input type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} required/></label>
                                     <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)}>{allDayTimes.map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
@@ -5281,7 +5281,7 @@ function AdminPanel() {
                             <button className="admin-modal__close" type="button" onClick={() => setEditingClient(null)}>×</button>
                             <h2>Editar cadastro</h2>
                             <label>Nome<input value={editClientName} onChange={(event) => setEditClientName(event.target.value)}/></label>
-                            <label>Telefone<input value={editClientPhone} onChange={(event) => setEditClientPhone(event.target.value)}/></label>
+                            <label>Telefone<input value={editClientPhone} onChange={(event) => setEditClientPhone(formatBrazilianPhone(event.target.value))} maxLength={15} inputMode="numeric"/></label>
                             <label>E-mail<input type="email" value={editClientEmail} onChange={(event) => setEditClientEmail(event.target.value)}/></label>
                             {clientEditError && <p className="admin-reschedule__message">{clientEditError}</p>}
                             <button className="admin-primary-button" type="button" disabled={isSavingClient} onClick={() => void saveClientChanges()}>{isSavingClient ? "Salvando..." : "Salvar cadastro"}</button>
