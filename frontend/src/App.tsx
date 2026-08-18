@@ -1488,11 +1488,6 @@ const adminStyles = `
     color: #6d3445;
 }
 
-.admin-client-card__actions button.is-nail-record {
-    background: #8b5264;
-    color: #fff;
-}
-
 .admin-client-history,
 .admin-client-editor {
     position: relative;
@@ -2268,9 +2263,6 @@ const adminStyles = `
     font: inherit;
 }
 
-.admin-manual-form__email {
-    grid-column: span 2;
-}
 
 .admin-manual-form__actions {
     display: flex;
@@ -2327,10 +2319,6 @@ const adminStyles = `
 @media (max-width: 1050px) {
     .admin-manual-form {
         grid-template-columns: 1fr 1fr;
-    }
-
-    .admin-manual-form__email {
-        grid-column: auto;
     }
 
     .admin-manual-form__actions {
@@ -3665,7 +3653,6 @@ function AdminPanel() {
     const [showManualForm, setShowManualForm] = useState(false);
     const [manualClientName, setManualClientName] = useState("");
     const [manualClientPhone, setManualClientPhone] = useState("");
-    const [manualClientEmail, setManualClientEmail] = useState("");
     const [manualServiceName, setManualServiceName] = useState(fallbackServices[0].name);
     const [manualDate, setManualDate] = useState(formatDateForInput(new Date()));
     const [manualTime, setManualTime] = useState("07:00");
@@ -3891,7 +3878,7 @@ function AdminPanel() {
         const {data, error} = await supabase.from("appointments").insert({
             client_name: manualClientName.trim(),
             client_phone: formatBrazilianPhone(manualClientPhone),
-            client_email: manualClientEmail.trim() || null,
+            client_email: null,
             service_name: service.name,
             appointment_date: manualDate,
             start_time: manualTime,
@@ -3912,7 +3899,6 @@ function AdminPanel() {
         setAgendaDate(manualDate);
         setManualClientName("");
         setManualClientPhone("");
-        setManualClientEmail("");
         setIsSavingManualAppointment(false);
     }
 
@@ -4038,13 +4024,6 @@ function AdminPanel() {
         setSelectedClient(client);
     }
 
-    function openNailRecordForClient(client: AdminClient) {
-        resetNailRecordForm();
-        setNailRecords([]);
-        setSelectedClient(client);
-        setShowNailRecordForm(true);
-    }
-
     function closeClientHistory() {
         resetNailRecordForm();
         setNailRecords([]);
@@ -4082,7 +4061,7 @@ function AdminPanel() {
             .insert({
                 full_name: client.name.trim(),
                 phone: client.phone.trim(),
-                email: client.email.trim(),
+                email: client.email.trim() || null,
             })
             .select("id, full_name, phone, email, created_at, updated_at")
             .single();
@@ -4172,33 +4151,11 @@ function AdminPanel() {
     }
 
     function handleNailCameraSelection(event: React.ChangeEvent<HTMLInputElement>) {
-        const input = event.currentTarget;
-        const rawFiles = Array.from(input.files ?? []);
-
-        if (!rawFiles.length) {
-            setNailRecordError(
-                "Nenhuma foto foi recebida. Se você abriu a câmera, tire a foto e confirme em Usar foto/OK antes de voltar ao site.",
-            );
-            input.value = "";
-            return;
-        }
-
-        const selectedFiles = rawFiles
-            .filter((file) => file.type.startsWith("image/") || !file.type)
-            .map((file, index) => {
-                // Cria uma cópia independente do <input>. Alguns navegadores móveis
-                // liberam o arquivo temporário da câmera quando o input é limpo.
-                const safeType = file.type || "image/jpeg";
-                const fallbackName = `foto-unha-${Date.now()}-${index + 1}.jpg`;
-                return new File([file], file.name || fallbackName, {
-                    type: safeType,
-                    lastModified: file.lastModified || Date.now(),
-                });
-            });
+        const selectedFiles = Array.from(event.target.files ?? [])
+            .filter((file) => file.type.startsWith("image/"));
 
         if (!selectedFiles.length) {
-            setNailRecordError("O arquivo retornado pela câmera não foi reconhecido como imagem.");
-            input.value = "";
+            event.currentTarget.value = "";
             return;
         }
 
@@ -4208,21 +4165,14 @@ function AdminPanel() {
 
         if (oversizedFile) {
             setNailRecordError("Cada foto pode ter no máximo 12 MB.");
-            input.value = "";
+            event.currentTarget.value = "";
             return;
         }
 
         setNailRecordError("");
-        setNailRecordSuccess(
-            selectedFiles.length === 1
-                ? "Foto adicionada. Escreva a observação e toque em Salvar registro."
-                : `${selectedFiles.length} fotos adicionadas.`,
-        );
+        setNailRecordSuccess("");
         setNailRecordFiles((current) => [...current, ...selectedFiles].slice(0, 6));
-
-        // Só limpamos depois de copiar os blobs acima, permitindo tirar outra foto
-        // com o mesmo input sem perder a foto já capturada.
-        input.value = "";
+        event.currentTarget.value = "";
     }
 
     function removeNailRecordFile(index: number) {
@@ -5037,7 +4987,6 @@ function AdminPanel() {
                                         {client.nextAppointment && <div className="admin-client-card__next"><span>Próximo</span><strong>{formatAdminDate(client.nextAppointment.appointment_date)} às {String(client.nextAppointment.start_time).slice(0, 5)}</strong></div>}
                                         <div className="admin-client-card__actions">
                                             <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
-                                            <button type="button" className="is-nail-record" onClick={() => openNailRecordForClient(client)}>📷 Registrar estado da unha</button>
                                             <button type="button" className="is-secondary" onClick={() => openClientEditor(client)}>Editar cadastro</button>
                                             <button type="button" className="is-danger" disabled={deletingClientKey === client.key} onClick={() => void deleteClient(client)}>{deletingClientKey === client.key ? "Excluindo..." : "Remover da lista"}</button>
                                         </div>
@@ -5054,7 +5003,6 @@ function AdminPanel() {
                                 <form className="admin-manual-form" onSubmit={createManualAppointment}>
                                     <label>Nome da cliente<input value={manualClientName} onChange={(event) => setManualClientName(event.target.value)} required/></label>
                                     <label>Telefone<input value={manualClientPhone} onChange={(event) => setManualClientPhone(event.target.value)} required/></label>
-                                    <label className="admin-manual-form__email">E-mail<input type="email" value={manualClientEmail} onChange={(event) => setManualClientEmail(event.target.value)}/></label>
                                     <label>Serviço<select value={manualServiceName} onChange={(event) => setManualServiceName(event.target.value)}>{adminServices.map((service) => <option key={service.id} value={service.name}>{service.name} — {service.duration_minutes} min</option>)}</select></label>
                                     <label>Data<input type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} required/></label>
                                     <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)}>{allDayTimes.map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
