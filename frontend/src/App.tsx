@@ -3854,22 +3854,21 @@ function AdminPanel() {
     async function createManualAppointment(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setManualError("");
+        if (!manualDate || !manualTime) {
+            setManualError("Escolha a data e o horário.");
+            return;
+        }
+
         const now = new Date();
-        const today = formatDateForInput(now);
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const selectedDateTime = new Date(`${manualDate}T${manualTime}:00`);
 
-        if (!manualDate) {
-            setManualError("Selecione uma data para o agendamento.");
+        if (Number.isNaN(selectedDateTime.getTime())) {
+            setManualError("Data ou horário inválido.");
             return;
         }
 
-        if (manualDate < today) {
-            setManualError("Não é possível criar um agendamento para uma data que já passou.");
-            return;
-        }
-
-        if (manualDate === today && (!manualTime || timeToMinutes(manualTime) <= currentMinutes)) {
-            setManualError("Não é possível criar um agendamento para um horário que já passou.");
+        if (selectedDateTime.getTime() <= now.getTime()) {
+            setManualError("Não é possível criar um agendamento em uma data ou horário que já passou.");
             return;
         }
 
@@ -3882,10 +3881,6 @@ function AdminPanel() {
         }
         if (manualClientName.trim().length < 3 || manualClientPhone.replace(/\D/g, "").length < 10) {
             setManualError("Informe nome completo e telefone válido.");
-            return;
-        }
-        if (!manualDate || !manualTime) {
-            setManualError("Escolha a data e o horário.");
             return;
         }
         if (appointmentConflicts("", manualDate, manualTime, service.duration_minutes)) {
