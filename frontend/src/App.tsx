@@ -931,6 +931,31 @@ type AdminClient = {
     nextAppointment: AdminAppointment | null;
 };
 
+type ClientProfile = {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string | null;
+    created_at?: string;
+    updated_at?: string;
+};
+
+type NailRecordPhoto = {
+    id: string;
+    nail_record_id: string;
+    photo_path: string;
+    created_at: string;
+    signedUrl?: string;
+};
+
+type NailRecord = {
+    id: string;
+    client_id: string;
+    notes: string | null;
+    created_at: string;
+    photos: NailRecordPhoto[];
+};
+
 const dayNames = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 const adminStyles = `
@@ -1461,6 +1486,11 @@ const adminStyles = `
 .admin-client-card__actions button.is-secondary {
     background: #eadde1;
     color: #6d3445;
+}
+
+.admin-client-card__actions button.is-nail-record {
+    background: #8b5264;
+    color: #fff;
 }
 
 .admin-client-history,
@@ -3301,6 +3331,306 @@ const adminEnhancementStyles = `
     }
 }
 
+
+/* REGISTROS FOTOGRÁFICOS DAS UNHAS */
+
+.admin-client-history {
+    width: min(100%, 820px);
+}
+
+.admin-client-history__section {
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid #eee4e7;
+}
+
+.admin-client-history__section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.admin-client-history__section-header h3 {
+    margin: 0;
+    color: #35272c;
+    font-size: 1.05rem;
+}
+
+.admin-client-history__section-header p {
+    margin: 5px 0 0;
+    color: #80666e;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.admin-nail-record__new-button {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 11px;
+    padding: 11px 14px;
+    background: #6d3445;
+    color: #fff;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.admin-nail-form {
+    display: grid;
+    gap: 15px;
+    margin-bottom: 18px;
+    padding: 18px;
+    border: 1px solid #e8d8dd;
+    border-radius: 16px;
+    background: #fcf8f9;
+}
+
+.admin-nail-form__camera-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.admin-nail-form__file-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid #cfaab5;
+    border-radius: 11px;
+    background: #fff;
+    color: #6d3445;
+    font-size: 0.8rem;
+    font-weight: 900;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.admin-nail-form__file-button.is-camera {
+    background: linear-gradient(135deg, #a86175, #6d3445);
+    border-color: transparent;
+    color: #fff;
+}
+
+.admin-nail-form__file-button input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.admin-nail-form textarea {
+    width: 100%;
+    min-height: 100px;
+    resize: vertical;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 12px 13px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+
+.admin-nail-form textarea:focus {
+    outline: 2px solid rgba(184, 120, 139, 0.26);
+    border-color: #a96679;
+}
+
+.admin-nail-form__previews {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.admin-nail-form__preview {
+    position: relative;
+    overflow: hidden;
+    border-radius: 13px;
+    aspect-ratio: 1;
+    background: #efe3e7;
+}
+
+.admin-nail-form__preview img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.admin-nail-form__preview button {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(45, 25, 31, 0.84);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.admin-nail-form__hint,
+.admin-nail-form__message {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.admin-nail-form__hint {
+    color: #80666e;
+}
+
+.admin-nail-form__message.is-error {
+    color: #a02f3d;
+}
+
+.admin-nail-form__message.is-success {
+    color: #287c4a;
+}
+
+.admin-nail-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.admin-nail-form__actions button {
+    border: 0;
+    border-radius: 11px;
+    padding: 12px 15px;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.admin-nail-form__actions .save {
+    background: #6d3445;
+    color: #fff;
+}
+
+.admin-nail-form__actions .cancel {
+    background: #eadde1;
+    color: #6d3445;
+}
+
+.admin-nail-form__actions button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.admin-nail-records {
+    display: grid;
+    gap: 13px;
+}
+
+.admin-nail-record {
+    padding: 15px;
+    border: 1px solid #eadde1;
+    border-radius: 15px;
+    background: #fff;
+}
+
+.admin-nail-record__top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.admin-nail-record__top strong {
+    color: #4d363e;
+}
+
+.admin-nail-record__top span {
+    color: #8a7078;
+    font-size: 0.76rem;
+    white-space: nowrap;
+}
+
+.admin-nail-record__notes {
+    margin: 10px 0 0;
+    color: #654d55;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.admin-nail-record__photos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+    margin-top: 13px;
+}
+
+.admin-nail-record__photos a {
+    overflow: hidden;
+    border-radius: 12px;
+    aspect-ratio: 1;
+    background: #efe3e7;
+}
+
+.admin-nail-record__photos img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.admin-nail-records__empty,
+.admin-nail-records__loading {
+    padding: 18px;
+    border-radius: 13px;
+    background: #faf5f7;
+    color: #80666e;
+    text-align: center;
+    font-size: 0.84rem;
+}
+
+@media (max-width: 620px) {
+    .admin-client-history {
+        width: min(100%, 650px);
+        padding: 19px;
+    }
+
+    .admin-client-history__section-header {
+        flex-direction: column;
+    }
+
+    .admin-nail-record__new-button {
+        width: 100%;
+    }
+
+    .admin-nail-form__camera-actions,
+    .admin-nail-form__actions {
+        flex-direction: column;
+    }
+
+    .admin-nail-form__file-button,
+    .admin-nail-form__actions button {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .admin-nail-form__previews,
+    .admin-nail-record__photos {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-nail-record__top {
+        flex-direction: column;
+    }
+}
+
 `;
 
 
@@ -3362,6 +3692,29 @@ function AdminPanel() {
     const [clientEditError, setClientEditError] = useState("");
     const [isSavingClient, setIsSavingClient] = useState(false);
     const [deletingClientKey, setDeletingClientKey] = useState("");
+
+    const [nailRecords, setNailRecords] = useState<NailRecord[]>([]);
+    const [isLoadingNailRecords, setIsLoadingNailRecords] = useState(false);
+    const [showNailRecordForm, setShowNailRecordForm] = useState(false);
+    const [nailRecordNotes, setNailRecordNotes] = useState("");
+    const [nailRecordFiles, setNailRecordFiles] = useState<File[]>([]);
+    const [nailRecordError, setNailRecordError] = useState("");
+    const [nailRecordSuccess, setNailRecordSuccess] = useState("");
+    const [isSavingNailRecord, setIsSavingNailRecord] = useState(false);
+
+    const nailRecordFilePreviews = useMemo(
+        () => nailRecordFiles.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+        })),
+        [nailRecordFiles],
+    );
+
+    useEffect(() => {
+        return () => {
+            nailRecordFilePreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+        };
+    }, [nailRecordFilePreviews]);
 
     const [blockDate, setBlockDate] = useState(formatDateForInput(new Date()));
     const [selectedBlockTimes, setSelectedBlockTimes] = useState<string[]>([]);
@@ -3666,6 +4019,338 @@ function AdminPanel() {
         setAppointments((current) => current.filter((item) => item.id !== appointment.id));
         setSelectedAdminAppointment(null);
     }
+
+    function normalizeClientPhone(value: string) {
+        return value.replace(/\D/g, "");
+    }
+
+    function resetNailRecordForm() {
+        setShowNailRecordForm(false);
+        setNailRecordNotes("");
+        setNailRecordFiles([]);
+        setNailRecordError("");
+        setNailRecordSuccess("");
+    }
+
+    function openClientHistory(client: AdminClient) {
+        resetNailRecordForm();
+        setNailRecords([]);
+        setSelectedClient(client);
+    }
+
+    function openNailRecordForClient(client: AdminClient) {
+        resetNailRecordForm();
+        setNailRecords([]);
+        setSelectedClient(client);
+        setShowNailRecordForm(true);
+    }
+
+    function closeClientHistory() {
+        resetNailRecordForm();
+        setNailRecords([]);
+        setSelectedClient(null);
+    }
+
+    async function findClientProfile(client: AdminClient): Promise<ClientProfile | null> {
+        const {data, error} = await supabase
+            .from("client_profiles")
+            .select("id, full_name, phone, email, created_at, updated_at");
+
+        if (error) {
+            throw error;
+        }
+
+        const clientPhoneDigits = normalizeClientPhone(client.phone);
+
+        const matchingProfile = ((data ?? []) as ClientProfile[]).find((profile) => {
+            const profilePhoneDigits = normalizeClientPhone(profile.phone ?? "");
+            return Boolean(clientPhoneDigits && profilePhoneDigits === clientPhoneDigits);
+        });
+
+        return matchingProfile ?? null;
+    }
+
+    async function ensureClientProfile(client: AdminClient): Promise<ClientProfile> {
+        const existingProfile = await findClientProfile(client);
+
+        if (existingProfile) {
+            return existingProfile;
+        }
+
+        const {data, error} = await supabase
+            .from("client_profiles")
+            .insert({
+                full_name: client.name.trim(),
+                phone: client.phone.trim(),
+                email: client.email.trim(),
+            })
+            .select("id, full_name, phone, email, created_at, updated_at")
+            .single();
+
+        if (error || !data) {
+            throw error ?? new Error("Não foi possível criar o perfil da cliente.");
+        }
+
+        return data as ClientProfile;
+    }
+
+    async function loadNailRecordsForClient(client: AdminClient) {
+        setIsLoadingNailRecords(true);
+        setNailRecordError("");
+
+        try {
+            const profile = await findClientProfile(client);
+
+            if (!profile) {
+                setNailRecords([]);
+                return;
+            }
+
+            const {data: recordData, error: recordError} = await supabase
+                .from("nail_records")
+                .select("id, client_id, notes, created_at")
+                .eq("client_id", profile.id)
+                .order("created_at", {ascending: false});
+
+            if (recordError) {
+                throw recordError;
+            }
+
+            const records = (recordData ?? []) as Omit<NailRecord, "photos">[];
+
+            if (!records.length) {
+                setNailRecords([]);
+                return;
+            }
+
+            const recordIds = records.map((record) => record.id);
+
+            const {data: photoData, error: photoError} = await supabase
+                .from("nail_record_photos")
+                .select("id, nail_record_id, photo_path, created_at")
+                .in("nail_record_id", recordIds)
+                .order("created_at", {ascending: true});
+
+            if (photoError) {
+                throw photoError;
+            }
+
+            const photosWithSignedUrls = await Promise.all(
+                ((photoData ?? []) as NailRecordPhoto[]).map(async (photo) => {
+                    const {data: signedData, error: signedError} = await supabase
+                        .storage
+                        .from("nail-records")
+                        .createSignedUrl(photo.photo_path, 60 * 60);
+
+                    if (signedError) {
+                        console.error("Erro ao gerar URL temporária da foto:", signedError);
+                        return photo;
+                    }
+
+                    return {
+                        ...photo,
+                        signedUrl: signedData.signedUrl,
+                    };
+                }),
+            );
+
+            setNailRecords(
+                records.map((record) => ({
+                    ...record,
+                    photos: photosWithSignedUrls.filter(
+                        (photo) => photo.nail_record_id === record.id,
+                    ),
+                })),
+            );
+        } catch (error) {
+            console.error("Erro ao carregar registros das unhas:", error);
+            setNailRecordError("Não foi possível carregar os registros das unhas.");
+            setNailRecords([]);
+        } finally {
+            setIsLoadingNailRecords(false);
+        }
+    }
+
+    function handleNailCameraSelection(event: React.ChangeEvent<HTMLInputElement>) {
+        const input = event.currentTarget;
+        const rawFiles = Array.from(input.files ?? []);
+
+        if (!rawFiles.length) {
+            setNailRecordError(
+                "Nenhuma foto foi recebida. Se você abriu a câmera, tire a foto e confirme em Usar foto/OK antes de voltar ao site.",
+            );
+            input.value = "";
+            return;
+        }
+
+        const selectedFiles = rawFiles
+            .filter((file) => file.type.startsWith("image/") || !file.type)
+            .map((file, index) => {
+                // Cria uma cópia independente do <input>. Alguns navegadores móveis
+                // liberam o arquivo temporário da câmera quando o input é limpo.
+                const safeType = file.type || "image/jpeg";
+                const fallbackName = `foto-unha-${Date.now()}-${index + 1}.jpg`;
+                return new File([file], file.name || fallbackName, {
+                    type: safeType,
+                    lastModified: file.lastModified || Date.now(),
+                });
+            });
+
+        if (!selectedFiles.length) {
+            setNailRecordError("O arquivo retornado pela câmera não foi reconhecido como imagem.");
+            input.value = "";
+            return;
+        }
+
+        const oversizedFile = selectedFiles.find(
+            (file) => file.size > 12 * 1024 * 1024,
+        );
+
+        if (oversizedFile) {
+            setNailRecordError("Cada foto pode ter no máximo 12 MB.");
+            input.value = "";
+            return;
+        }
+
+        setNailRecordError("");
+        setNailRecordSuccess(
+            selectedFiles.length === 1
+                ? "Foto adicionada. Escreva a observação e toque em Salvar registro."
+                : `${selectedFiles.length} fotos adicionadas.`,
+        );
+        setNailRecordFiles((current) => [...current, ...selectedFiles].slice(0, 6));
+
+        // Só limpamos depois de copiar os blobs acima, permitindo tirar outra foto
+        // com o mesmo input sem perder a foto já capturada.
+        input.value = "";
+    }
+
+    function removeNailRecordFile(index: number) {
+        setNailRecordFiles((current) =>
+            current.filter((_, currentIndex) => currentIndex !== index),
+        );
+    }
+
+    async function saveNailRecord() {
+        if (!selectedClient) {
+            return;
+        }
+
+        setNailRecordError("");
+        setNailRecordSuccess("");
+
+        if (!nailRecordFiles.length) {
+            setNailRecordError("Tire pelo menos uma foto da unha antes de salvar.");
+            return;
+        }
+
+        setIsSavingNailRecord(true);
+
+        let createdRecordId: string | null = null;
+        const uploadedPaths: string[] = [];
+
+        try {
+            const profile = await ensureClientProfile(selectedClient);
+
+            const {data: recordData, error: recordError} = await supabase
+                .from("nail_records")
+                .insert({
+                    client_id: profile.id,
+                    notes: nailRecordNotes.trim() || null,
+                })
+                .select("id, client_id, notes, created_at")
+                .single();
+
+            if (recordError || !recordData) {
+                throw recordError ?? new Error("Não foi possível criar o registro.");
+            }
+
+            createdRecordId = recordData.id;
+
+            const photoRows: Array<{
+                nail_record_id: string;
+                photo_path: string;
+            }> = [];
+
+            for (let index = 0; index < nailRecordFiles.length; index += 1) {
+                const file = nailRecordFiles[index];
+                const originalExtension = file.name.includes(".")
+                    ? file.name.split(".").pop()?.toLowerCase()
+                    : "";
+                const safeExtension = originalExtension?.replace(/[^a-z0-9]/g, "") || "jpg";
+                const uniqueId =
+                    typeof crypto !== "undefined" && "randomUUID" in crypto
+                        ? crypto.randomUUID()
+                        : `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`;
+
+                const photoPath =
+                    `${profile.id}/${recordData.id}/${uniqueId}.${safeExtension}`;
+
+                const {error: uploadError} = await supabase
+                    .storage
+                    .from("nail-records")
+                    .upload(photoPath, file, {
+                        cacheControl: "3600",
+                        upsert: false,
+                        contentType: file.type || "image/jpeg",
+                    });
+
+                if (uploadError) {
+                    throw uploadError;
+                }
+
+                uploadedPaths.push(photoPath);
+                photoRows.push({
+                    nail_record_id: recordData.id,
+                    photo_path: photoPath,
+                });
+            }
+
+            const {error: photoInsertError} = await supabase
+                .from("nail_record_photos")
+                .insert(photoRows);
+
+            if (photoInsertError) {
+                throw photoInsertError;
+            }
+
+            setNailRecordNotes("");
+            setNailRecordFiles([]);
+            setShowNailRecordForm(false);
+            setNailRecordSuccess("Registro da unha salvo com sucesso.");
+
+            await loadNailRecordsForClient(selectedClient);
+        } catch (error) {
+            console.error("Erro ao salvar registro da unha:", error);
+
+            if (uploadedPaths.length) {
+                await supabase.storage.from("nail-records").remove(uploadedPaths);
+            }
+
+            if (createdRecordId) {
+                await supabase
+                    .from("nail_records")
+                    .delete()
+                    .eq("id", createdRecordId);
+            }
+
+            setNailRecordError(
+                "Não foi possível salvar o registro. Confira a conexão e tente novamente.",
+            );
+        } finally {
+            setIsSavingNailRecord(false);
+        }
+    }
+
+    useEffect(() => {
+        if (!isAuthenticated || !selectedClient) {
+            setNailRecords([]);
+            setIsLoadingNailRecords(false);
+            return;
+        }
+
+        void loadNailRecordsForClient(selectedClient);
+    }, [isAuthenticated, selectedClient?.key]);
 
     const clients = useMemo<AdminClient[]>(() => {
         const grouped = new Map<string, AdminAppointment[]>();
@@ -4351,7 +5036,8 @@ function AdminPanel() {
                                         <div className="admin-client-card__metrics"><div><span>Atendimentos realizados</span><strong>{realized}</strong></div><div><span>Atendimentos cancelados</span><strong>{cancelled}</strong></div></div>
                                         {client.nextAppointment && <div className="admin-client-card__next"><span>Próximo</span><strong>{formatAdminDate(client.nextAppointment.appointment_date)} às {String(client.nextAppointment.start_time).slice(0, 5)}</strong></div>}
                                         <div className="admin-client-card__actions">
-                                            <button type="button" onClick={() => setSelectedClient(client)}>Ver histórico</button>
+                                            <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
+                                            <button type="button" className="is-nail-record" onClick={() => openNailRecordForClient(client)}>📷 Registrar estado da unha</button>
                                             <button type="button" className="is-secondary" onClick={() => openClientEditor(client)}>Editar cadastro</button>
                                             <button type="button" className="is-danger" disabled={deletingClientKey === client.key} onClick={() => void deleteClient(client)}>{deletingClientKey === client.key ? "Excluindo..." : "Remover da lista"}</button>
                                         </div>
@@ -4426,12 +5112,188 @@ function AdminPanel() {
                 )}
 
                 {selectedClient && (
-                    <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedClient(null);}}>
+                    <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) closeClientHistory();}}>
                         <section className="admin-client-history">
-                            <button className="admin-modal__close" type="button" onClick={() => setSelectedClient(null)}>×</button>
+                            <button className="admin-modal__close" type="button" onClick={closeClientHistory}>×</button>
                             <h2>Histórico de {selectedClient.name}</h2>
                             <p>{selectedClient.phone} • {selectedClient.email || "E-mail não informado"}</p>
-                            <div className="admin-client-history__list">{selectedClient.appointments.map((appointment) => <article key={appointment.id}><div><strong>{appointment.service_name}</strong><span>{formatAdminDate(appointment.appointment_date)} às {String(appointment.start_time).slice(0, 5)}</span></div><span>{getAppointmentStatusLabel(appointment.status)}</span></article>)}</div>
+
+                            <section className="admin-client-history__section">
+                                <div className="admin-client-history__section-header">
+                                    <div>
+                                        <h3>Registros das unhas</h3>
+                                        <p>Fotos e observações ficam vinculadas ao perfil da cliente com data e hora do registro.</p>
+                                    </div>
+                                    <button
+                                        className="admin-nail-record__new-button"
+                                        type="button"
+                                        onClick={() => {
+                                            setShowNailRecordForm((current) => !current);
+                                            setNailRecordError("");
+                                            setNailRecordSuccess("");
+                                        }}
+                                    >
+                                        {showNailRecordForm ? "Fechar registro" : "Registrar estado da unha"}
+                                    </button>
+                                </div>
+
+                                {showNailRecordForm && (
+                                    <div className="admin-nail-form">
+                                        <div className="admin-nail-form__camera-actions">
+                                            <label className="admin-nail-form__file-button is-camera">
+                                                📷 Abrir câmera
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    onChange={handleNailCameraSelection}
+                                                />
+                                            </label>
+
+                                            <label className="admin-nail-form__file-button">
+                                                Escolher da galeria
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    onChange={handleNailCameraSelection}
+                                                />
+                                            </label>
+                                        </div>
+
+                                        <p className="admin-nail-form__hint">
+                                            Você pode adicionar até 6 fotos por registro. No celular, “Abrir câmera” solicita a câmera traseira quando o navegador oferece suporte.
+                                        </p>
+
+                                        {nailRecordFilePreviews.length > 0 && (
+                                            <div className="admin-nail-form__previews">
+                                                {nailRecordFilePreviews.map((preview, index) => (
+                                                    <div className="admin-nail-form__preview" key={`${preview.file.name}-${preview.file.lastModified}-${index}`}>
+                                                        <img src={preview.url} alt={`Foto selecionada ${index + 1}`}/>
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Remover foto ${index + 1}`}
+                                                            onClick={() => removeNailRecordFile(index)}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <label>
+                                            <strong>Observação sobre a unha</strong>
+                                            <textarea
+                                                value={nailRecordNotes}
+                                                onChange={(event) => setNailRecordNotes(event.target.value)}
+                                                placeholder="Ex.: pequena fissura no indicador direito, unha fragilizada, descolamento pré-existente..."
+                                                maxLength={1500}
+                                            />
+                                        </label>
+
+                                        {nailRecordError && (
+                                            <p className="admin-nail-form__message is-error">{nailRecordError}</p>
+                                        )}
+
+                                        <div className="admin-nail-form__actions">
+                                            <button
+                                                className="save"
+                                                type="button"
+                                                disabled={isSavingNailRecord}
+                                                onClick={() => void saveNailRecord()}
+                                            >
+                                                {isSavingNailRecord ? "Salvando registro..." : "Salvar registro"}
+                                            </button>
+                                            <button
+                                                className="cancel"
+                                                type="button"
+                                                disabled={isSavingNailRecord}
+                                                onClick={resetNailRecordForm}
+                                            >
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {nailRecordSuccess && (
+                                    <p className="admin-nail-form__message is-success">{nailRecordSuccess}</p>
+                                )}
+
+                                {isLoadingNailRecords ? (
+                                    <div className="admin-nail-records__loading">Carregando registros das unhas...</div>
+                                ) : nailRecords.length ? (
+                                    <div className="admin-nail-records">
+                                        {nailRecords.map((record) => (
+                                            <article className="admin-nail-record" key={record.id}>
+                                                <div className="admin-nail-record__top">
+                                                    <strong>Registro fotográfico</strong>
+                                                    <span>
+                                                        {new Date(record.created_at).toLocaleString("pt-BR", {
+                                                            day: "2-digit",
+                                                            month: "2-digit",
+                                                            year: "numeric",
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                        })}
+                                                    </span>
+                                                </div>
+
+                                                <p className="admin-nail-record__notes">
+                                                    {record.notes || "Sem observação informada."}
+                                                </p>
+
+                                                {record.photos.length > 0 && (
+                                                    <div className="admin-nail-record__photos">
+                                                        {record.photos.map((photo, index) =>
+                                                            photo.signedUrl ? (
+                                                                <a
+                                                                    key={photo.id}
+                                                                    href={photo.signedUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    title="Abrir foto em tamanho maior"
+                                                                >
+                                                                    <img
+                                                                        src={photo.signedUrl}
+                                                                        alt={`Registro da unha ${index + 1}`}
+                                                                    />
+                                                                </a>
+                                                            ) : null,
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </article>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="admin-nail-records__empty">
+                                        Nenhum registro da unha salvo para esta cliente.
+                                    </div>
+                                )}
+                            </section>
+
+                            <section className="admin-client-history__section">
+                                <div className="admin-client-history__section-header">
+                                    <div>
+                                        <h3>Histórico de atendimentos</h3>
+                                        <p>Agendamentos registrados para esta cliente.</p>
+                                    </div>
+                                </div>
+
+                                <div className="admin-client-history__list">
+                                    {selectedClient.appointments.map((appointment) => (
+                                        <article key={appointment.id}>
+                                            <div>
+                                                <strong>{appointment.service_name}</strong>
+                                                <span>{formatAdminDate(appointment.appointment_date)} às {String(appointment.start_time).slice(0, 5)}</span>
+                                            </div>
+                                            <span>{getAppointmentStatusLabel(appointment.status)}</span>
+                                        </article>
+                                    ))}
+                                </div>
+                            </section>
                         </section>
                     </div>
                 )}
