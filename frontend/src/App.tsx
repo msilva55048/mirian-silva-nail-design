@@ -4053,19 +4053,44 @@ function AdminPanel() {
 
         const clientPhoneDigits = normalizeClientPhone(client.phone);
 
-        const matchingProfile = ((data ?? []) as ClientProfile[]).find((profile) => {
-            const profilePhoneDigits = normalizeClientPhone(profile.phone ?? "");
-            return Boolean(clientPhoneDigits && profilePhoneDigits === clientPhoneDigits);
-        });
+        if (clientPhoneDigits) {
+            const matchedByPhone =
+                (data ?? []).find(
+                    (profile) =>
+                        normalizeClientPhone(profile.phone ?? "") === clientPhoneDigits,
+                ) ?? null;
 
-        return matchingProfile ?? null;
+            if (matchedByPhone) {
+                return matchedByPhone;
+            }
+        }
+
+        return null;
     }
 
     async function ensureClientProfile(client: AdminClient): Promise<ClientProfile> {
         const existingProfile = await findClientProfile(client);
 
         if (existingProfile) {
-            return existingProfile;
+            const updates = {
+                full_name: client.name.trim(),
+                phone: client.phone.trim(),
+                email: client.email.trim() || null,
+                updated_at: new Date().toISOString(),
+            };
+
+            const {data: updatedProfile, error: updateError} = await supabase
+                .from("client_profiles")
+                .update(updates)
+                .eq("id", existingProfile.id)
+                .select("id, full_name, phone, email, created_at, updated_at")
+                .single();
+
+            if (updateError) {
+                throw updateError;
+            }
+
+            return updatedProfile as ClientProfile;
         }
 
         const {data, error} = await supabase
@@ -4078,8 +4103,8 @@ function AdminPanel() {
             .select("id, full_name, phone, email, created_at, updated_at")
             .single();
 
-        if (error || !data) {
-            throw error ?? new Error("Não foi possível criar o perfil da cliente.");
+        if (error) {
+            throw error;
         }
 
         return data as ClientProfile;
@@ -4317,8 +4342,8 @@ function AdminPanel() {
     const clients = useMemo<AdminClient[]>(() => {
         const grouped = new Map<string, AdminAppointment[]>();
         appointments.filter((appointment) => !appointment.client_hidden).forEach((appointment) => {
-            const digits = appointment.client_phone.replace(/\D/g, "");
-            const key = digits || appointment.client_name.trim().toLowerCase().replace(/\s+/g, "-");
+            const digits = normalizeClientPhone(appointment.client_phone);
+            const key = digits || appointment.id;
             grouped.set(key, [...(grouped.get(key) ?? []), appointment]);
         });
         const now = new Date();
