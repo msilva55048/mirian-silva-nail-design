@@ -1488,6 +1488,11 @@ const adminStyles = `
     color: #6d3445;
 }
 
+.admin-client-card__actions button.is-nail-record {
+    background: #8b5264;
+    color: #fff;
+}
+
 .admin-client-history,
 .admin-client-editor {
     position: relative;
@@ -2263,6 +2268,9 @@ const adminStyles = `
     font: inherit;
 }
 
+.admin-manual-form__email {
+    grid-column: span 2;
+}
 
 .admin-manual-form__actions {
     display: flex;
@@ -2319,6 +2327,10 @@ const adminStyles = `
 @media (max-width: 1050px) {
     .admin-manual-form {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .admin-manual-form__email {
+        grid-column: auto;
     }
 
     .admin-manual-form__actions {
@@ -4024,6 +4036,13 @@ function AdminPanel() {
         setSelectedClient(client);
     }
 
+    function openNailRecordForClient(client: AdminClient) {
+        resetNailRecordForm();
+        setNailRecords([]);
+        setSelectedClient(client);
+        setShowNailRecordForm(true);
+    }
+
     function closeClientHistory() {
         resetNailRecordForm();
         setNailRecords([]);
@@ -4061,7 +4080,7 @@ function AdminPanel() {
             .insert({
                 full_name: client.name.trim(),
                 phone: client.phone.trim(),
-                email: client.email.trim() || null,
+                email: client.email.trim(),
             })
             .select("id, full_name, phone, email, created_at, updated_at")
             .single();
@@ -4151,11 +4170,33 @@ function AdminPanel() {
     }
 
     function handleNailCameraSelection(event: React.ChangeEvent<HTMLInputElement>) {
-        const selectedFiles = Array.from(event.target.files ?? [])
-            .filter((file) => file.type.startsWith("image/"));
+        const input = event.currentTarget;
+        const rawFiles = Array.from(input.files ?? []);
+
+        if (!rawFiles.length) {
+            setNailRecordError(
+                "Nenhuma foto foi recebida. Se você abriu a câmera, tire a foto e confirme em Usar foto/OK antes de voltar ao site.",
+            );
+            input.value = "";
+            return;
+        }
+
+        const selectedFiles = rawFiles
+            .filter((file) => file.type.startsWith("image/") || !file.type)
+            .map((file, index) => {
+                // Cria uma cópia independente do <input>. Alguns navegadores móveis
+                // liberam o arquivo temporário da câmera quando o input é limpo.
+                const safeType = file.type || "image/jpeg";
+                const fallbackName = `foto-unha-${Date.now()}-${index + 1}.jpg`;
+                return new File([file], file.name || fallbackName, {
+                    type: safeType,
+                    lastModified: file.lastModified || Date.now(),
+                });
+            });
 
         if (!selectedFiles.length) {
-            event.currentTarget.value = "";
+            setNailRecordError("O arquivo retornado pela câmera não foi reconhecido como imagem.");
+            input.value = "";
             return;
         }
 
@@ -4165,14 +4206,21 @@ function AdminPanel() {
 
         if (oversizedFile) {
             setNailRecordError("Cada foto pode ter no máximo 12 MB.");
-            event.currentTarget.value = "";
+            input.value = "";
             return;
         }
 
         setNailRecordError("");
-        setNailRecordSuccess("");
+        setNailRecordSuccess(
+            selectedFiles.length === 1
+                ? "Foto adicionada. Escreva a observação e toque em Salvar registro."
+                : `${selectedFiles.length} fotos adicionadas.`,
+        );
         setNailRecordFiles((current) => [...current, ...selectedFiles].slice(0, 6));
-        event.currentTarget.value = "";
+
+        // Só limpamos depois de copiar os blobs acima, permitindo tirar outra foto
+        // com o mesmo input sem perder a foto já capturada.
+        input.value = "";
     }
 
     function removeNailRecordFile(index: number) {
@@ -4987,6 +5035,7 @@ function AdminPanel() {
                                         {client.nextAppointment && <div className="admin-client-card__next"><span>Próximo</span><strong>{formatAdminDate(client.nextAppointment.appointment_date)} às {String(client.nextAppointment.start_time).slice(0, 5)}</strong></div>}
                                         <div className="admin-client-card__actions">
                                             <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
+                                            <button type="button" className="is-nail-record" onClick={() => openNailRecordForClient(client)}>📷 Registrar estado da unha</button>
                                             <button type="button" className="is-secondary" onClick={() => openClientEditor(client)}>Editar cadastro</button>
                                             <button type="button" className="is-danger" disabled={deletingClientKey === client.key} onClick={() => void deleteClient(client)}>{deletingClientKey === client.key ? "Excluindo..." : "Remover da lista"}</button>
                                         </div>
