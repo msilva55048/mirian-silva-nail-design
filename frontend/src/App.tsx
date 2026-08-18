@@ -1488,6 +1488,11 @@ const adminStyles = `
     color: #6d3445;
 }
 
+.admin-client-card__actions button.is-nail-record {
+    background: #9a5368;
+    color: #fff;
+}
+
 .admin-client-history,
 .admin-client-editor {
     position: relative;
@@ -4024,6 +4029,13 @@ function AdminPanel() {
         setSelectedClient(client);
     }
 
+    function openNailRecordForClient(client: AdminClient) {
+        resetNailRecordForm();
+        setNailRecords([]);
+        setSelectedClient(client);
+        setShowNailRecordForm(true);
+    }
+
     function closeClientHistory() {
         resetNailRecordForm();
         setNailRecords([]);
@@ -4987,6 +4999,7 @@ function AdminPanel() {
                                         {client.nextAppointment && <div className="admin-client-card__next"><span>Próximo</span><strong>{formatAdminDate(client.nextAppointment.appointment_date)} às {String(client.nextAppointment.start_time).slice(0, 5)}</strong></div>}
                                         <div className="admin-client-card__actions">
                                             <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
+                                            <button type="button" className="is-nail-record" onClick={() => openNailRecordForClient(client)}>📷 Registrar estado da unha</button>
                                             <button type="button" className="is-secondary" onClick={() => openClientEditor(client)}>Editar cadastro</button>
                                             <button type="button" className="is-danger" disabled={deletingClientKey === client.key} onClick={() => void deleteClient(client)}>{deletingClientKey === client.key ? "Excluindo..." : "Remover da lista"}</button>
                                         </div>
