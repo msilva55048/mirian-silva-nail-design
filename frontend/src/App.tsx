@@ -297,6 +297,27 @@ const clientAccountStyles = `
     color: #35272c;
     font: inherit;
 }
+.client-password-field {
+    position: relative;
+}
+.client-password-field input {
+    padding-right: 88px;
+}
+.client-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 9px;
+    padding: 7px 9px;
+    background: #f4e8eb;
+    color: #6d3445;
+    font: inherit;
+    font-size: .76rem;
+    font-weight: 900;
+    cursor: pointer;
+}
 .client-auth-submit,
 .client-account__primary,
 .client-account__logout {
@@ -731,6 +752,7 @@ function PublicSite() {
     const [authPhone, setAuthPhone] = useState("");
     const [authEmail, setAuthEmail] = useState("");
     const [authPassword, setAuthPassword] = useState("");
+    const [showAuthPassword, setShowAuthPassword] = useState(false);
     const [authError, setAuthError] = useState("");
     const [authSuccess, setAuthSuccess] = useState("");
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
@@ -866,6 +888,7 @@ function PublicSite() {
 
     function openClientAuth(mode: "login" | "signup") {
         setClientAuthMode(mode);
+        setShowAuthPassword(false);
         resetAuthMessages();
         setShowClientAuth(true);
     }
@@ -922,7 +945,8 @@ function PublicSite() {
                 if (data.session?.user) {
                     await loadAuthenticatedClient(data.session.user);
                     setShowClientAuth(false);
-                    setShowClientAccount(true);
+                    setShowClientAccount(false);
+                    setShowAuthPassword(false);
                     setAuthPassword("");
                 } else {
                     setAuthSuccess("Conta criada. Confira seu e-mail para confirmar o cadastro e depois faça login.");
@@ -941,7 +965,8 @@ function PublicSite() {
                 }
 
                 setShowClientAuth(false);
-                setShowClientAccount(true);
+                setShowClientAccount(false);
+                setShowAuthPassword(false);
                 setAuthPassword("");
             }
         } catch (error) {
@@ -1914,6 +1939,7 @@ function PublicSite() {
                                 type="button"
                                 onClick={() => {
                                     setClientAuthMode("login");
+                                    setShowAuthPassword(false);
                                     resetAuthMessages();
                                 }}
                             >
@@ -1924,6 +1950,7 @@ function PublicSite() {
                                 type="button"
                                 onClick={() => {
                                     setClientAuthMode("signup");
+                                    setShowAuthPassword(false);
                                     resetAuthMessages();
                                 }}
                             >
@@ -1973,14 +2000,24 @@ function PublicSite() {
 
                             <label>
                                 Senha
-                                <input
-                                    type="password"
-                                    value={authPassword}
-                                    onChange={(event) => setAuthPassword(event.target.value)}
-                                    autoComplete={clientAuthMode === "login" ? "current-password" : "new-password"}
-                                    minLength={6}
-                                    required
-                                />
+                                <div className="client-password-field">
+                                    <input
+                                        type={showAuthPassword ? "text" : "password"}
+                                        value={authPassword}
+                                        onChange={(event) => setAuthPassword(event.target.value)}
+                                        autoComplete={clientAuthMode === "login" ? "current-password" : "new-password"}
+                                        minLength={6}
+                                        required
+                                    />
+                                    <button
+                                        className="client-password-toggle"
+                                        type="button"
+                                        onClick={() => setShowAuthPassword((current) => !current)}
+                                        aria-label={showAuthPassword ? "Ocultar senha" : "Mostrar senha"}
+                                    >
+                                        {showAuthPassword ? "Ocultar" : "Mostrar"}
+                                    </button>
+                                </div>
                             </label>
 
                             {authError && <p className="client-auth-message is-error">{authError}</p>}
@@ -4953,28 +4990,14 @@ function AdminPanel() {
 
         async function checkSession() {
             const {data: {session}} = await supabase.auth.getSession();
-            const isAdmin = sessionIsMirianAdmin(session);
-
-            if (session && !isAdmin) {
-                await supabase.auth.signOut();
-            }
-
-            setIsAuthenticated(isAdmin);
+            setIsAuthenticated(sessionIsMirianAdmin(session));
             setIsCheckingSession(false);
         }
 
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
-            const isAdmin = sessionIsMirianAdmin(session);
-
-            if (session && !isAdmin) {
-                window.setTimeout(() => {
-                    void supabase.auth.signOut();
-                }, 0);
-            }
-
-            setIsAuthenticated(isAdmin);
+            setIsAuthenticated(sessionIsMirianAdmin(session));
             setIsCheckingSession(false);
         });
 
