@@ -348,14 +348,25 @@ const clientAccountStyles = `
 }
 .client-week-days {
     display: grid;
-    grid-template-columns: repeat(7, minmax(66px, 1fr));
     gap: 6px;
-    overflow-x: auto;
+    width: 100%;
     padding: 2px 1px 5px;
-    scrollbar-width: thin;
+    overflow: visible;
+}
+.client-week-days__row {
+    display: grid;
+    gap: 6px;
+    width: 100%;
+}
+.client-week-days__row--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.client-week-days__row--three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .client-week-day {
-    min-width: 66px;
+    width: 100%;
+    min-width: 0;
     border: 1px solid #e0d0d5;
     border-radius: 12px;
     padding: 8px 5px;
@@ -471,7 +482,12 @@ const clientAccountStyles = `
         flex-wrap: wrap;
     }
     .client-week-days {
-        grid-template-columns: repeat(7, 70px);
+        width: 100%;
+        overflow: visible;
+    }
+    .client-week-day {
+        width: 100%;
+        min-width: 0;
     }
 }
 
@@ -2084,31 +2100,41 @@ function PublicSite() {
                                 )}
 
                                 <div className="client-week-days">
-                                    {visibleWeekDates.map((date) => {
-                                        const parsed = parseLocalDate(date);
-                                        const isPast = date < today;
+                                    {[
+                                        {dates: visibleWeekDates.slice(0, 4), rowClass: "client-week-days__row--four"},
+                                        {dates: visibleWeekDates.slice(4, 7), rowClass: "client-week-days__row--three"},
+                                    ].map((row, rowIndex) => (
+                                        <div
+                                            className={`client-week-days__row ${row.rowClass}`}
+                                            key={`week-row-${rowIndex}`}
+                                        >
+                                            {row.dates.map((date) => {
+                                                const parsed = parseLocalDate(date);
+                                                const isPast = date < today;
 
-                                        return (
-                                            <button
-                                                key={date}
-                                                type="button"
-                                                disabled={isPast}
-                                                className={[
-                                                    "client-week-day",
-                                                    date === selectedDate ? "is-selected" : "",
-                                                    isPast ? "is-past" : "",
-                                                ].filter(Boolean).join(" ")}
-                                                onClick={() => selectBookingDate(date)}
-                                            >
-                                            <span>
-                                                {parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}
-                                            </span>
-                                                <strong>
-                                                    {parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}
-                                                </strong>
-                                            </button>
-                                        );
-                                    })}
+                                                return (
+                                                    <button
+                                                        key={date}
+                                                        type="button"
+                                                        disabled={isPast}
+                                                        className={[
+                                                            "client-week-day",
+                                                            date === selectedDate ? "is-selected" : "",
+                                                            isPast ? "is-past" : "",
+                                                        ].filter(Boolean).join(" ")}
+                                                        onClick={() => selectBookingDate(date)}
+                                                    >
+                                                    <span>
+                                                        {parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}
+                                                    </span>
+                                                        <strong>
+                                                            {parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}
+                                                        </strong>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
                                 </div>
 
                                 <div className="client-week-times">
