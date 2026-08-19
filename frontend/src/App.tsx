@@ -109,8 +109,20 @@ function intervalsOverlap(
     return firstStart < secondEnd && firstEnd > secondStart;
 }
 
+function normalizeBrazilianPhoneDigits(value: string) {
+    let digits = value.replace(/\D/g, "");
+
+    // Se vier com código do país (+55), remove antes de formatar.
+    // Ex.: 5548999999999 -> 48999999999.
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+        digits = digits.slice(2);
+    }
+
+    return digits.slice(0, 11);
+}
+
 function formatBrazilianPhone(value: string) {
-    const digits = value.replace(/\D/g, "").slice(0, 11);
+    const digits = normalizeBrazilianPhoneDigits(value);
 
     if (digits.length <= 2) {
         return digits.length ? `(${digits}` : "";
@@ -141,6 +153,547 @@ function formatDuration(minutes: number) {
     return remainingMinutes ? `${hours}h${String(remainingMinutes).padStart(2, "0")}` : `${hours}h`;
 }
 
+type PublicClientProfile = {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string | null;
+    phone_digits: string;
+    user_id: string;
+};
+
+type PublicClientAppointment = {
+    id: string;
+    client_id: string | null;
+    service_name: string;
+    appointment_date: string;
+    start_time: string;
+    duration_minutes: number;
+    price_cents: number | null;
+    status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
+    created_at: string;
+};
+
+const clientAccountStyles = `
+.client-navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.client-auth-button,
+.client-account-button {
+    border: 1px solid rgba(255,255,255,.55);
+    border-radius: 999px;
+    padding: 10px 15px;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+}
+.client-account-button {
+    background: #fff;
+    color: #6d3445;
+}
+.client-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(31,19,23,.58);
+    backdrop-filter: blur(7px);
+}
+.client-modal {
+    position: relative;
+    width: min(100%, 520px);
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    box-sizing: border-box;
+    border-radius: 24px;
+    padding: 28px;
+    background: #fff;
+    color: #35272c;
+    box-shadow: 0 24px 80px rgba(33,17,22,.28);
+}
+.client-modal--account {
+    width: min(100%, 760px);
+}
+.client-modal__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 50%;
+    background: #f3e7ea;
+    color: #6d3445;
+    font-size: 1.35rem;
+    cursor: pointer;
+}
+.client-modal__eyebrow {
+    display: block;
+    margin-bottom: 6px;
+    color: #a05b70;
+    font-size: .75rem;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+.client-modal h2 {
+    margin: 0;
+    color: #392a2f;
+}
+.client-modal > p {
+    margin: 8px 0 22px;
+    color: #80666e;
+    line-height: 1.5;
+}
+.client-auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding: 5px;
+    border-radius: 14px;
+    background: #f3e7ea;
+}
+.client-auth-tabs button {
+    border: 0;
+    border-radius: 10px;
+    padding: 11px;
+    background: transparent;
+    color: #755961;
+    font: inherit;
+    font-weight: 850;
+    cursor: pointer;
+}
+.client-auth-tabs button.is-active {
+    background: #fff;
+    color: #6d3445;
+    box-shadow: 0 5px 16px rgba(83,48,58,.1);
+}
+.client-auth-form {
+    display: grid;
+    gap: 14px;
+}
+.client-auth-form label {
+    display: grid;
+    gap: 7px;
+    color: #5f454d;
+    font-size: .85rem;
+    font-weight: 800;
+}
+.client-auth-form input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 12px 13px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+.client-auth-submit,
+.client-account__primary,
+.client-account__logout {
+    border: 0;
+    border-radius: 12px;
+    padding: 13px 16px;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.client-auth-submit,
+.client-account__primary {
+    background: linear-gradient(135deg, #a86175, #6d3445);
+    color: #fff;
+}
+.client-auth-submit:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+.client-auth-message {
+    margin: 0;
+    border-radius: 12px;
+    padding: 11px 12px;
+    font-size: .86rem;
+}
+.client-auth-message.is-error {
+    background: #fff0f1;
+    color: #a02f3d;
+}
+.client-auth-message.is-success {
+    background: #edf8f1;
+    color: #287044;
+}
+.client-account__profile {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 10px;
+    margin: 20px 0;
+}
+.client-account__profile div {
+    padding: 13px;
+    border-radius: 14px;
+    background: #faf5f7;
+}
+.client-account__profile span,
+.client-account__profile strong {
+    display: block;
+}
+.client-account__profile span {
+    margin-bottom: 5px;
+    color: #8a7078;
+    font-size: .72rem;
+    font-weight: 850;
+    text-transform: uppercase;
+}
+.client-account__profile strong {
+    overflow-wrap: anywhere;
+    color: #4d363e;
+    font-size: .9rem;
+}
+.client-account__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.client-account__logout {
+    background: #efe4e7;
+    color: #6d3445;
+}
+.client-account__section {
+    margin-top: 22px;
+}
+.client-account__section h3 {
+    margin: 0 0 12px;
+    color: #4a343b;
+}
+.client-account__appointments {
+    display: grid;
+    gap: 10px;
+}
+.client-account__appointment {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    gap: 14px;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px;
+    border: 1px solid #eadde1;
+    border-radius: 14px;
+    background: #fff;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+}
+.client-account__appointment.is-editable {
+    cursor: pointer;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.client-account__appointment.is-editable:hover {
+    transform: translateY(-1px);
+    border-color: #c995a5;
+    box-shadow: 0 8px 22px rgba(83,48,58,.08);
+}
+.client-account__appointment-hint {
+    margin-top: 7px !important;
+    color: #9a5368 !important;
+    font-weight: 800;
+}
+.client-account__appointment strong,
+.client-account__appointment span {
+    display: block;
+}
+.client-account__appointment span {
+    margin-top: 4px;
+    color: #80666e;
+    font-size: .82rem;
+}
+.client-account__status {
+    border-radius: 999px;
+    padding: 7px 10px;
+    background: #f3e7ea;
+    color: #6d3445;
+    font-size: .72rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+.client-edit-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 16px;
+}
+.client-edit-cancel {
+    width: 100%;
+    border: 1px solid #e0b8c2;
+    border-radius: 13px;
+    padding: 13px 16px;
+    background: #fff1f3;
+    color: #a23f4d;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.client-edit-cancel:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+.client-edit-current {
+    margin: 14px 0 4px;
+    padding: 13px 14px;
+    border-radius: 13px;
+    background: #faf5f7;
+    color: #6d4a55;
+}
+.client-edit-current strong,
+.client-edit-current span {
+    display: block;
+}
+.client-edit-current span {
+    margin-bottom: 4px;
+    font-size: .72rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    color: #9a6c79;
+}
+
+.client-account__empty {
+    padding: 18px;
+    border-radius: 14px;
+    background: #faf5f7;
+    color: #80666e;
+    text-align: center;
+}
+.client-booking-gate {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(28px, 5vw, 46px);
+    border: 1px solid rgba(125, 78, 91, 0.13);
+    border-radius: 26px;
+    background:
+        radial-gradient(circle at top right, rgba(188, 112, 136, .18), transparent 20rem),
+        linear-gradient(145deg, #fff, #fbf4f6);
+    box-shadow: 0 20px 55px rgba(83, 48, 58, .09);
+}
+.client-booking-gate__badge {
+    display: inline-flex;
+    margin-bottom: 14px;
+    border-radius: 999px;
+    padding: 7px 11px;
+    background: #f2e0e6;
+    color: #8a465b;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+.client-booking-gate h3 {
+    max-width: 660px;
+    margin: 0;
+    color: #35272c;
+    font-size: clamp(1.75rem, 4vw, 2.65rem);
+    line-height: 1.08;
+}
+.client-booking-gate > p {
+    max-width: 650px;
+    margin: 15px 0 0;
+    color: #755961;
+    font-size: 1rem;
+    line-height: 1.65;
+}
+.client-booking-gate__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 11px;
+    margin-top: 24px;
+}
+.client-booking-gate__primary,
+.client-booking-gate__secondary {
+    border-radius: 13px;
+    padding: 13px 18px;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.client-booking-gate__primary {
+    border: 0;
+    background: linear-gradient(135deg, #a86175, #6d3445);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(109, 52, 69, .2);
+}
+.client-booking-gate__secondary {
+    border: 1px solid #d7c0c7;
+    background: #fff;
+    color: #6d3445;
+}
+.client-booking-gate__benefits {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 10px;
+    margin-top: 28px;
+}
+.client-booking-gate__benefits div {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.8);
+    border: 1px solid rgba(125, 78, 91, .09);
+}
+.client-booking-gate__benefits strong,
+.client-booking-gate__benefits span {
+    display: block;
+}
+.client-booking-gate__benefits strong {
+    color: #5a3e47;
+    font-size: .86rem;
+}
+.client-booking-gate__benefits span {
+    margin-top: 4px;
+    color: #8a7078;
+    font-size: .75rem;
+    line-height: 1.4;
+}
+.client-booking-panel {
+    padding: clamp(22px, 4vw, 34px);
+    border: 1px solid rgba(125, 78, 91, .13);
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 18px 50px rgba(83,48,58,.08);
+}
+.client-booking-panel__welcome {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 22px;
+}
+.client-booking-panel__welcome h3 {
+    margin: 4px 0 0;
+    color: #35272c;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+}
+.client-booking-panel__welcome p {
+    margin: 8px 0 0;
+    color: #80666e;
+}
+.client-booking-panel__account {
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 10px 13px;
+    background: #faf5f7;
+    color: #6d3445;
+    font: inherit;
+    font-weight: 850;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.client-booking-panel__identity {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.client-booking-panel__identity div {
+    padding: 12px 13px;
+    border-radius: 13px;
+    background: #faf5f7;
+}
+.client-booking-panel__identity span,
+.client-booking-panel__identity strong {
+    display: block;
+}
+.client-booking-panel__identity span {
+    margin-bottom: 4px;
+    color: #8a7078;
+    font-size: .7rem;
+    font-weight: 850;
+    text-transform: uppercase;
+}
+.client-booking-panel__identity strong {
+    color: #4d363e;
+    font-size: .87rem;
+    overflow-wrap: anywhere;
+}
+.client-booking-panel__service {
+    display: grid;
+    gap: 8px;
+}
+.client-booking-panel__service label {
+    color: #5f454d;
+    font-size: .86rem;
+    font-weight: 900;
+}
+.client-booking-panel__service select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 13px;
+    padding: 13px 14px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+.client-booking-panel__continue {
+    width: 100%;
+    margin-top: 17px;
+    border: 0;
+    border-radius: 13px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #a86175, #6d3445);
+    color: #fff;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.client-booking-panel__continue:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+.client-session-loading {
+    padding: 32px;
+    border-radius: 22px;
+    background: #fff;
+    color: #80666e;
+    text-align: center;
+    box-shadow: 0 16px 42px rgba(83,48,58,.06);
+}
+@media (max-width: 760px) {
+    .client-booking-gate__benefits {
+        grid-template-columns: 1fr;
+    }
+    .client-booking-panel__welcome {
+        flex-direction: column;
+    }
+    .client-booking-panel__account {
+        width: 100%;
+    }
+    .client-booking-panel__identity {
+        grid-template-columns: 1fr;
+    }
+    .client-navbar-actions {
+        gap: 5px;
+    }
+    .client-auth-button,
+    .client-account-button {
+        padding: 8px 10px;
+        font-size: .78rem;
+    }
+    .client-account__profile {
+        grid-template-columns: 1fr;
+    }
+    .client-account__appointment {
+        grid-template-columns: 1fr;
+    }
+}
+`;
+
 function PublicSite() {
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
@@ -164,31 +717,335 @@ function PublicSite() {
         6: {startTime: "07:00", endTime: "13:00"},
     });
 
-    function continueToDateSelection() {
-        const normalizedName = clientName.trim().replace(/\s+/g, " ");
-        const phoneDigits = clientPhone.replace(/\D/g, "");
+    const [clientUserId, setClientUserId] = useState<string | null>(null);
+    const [clientUserEmail, setClientUserEmail] = useState("");
+    const [clientProfile, setClientProfile] = useState<PublicClientProfile | null>(null);
+    const [clientAppointments, setClientAppointments] = useState<PublicClientAppointment[]>([]);
+    const [, setIsCheckingClientSession] = useState(true);
+    const [isLoadingClientAccount, setIsLoadingClientAccount] = useState(false);
+    const [showClientAuth, setShowClientAuth] = useState(false);
+    const [showClientAccount, setShowClientAccount] = useState(false);
+    const [, setFocusClientAppointments] = useState(false);
+    const [clientAuthMode, setClientAuthMode] = useState<"login" | "signup">("login");
+    const [authFullName, setAuthFullName] = useState("");
+    const [authPhone, setAuthPhone] = useState("");
+    const [authEmail, setAuthEmail] = useState("");
+    const [authPassword, setAuthPassword] = useState("");
+    const [authError, setAuthError] = useState("");
+    const [authSuccess, setAuthSuccess] = useState("");
+    const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+    const [editingClientAppointment, setEditingClientAppointment] = useState<PublicClientAppointment | null>(null);
+    const [isCancellingClientAppointment, setIsCancellingClientAppointment] = useState(false);
 
+    function normalizeRpcRow<T>(data: T | T[] | null): T | null {
+        if (!data) return null;
+        return Array.isArray(data) ? (data[0] ?? null) : data;
+    }
+
+    async function loadClientAppointments(profileId: string) {
+        const {data, error} = await supabase.rpc("get_my_client_appointments");
+
+        if (error) {
+            console.error("Erro ao carregar agendamentos da cliente:", error);
+            setClientAppointments([]);
+            return;
+        }
+
+        const loaded = ((data ?? []) as PublicClientAppointment[])
+            .filter((appointment) => appointment.client_id === profileId)
+            .sort((a, b) => {
+                const first = new Date(`${a.appointment_date}T${String(a.start_time).slice(0, 5)}:00`).getTime();
+                const second = new Date(`${b.appointment_date}T${String(b.start_time).slice(0, 5)}:00`).getTime();
+                return second - first;
+            });
+
+        setClientAppointments(loaded);
+    }
+
+    async function resolveClientProfile(user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>}) {
+        const {data: profileData, error: profileError} = await supabase.rpc("get_my_client_profile");
+
+        if (profileError) {
+            console.error("Erro ao carregar perfil da cliente:", profileError);
+        }
+
+        let profile = normalizeRpcRow<PublicClientProfile>(profileData as PublicClientProfile[] | PublicClientProfile | null);
+
+        if (!profile) {
+            const metadata = user.user_metadata ?? {};
+            const metadataName = typeof metadata.full_name === "string" ? metadata.full_name : "";
+            const metadataPhone = typeof metadata.phone === "string" ? metadata.phone : "";
+
+            if (metadataName && metadataPhone) {
+                const {data: claimedData, error: claimError} = await supabase.rpc("claim_client_profile", {
+                    p_full_name: metadataName,
+                    p_phone: metadataPhone,
+                    p_email: user.email ?? null,
+                });
+
+                if (claimError) {
+                    console.error("Erro ao vincular perfil da cliente:", claimError);
+                    setAuthError("Sua conta foi autenticada, mas não foi possível vincular o perfil. Fale com a Mirian.");
+                } else {
+                    profile = normalizeRpcRow<PublicClientProfile>(claimedData as PublicClientProfile[] | PublicClientProfile | null);
+                }
+            }
+        }
+
+        setClientProfile(profile);
+
+        if (profile) {
+            setClientName(profile.full_name);
+            setClientPhone(formatBrazilianPhone(profile.phone));
+            await loadClientAppointments(profile.id);
+        } else {
+            setClientAppointments([]);
+        }
+
+        return profile;
+    }
+
+    async function loadAuthenticatedClient(user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>}) {
+        setIsLoadingClientAccount(true);
+        setClientUserId(user.id);
+        setClientUserEmail(user.email ?? "");
+        await resolveClientProfile(user);
+        setIsLoadingClientAccount(false);
+    }
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function initializeClientSession() {
+            const {data: {session}} = await supabase.auth.getSession();
+
+            if (!mounted) return;
+
+            if (session?.user) {
+                await loadAuthenticatedClient(session.user);
+            } else {
+                setClientUserId(null);
+                setClientUserEmail("");
+                setClientProfile(null);
+                setClientAppointments([]);
+            }
+
+            if (mounted) setIsCheckingClientSession(false);
+        }
+
+        void initializeClientSession();
+
+        const {data: authListener} = supabase.auth.onAuthStateChange((_event, session) => {
+            window.setTimeout(() => {
+                if (!mounted) return;
+
+                if (session?.user) {
+                    void loadAuthenticatedClient(session.user);
+                } else {
+                    setClientUserId(null);
+                    setClientUserEmail("");
+                    setClientProfile(null);
+                    setClientAppointments([]);
+                    setShowClientAccount(false);
+                }
+
+                setIsCheckingClientSession(false);
+            }, 0);
+        });
+
+        return () => {
+            mounted = false;
+            authListener.subscription.unsubscribe();
+        };
+    }, []);
+
+    function resetAuthMessages() {
+        setAuthError("");
+        setAuthSuccess("");
+    }
+
+    function openClientAuth(mode: "login" | "signup") {
+        setClientAuthMode(mode);
+        resetAuthMessages();
+        setShowClientAuth(true);
+    }
+
+    async function submitClientAuth(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        resetAuthMessages();
+
+        const email = authEmail.trim().toLowerCase();
+        const password = authPassword;
+        const phoneDigits = authPhone.replace(/\D/g, "");
+        const fullName = authFullName.trim().replace(/\s+/g, " ");
+
+        if (!email || !password) {
+            setAuthError("Informe e-mail e senha.");
+            return;
+        }
+
+        if (password.length < 6) {
+            setAuthError("A senha precisa ter pelo menos 6 caracteres.");
+            return;
+        }
+
+        if (clientAuthMode === "signup") {
+            if (fullName.length < 3) {
+                setAuthError("Informe seu nome completo.");
+                return;
+            }
+
+            if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+                setAuthError("Informe um telefone válido com DDD.");
+                return;
+            }
+        }
+
+        setIsSubmittingAuth(true);
+
+        try {
+            if (clientAuthMode === "signup") {
+                const formattedPhone = formatBrazilianPhone(phoneDigits);
+                const {data, error} = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            phone: formattedPhone,
+                        },
+                    },
+                });
+
+                if (error) throw error;
+
+                if (data.session?.user) {
+                    await loadAuthenticatedClient(data.session.user);
+                    setShowClientAuth(false);
+                    setShowClientAccount(true);
+                    setAuthPassword("");
+                } else {
+                    setAuthSuccess("Conta criada. Confira seu e-mail para confirmar o cadastro e depois faça login.");
+                    setAuthPassword("");
+                }
+            } else {
+                const {data, error} = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+
+                if (error) throw error;
+
+                if (data.user) {
+                    await loadAuthenticatedClient(data.user);
+                }
+
+                setShowClientAuth(false);
+                setShowClientAccount(true);
+                setAuthPassword("");
+            }
+        } catch (error) {
+            console.error("Erro na autenticação da cliente:", error);
+            setAuthError(
+                clientAuthMode === "signup"
+                    ? "Não foi possível criar a conta. Verifique os dados ou tente outro e-mail."
+                    : "E-mail ou senha inválidos.",
+            );
+        } finally {
+            setIsSubmittingAuth(false);
+        }
+    }
+
+    async function logoutClient() {
+        await supabase.auth.signOut();
+        setShowClientAccount(false);
+        setClientProfile(null);
+        setClientAppointments([]);
+        setClientUserId(null);
+        setClientUserEmail("");
+        setClientName("");
+        setClientPhone("");
+    }
+
+    function isClientAppointmentEditable(appointment: PublicClientAppointment) {
+        if (appointment.status !== "confirmed" && appointment.status !== "pending") {
+            return false;
+        }
+
+        const appointmentMoment = new Date(
+            `${appointment.appointment_date}T${String(appointment.start_time).slice(0, 5)}:00`,
+        );
+
+        return appointmentMoment.getTime() > Date.now();
+    }
+
+    function openEditClientAppointment(appointment: PublicClientAppointment) {
+        if (!isClientAppointmentEditable(appointment)) return;
+
+        setEditingClientAppointment(appointment);
+        setSelectedService(appointment.service_name);
+        setSelectedDate("");
+        setSelectedTime("");
+        setBookingError("");
+        setClientName(clientProfile?.full_name ?? "");
+        setClientPhone(clientProfile ? formatBrazilianPhone(clientProfile.phone) : "");
+        setShowClientAccount(false);
+        setBookingStep(2);
+    }
+
+    async function cancelEditingClientAppointment() {
+        if (!editingClientAppointment || !clientProfile) return;
+
+        const confirmed = window.confirm(
+            "Deseja realmente cancelar este agendamento? O horário ficará disponível para outra cliente.",
+        );
+
+        if (!confirmed) return;
+
+        setIsCancellingClientAppointment(true);
         setBookingError("");
 
-        if (normalizedName.length < 3) {
-            setBookingError("Informe seu nome completo para continuar.");
-            return;
-        }
+        try {
+            const {error} = await supabase.rpc("cancel_my_appointment", {
+                p_appointment_id: editingClientAppointment.id,
+            });
 
-        if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-            setBookingError(
-                "Informe um telefone válido com DDD, usando 10 ou 11 números.",
-            );
-            return;
-        }
+            if (error) throw error;
 
-        if (!selectedServiceInformation) {
-            setBookingError("Escolha um serviço para continuar.");
-            return;
+            await loadClientAppointments(clientProfile.id);
+            setEditingClientAppointment(null);
+            setSelectedService("");
+            setSelectedDate("");
+            setSelectedTime("");
+            setBookingStep(1);
+            setShowClientAccount(true);
+        } catch (error) {
+            console.error("Erro ao cancelar agendamento:", error);
+            setBookingError("Não foi possível cancelar o agendamento. Tente novamente.");
+        } finally {
+            setIsCancellingClientAppointment(false);
         }
+    }
 
-        setClientName(normalizedName);
-        setBookingStep(2);
+    function openClientAppointments() {
+        setFocusClientAppointments(true);
+        setShowClientAccount(true);
+
+        window.setTimeout(() => {
+            document.getElementById("client-account-appointments")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        }, 80);
+    }
+
+
+    function getClientAppointmentStatusLabel(status: PublicClientAppointment["status"]) {
+        if (status === "confirmed") return "Confirmado";
+        if (status === "completed") return "Concluído";
+        if (status === "cancelled") return "Cancelado";
+        if (status === "no-show") return "Não compareceu";
+        return "Pendente";
     }
 
     useEffect(() => {
@@ -352,6 +1209,7 @@ function PublicSite() {
             .filter(
                 (appointment) =>
                     appointment.date === date &&
+                    appointment.id !== editingClientAppointment?.id &&
                     appointment.status !== "cancelled" &&
                     appointment.status !== "no-show",
             )
@@ -439,6 +1297,7 @@ function PublicSite() {
         selectedDate,
         selectedServiceInformation,
         businessHours,
+        editingClientAppointment,
     ]);
 
     function formatSelectedDate() {
@@ -461,11 +1320,12 @@ function PublicSite() {
 
     function closeBooking() {
         setBookingStep(1);
-        setClientName("");
-        setClientPhone("");
+        setClientName(clientProfile?.full_name ?? "");
+        setClientPhone(clientProfile ? formatBrazilianPhone(clientProfile.phone) : "");
         setSelectedService("");
         setSelectedDate("");
         setSelectedTime("");
+        setEditingClientAppointment(null);
         setBookingError("");
     }
 
@@ -531,6 +1391,10 @@ function PublicSite() {
 
             const hasAppointmentConflict =
                 appointmentsForSelectedDate.some((appointment) => {
+                    if (appointment.id === editingClientAppointment?.id) {
+                        return false;
+                    }
+
                     const appointmentStart = timeToMinutes(
                         appointment.startTime,
                     );
@@ -575,41 +1439,61 @@ function PublicSite() {
                 return;
             }
 
-            const {error: insertError} = await supabase
-                .from("appointments")
-                .insert({
-                    client_name: clientName.trim(),
-                    client_phone: clientPhone.trim(),
-                    client_email: null,
-                    service_name: selectedServiceInformation.name,
-                    appointment_date: selectedDate,
-                    start_time: selectedTime,
-                    duration_minutes:
-                    selectedServiceInformation.durationMinutes,
-                    price_cents: selectedServiceInformation.priceCents,
-                    status: "confirmed",
+            if (editingClientAppointment) {
+                const {error: rescheduleError} = await supabase.rpc("reschedule_my_appointment", {
+                    p_appointment_id: editingClientAppointment.id,
+                    p_new_date: selectedDate,
+                    p_new_time: selectedTime,
                 });
 
-            if (insertError) {
-                throw insertError;
+                if (rescheduleError) {
+                    throw rescheduleError;
+                }
+            } else {
+                const {error: insertError} = await supabase
+                    .from("appointments")
+                    .insert({
+                        client_name: clientName.trim(),
+                        client_phone: clientPhone.trim(),
+                        client_email: (clientProfile?.email ?? clientUserEmail) || null,
+                        client_id: clientProfile?.id ?? null,
+                        service_name: selectedServiceInformation.name,
+                        appointment_date: selectedDate,
+                        start_time: selectedTime,
+                        duration_minutes:
+                        selectedServiceInformation.durationMinutes,
+                        price_cents: selectedServiceInformation.priceCents,
+                        status: "confirmed",
+                    });
+
+                if (insertError) {
+                    throw insertError;
+                }
             }
 
-            const newAppointment: Appointment = {
-                id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                clientName: clientName.trim(),
-                clientPhone: clientPhone.trim(),
-                clientEmail: "",
-                serviceName: selectedServiceInformation.name,
-                date: selectedDate,
-                startTime: selectedTime,
-                durationMinutes: selectedServiceInformation.durationMinutes,
-                status: "confirmed",
-            };
+            if (!editingClientAppointment) {
+                const newAppointment: Appointment = {
+                    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    clientName: clientName.trim(),
+                    clientPhone: clientPhone.trim(),
+                    clientEmail: clientProfile?.email ?? clientUserEmail,
+                    serviceName: selectedServiceInformation.name,
+                    date: selectedDate,
+                    startTime: selectedTime,
+                    durationMinutes: selectedServiceInformation.durationMinutes,
+                    status: "confirmed",
+                };
 
-            setAppointments((currentAppointments) => [
-                ...currentAppointments,
-                newAppointment,
-            ]);
+                setAppointments((currentAppointments) => [
+                    ...currentAppointments,
+                    newAppointment,
+                ]);
+            }
+
+            if (clientProfile) {
+                await loadClientAppointments(clientProfile.id);
+            }
+
             setBookingStep(5);
         } catch (error) {
             console.error("Erro ao confirmar agendamento:", error);
@@ -623,259 +1507,572 @@ function PublicSite() {
 
     return (
         <main className="home">
-            <section className="hero" id="inicio">
-                <div className="hero__overlay"/>
+            <style>{clientAccountStyles}</style>
 
-                <header className="navbar">
-                    <a className="brand" href="#inicio">
-                        <span className="brand__symbol">
-                            <img
-                                src="/logo-mirian.png"
-                                alt="Logo Mirian Silva Nail Design"
-                                style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    borderRadius: "50%",
-                                    display: "block",
-                                }}
-                            />
-                        </span>
-                        <span className="brand__text">
-                            <strong>Mirian Silva</strong>
-                            <small>Nail Design</small>
-                        </span>
-                    </a>
+            {clientUserId && clientProfile ? (
+                <div className="client-logged-page">
 
-                    <nav className="navbar__links" aria-label="Navegação principal">
-                        <a href="#inicio">Início</a>
-                        <a href="#servicos">Serviços</a>
-                        <a href="#agendamento">Agendamento</a>
-                    </nav>
+                    <style>{`
+                .client-logged-page {
+                    min-height: 100vh;
+                    background: #fff8fa;
+                    padding: 24px 0 64px;
+                }
+                .client-logged-header {
+                    width: min(1160px, calc(100% - 32px));
+                    margin: 0 auto 22px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 16px;
+                    padding: 14px 16px;
+                    border: 1px solid rgba(125, 78, 91, .12);
+                    border-radius: 18px;
+                    background: #fff;
+                    box-shadow: 0 10px 28px rgba(83, 48, 58, .06);
+                }
+                .client-logged-header__brand {
+                    display: flex;
+                    align-items: center;
+                    gap: 11px;
+                }
+                .client-logged-header__brand img {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                }
+                .client-logged-header__brand strong,
+                .client-logged-header__brand span {
+                    display: block;
+                }
+                .client-logged-header__brand strong {
+                    color: #4d363e;
+                    font-size: .98rem;
+                }
+                .client-logged-header__brand span {
+                    margin-top: 2px;
+                    color: #8a7078;
+                    font-size: .76rem;
+                }
+                .client-logged-header__actions {
+                    display: flex;
+                    width: min(440px, 100%);
+                    flex: 1;
+                }
+                .client-logged-header__actions button {
+                    width: 100%;
+                    border: 0;
+                    border-radius: 14px;
+                    padding: 16px 18px;
+                    font: inherit;
+                    font-size: 1.02rem;
+                    font-weight: 850;
+                    cursor: pointer;
+                }
+                .client-logged-header__appointments {
+                    background: #6d3445;
+                    color: #fff;
+                }
+                .client-logged-page .services {
+                    padding-top: 4px;
+                }
+                .client-logged-page .services__grid {
+                    gap: 18px;
+                }
+                .client-logged-page .service-card {
+                    padding: 28px 24px;
+                    min-height: unset;
+                }
+                .client-logged-page .service-card__button {
+                    width: 100%;
+                    box-sizing: border-box;
+                    cursor: pointer;
+                    font: inherit;
+                }
+                @media (max-width: 700px) {
+                    .client-logged-header {
+                        align-items: flex-start;
+                        flex-direction: column;
+                    }
+                    .client-logged-header__actions {
+                        width: 100%;
+                    }
+                    .client-logged-header__actions button {
+                        width: 100%;
+                    }
+                }
+            `}</style>
 
-                    <a className="navbar__button" href="/admin">
-                        Login ADM
-                    </a>
-                </header>
-
-                <div className="hero__content">
-                    <span className="hero__eyebrow">Beleza em cada detalhe</span>
-                    <h1>Mirian Silva<span>Nail Design</span></h1>
-                    <p>Cuidados exclusivos para unhas elegantes, saudáveis e cheias de personalidade.</p>
-
-                    <div className="hero__actions">
-                        <a className="button button--primary" href="#agendamento">Agendar horário</a>
-                        <a className="button button--instagram" href="https://www.instagram.com/nails.mirian.silva/"
-                           target="_blank" rel="noopener noreferrer">Instagram</a>
-                        <a className="button button--whatsapp"
-                           href="https://wa.me/5548998074518?text=Olá%2C%20Mirian!%20Gostaria%20de%20mais%20informações%20sobre%20os%20serviços."
-                           target="_blank" rel="noopener noreferrer">WhatsApp</a>
-                    </div>
-
-                    <div className="hero__details">
-                        <div><strong>Atendimento personalizado</strong><span>Experiência pensada para você</span></div>
-                        <div><strong>Agendamento online</strong><span>Rápido, simples e seguro</span></div>
-                    </div>
-                </div>
-
-                <div className="hero__decoration hero__decoration--one"/>
-                <div className="hero__decoration hero__decoration--two"/>
-            </section>
-
-            <section className="services" id="servicos">
-                <div className="services__header">
-                    <span className="section-label">Serviços exclusivos</span>
-                    <h2>Escolha o cuidado ideal para suas unhas</h2>
-                    <p>Confira os serviços disponíveis, seus valores e o tempo necessário para cada atendimento.</p>
-                </div>
-
-                <div className="services__grid">
-                    {services.map((service, index) => (
-                        <article className="service-card" key={service.name}>
-                            <span className="service-card__number">{String(index + 1).padStart(2, "0")}</span>
-                            <div className="service-card__content"><h3>{service.name}</h3><p>{service.description}</p>
-                            </div>
-                            <div className="service-card__footer">
-                                <div><span>Duração</span><strong>{service.duration}</strong></div>
-                                <div><span>Valor</span><strong>{service.price}</strong></div>
-                            </div>
-                            <a href="#agendamento" className="service-card__button"
-                               onClick={() => selectService(service.name)}>Escolher este serviço</a>
-                        </article>
-                    ))}
-                </div>
-            </section>
-
-            <section className="booking" id="agendamento">
-                <div className="booking__form-container">
-                    <div className="booking__form-header"><span>Solicitação de agendamento</span><h3>Vamos começar?</h3>
-                        <p>Preencha seus dados para escolher o dia e o horário.</p></div>
-
-                    <form
-                        className="booking__form"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            continueToDateSelection();
-                        }}
-                    >
-                        <div className="form-group"><label htmlFor="client-name">Nome completo</label><input
-                            id="client-name" name="client-name" type="text" placeholder="Digite seu nome"
-                            autoComplete="name" minLength={3} maxLength={80} value={clientName} onChange={(event) => {
-                            setClientName(event.target.value);
-                            setBookingError("");
-                        }} required/></div>
-                        <div className="form-group"><label htmlFor="client-phone">Telefone ou WhatsApp</label><input
-                            id="client-phone" name="client-phone" type="tel" inputMode="numeric"
-                            placeholder="(00) 00000-0000" autoComplete="tel" maxLength={15} value={clientPhone}
-                            onChange={(event) => {
-                                setClientPhone(formatBrazilianPhone(event.target.value));
-                                setBookingError("");
-                            }} aria-describedby="client-phone-help" required/><small id="client-phone-help">Digite o DDD
-                            e o número. A formatação é automática.</small></div>
-                        <div className="form-group"><label htmlFor="service">Escolha o serviço</label><select
-                            id="service" name="service" value={selectedService}
-                            onChange={(event) => selectService(event.target.value)} required>
-                            <option value="" disabled>Selecione uma opção</option>
-                            {services.map((service) => <option key={service.name}
-                                                               value={service.name}>{service.name} — {service.price}</option>)}
-                        </select></div>
-
-                        {selectedServiceInformation && <div className="selected-service">
-                            <span>Serviço selecionado</span><strong>{selectedServiceInformation.name}</strong>
+                    <header className="client-logged-header">
+                        <div className="client-logged-header__brand">
+                            <img src="/logo-mirian.png" alt="Mirian Silva Nail Design" />
                             <div>
-                                <small>{selectedServiceInformation.duration}</small><small>{selectedServiceInformation.price}</small>
-                            </div>
-                        </div>}
-
-                        {bookingStep === 1 && bookingError && (
-                            <p className="booking-modal__error" role="alert" aria-live="polite">
-                                {bookingError}
-                            </p>
-                        )}
-
-                        <label className="form-checkbox"><input type="checkbox" required/><span>Confirmo que os dados informados estão corretos e desejo continuar para a escolha do dia e horário.</span></label>
-                        <button className="booking__submit" type="submit">Continuar agendamento<span>→</span></button>
-                        <p className="booking__security">Seus dados serão utilizados apenas para o agendamento.</p>
-                    </form>
-                </div>
-
-                {bookingStep === 2 && <div className="booking-modal">
-                    <div className="booking-modal__content">
-                        <button className="booking-modal__close" type="button" onClick={() => setBookingStep(1)}
-                                aria-label="Fechar escolha da data">×
-                        </button>
-                        <span className="section-label">Escolha a data</span><h3>Qual o melhor dia para você?</h3><p>As
-                        clientes podem escolher qualquer data futura.</p>
-                        <input className="booking-modal__date" type="date" min={today}
-                               value={selectedDate} onChange={(event) => {
-                            setSelectedDate(event.target.value);
-                            setSelectedTime("");
-                            setBookingError("");
-                        }}/>
-                        <div className="booking-modal__availability"><strong>Horários de atendimento</strong><span>Segunda a sexta: 07:00 até o último início às 19:00</span><span>Sábado e domingo: 07:00 até o último início às 13:00</span>
-                        </div>
-                        <button className="booking-modal__button" type="button"
-                                disabled={!selectedDate || isLoadingAppointments}
-                                onClick={() => setBookingStep(3)}>Continuar para horários
-                        </button>
-                    </div>
-                </div>}
-
-                {bookingStep === 3 && <div className="booking-modal">
-                    <div className="booking-modal__content">
-                        <button className="booking-modal__close" type="button" onClick={() => {
-                            setBookingError("");
-                            setBookingStep(2);
-                        }} aria-label="Voltar para a escolha da data">←
-                        </button>
-                        <span className="section-label">Escolha o horário</span><h3>Qual horário fica melhor?</h3><p>Os
-                        horários são calculados conforme os atendimentos já registrados e a duração do serviço.</p>
-                        <div className="booking-modal__summary">
-                            <div><span>Serviço</span><strong>{selectedService}</strong></div>
-                            <div><span>Data escolhida</span><strong>{formatSelectedDate()}</strong></div>
-                            <div><span>Duração</span><strong>{selectedServiceInformation?.duration}</strong></div>
-                            <div>
-                                <span>Tipo de agenda</span><strong>{isWeekend(selectedDate) ? "Fim de semana" : "Segunda a sexta"}</strong>
+                                <strong>Mirian Silva Nail Design</strong>
+                                <span>Olá, {clientProfile?.full_name.split(/\s+/)[0]}</span>
                             </div>
                         </div>
-                        {bookingError && <p className="booking-modal__error">{bookingError}</p>}
-                        {isLoadingAppointments ? (
-                            <p>Carregando horários disponíveis...</p>
-                        ) : availableTimes.length > 0 ? (
-                            <div className="booking-times">
-                                {availableTimes.map((time) => (
+
+                        <div className="client-logged-header__actions">
+                            <button
+                                className="client-logged-header__appointments"
+                                type="button"
+                                onClick={openClientAppointments}
+                            >
+                                Meus agendamentos
+                            </button>
+                        </div>
+                    </header>
+
+
+                    <section className="services" id="servicos">
+                        <div className="services__grid">
+                            {services.map((service, index) => (
+                                <article className="service-card" key={service.name}>
+                                    <span className="service-card__number">{String(index + 1).padStart(2, "0")}</span>
+                                    <div className="service-card__content"><h3>{service.name}</h3><p>{service.description}</p>
+                                    </div>
+                                    <div className="service-card__footer">
+                                        <div><span>Duração</span><strong>{service.duration}</strong></div>
+                                        <div><span>Valor</span><strong>{service.price}</strong></div>
+                                    </div>
                                     <button
-                                        key={time}
-                                        className={
-                                            selectedTime === time
-                                                ? "booking-time booking-time--selected"
-                                                : "booking-time"
-                                        }
                                         type="button"
+                                        className="service-card__button"
                                         onClick={() => {
-                                            setSelectedTime(time);
-                                            setBookingError("");
+                                            setEditingClientAppointment(null);
+                                            selectService(service.name);
+                                            setClientName(clientProfile?.full_name ?? "");
+                                            setClientPhone(clientProfile ? formatBrazilianPhone(clientProfile.phone) : "");
+                                            setBookingStep(2);
                                         }}
                                     >
-                                        {time}
+                                        Escolher este serviço
                                     </button>
-                                ))}
+                                </article>
+                            ))}
+                        </div>
+                    </section>
+
+
+                    {bookingStep === 2 && <div className="booking-modal">
+                        <div className="booking-modal__content">
+                            <button className="booking-modal__close" type="button" onClick={() => setBookingStep(1)}
+                                    aria-label="Fechar escolha da data">×
+                            </button>
+                            <span className="section-label">{editingClientAppointment ? "Editar agendamento" : "Escolha a data"}</span>
+                            <h3>{editingClientAppointment ? "Escolha o novo dia" : "Qual o melhor dia para você?"}</h3>
+                            <p>
+                                {editingClientAppointment
+                                    ? "Escolha uma nova data e depois um novo horário disponível."
+                                    : "As clientes podem escolher qualquer data futura."}
+                            </p>
+                            {editingClientAppointment && (
+                                <div className="client-edit-current">
+                                    <span>Agendamento atual</span>
+                                    <strong>
+                                        {new Date(`${editingClientAppointment.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}
+                                        {" às "}
+                                        {String(editingClientAppointment.start_time).slice(0, 5)}
+                                    </strong>
+                                </div>
+                            )}
+                            <input className="booking-modal__date" type="date" min={today}
+                                   value={selectedDate} onChange={(event) => {
+                                setSelectedDate(event.target.value);
+                                setSelectedTime("");
+                                setBookingError("");
+                            }}/>
+                            <div className="booking-modal__availability"><strong>Horários de atendimento</strong><span>Segunda a sexta: 07:00 até o último início às 19:00</span><span>Sábado e domingo: 07:00 até o último início às 13:00</span>
                             </div>
+                            <div className="client-edit-actions">
+                                <button className="booking-modal__button" type="button"
+                                        disabled={!selectedDate || isLoadingAppointments}
+                                        onClick={() => setBookingStep(3)}>Continuar para horários
+                                </button>
+                                {editingClientAppointment && (
+                                    <button
+                                        className="client-edit-cancel"
+                                        type="button"
+                                        disabled={isCancellingClientAppointment}
+                                        onClick={() => void cancelEditingClientAppointment()}
+                                    >
+                                        {isCancellingClientAppointment ? "Cancelando..." : "Cancelar agendamento"}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>}
+
+
+                    {bookingStep === 3 && <div className="booking-modal">
+                        <div className="booking-modal__content">
+                            <button className="booking-modal__close" type="button" onClick={() => {
+                                setBookingError("");
+                                setBookingStep(2);
+                            }} aria-label="Voltar para a escolha da data">←
+                            </button>
+                            <span className="section-label">Escolha o horário</span><h3>Qual horário fica melhor?</h3><p>Os
+                            horários são calculados conforme os atendimentos já registrados e a duração do serviço.</p>
+                            <div className="booking-modal__summary">
+                                <div><span>Serviço</span><strong>{selectedService}</strong></div>
+                                <div><span>Data escolhida</span><strong>{formatSelectedDate()}</strong></div>
+                                <div><span>Duração</span><strong>{selectedServiceInformation?.duration}</strong></div>
+                                <div>
+                                    <span>Tipo de agenda</span><strong>{isWeekend(selectedDate) ? "Fim de semana" : "Segunda a sexta"}</strong>
+                                </div>
+                            </div>
+                            {bookingError && <p className="booking-modal__error">{bookingError}</p>}
+                            {isLoadingAppointments ? (
+                                <p>Carregando horários disponíveis...</p>
+                            ) : availableTimes.length > 0 ? (
+                                <div className="booking-times">
+                                    {availableTimes.map((time) => (
+                                        <button
+                                            key={time}
+                                            className={
+                                                selectedTime === time
+                                                    ? "booking-time booking-time--selected"
+                                                    : "booking-time"
+                                            }
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedTime(time);
+                                                setBookingError("");
+                                            }}
+                                        >
+                                            {time}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="booking-times__empty">
+                                    <strong>Nenhum horário disponível nesta data.</strong>
+                                    <span>Volte e escolha outro dia para continuar.</span>
+                                </div>
+                            )}
+                            <button className="booking-modal__button" type="button" disabled={!selectedTime}
+                                    onClick={() => {
+                                        setBookingError("");
+                                        setBookingStep(4);
+                                    }}>Revisar agendamento
+                            </button>
+                        </div>
+                    </div>}
+
+
+                    {bookingStep === 4 && <div className="booking-modal">
+                        <div className="booking-modal__content">
+                            <button className="booking-modal__close" type="button" onClick={() => {
+                                setBookingError("");
+                                setBookingStep(3);
+                            }} aria-label="Voltar para os horários">←
+                            </button>
+                            <span className="section-label">{editingClientAppointment ? "Confirmar alteração" : "Confirmação"}</span>
+                            <h3>{editingClientAppointment ? "Revise o novo dia e horário" : "Revise seu agendamento"}</h3>
+                            <p>
+                                {editingClientAppointment
+                                    ? "Confira as novas informações antes de salvar a alteração."
+                                    : "Confira as informações antes de confirmar a solicitação."}
+                            </p>
+                            <div className="booking-modal__summary">
+                                <div><span>Cliente</span><strong>{clientName}</strong></div>
+                                <div><span>Telefone</span><strong>{clientPhone}</strong></div>
+                                <div><span>Serviço</span><strong>{selectedService}</strong></div>
+                                <div><span>Data</span><strong>{formatSelectedDate()}</strong></div>
+                                <div><span>Horário</span><strong>{selectedTime}</strong></div>
+                                <div><span>Valor</span><strong>{selectedServiceInformation?.price ?? ""}</strong></div>
+                            </div>
+                            {bookingError && <p className="booking-modal__error">{bookingError}</p>}
+                            <button className="booking-modal__button" type="button" disabled={isConfirmingBooking}
+                                    onClick={confirmBooking}>
+                                {isConfirmingBooking
+                                    ? "Salvando..."
+                                    : editingClientAppointment
+                                        ? "Salvar novo dia e horário"
+                                        : "Confirmar agendamento"}
+                            </button>
+                        </div>
+                    </div>}
+
+
+                    {bookingStep === 5 && <div className="booking-modal">
+                        <div className="booking-modal__content booking-success">
+                            <div className="booking-success__icon">✓</div>
+                            <span className="section-label">{editingClientAppointment ? "Agendamento alterado" : "Agendamento realizado"}</span>
+                            <h3>
+                                {editingClientAppointment
+                                    ? "Seu agendamento foi alterado com sucesso!"
+                                    : "Seu agendamento foi confirmado com sucesso!"}
+                            </h3>
+                            <p>
+                                {editingClientAppointment
+                                    ? "O novo dia e horário já estão reservados para você."
+                                    : `Obrigado, ${clientName}. Seu agendamento está confirmado e o horário já foi reservado para você.`}
+                            </p>
+                            <div className="booking-modal__summary">
+                                <div><span>Serviço</span><strong>{selectedService}</strong></div>
+                                <div><span>Data</span><strong>{formatSelectedDate()}</strong></div>
+                                <div><span>Horário</span><strong>{selectedTime}</strong></div>
+                                <div><span>Telefone</span><strong>{clientPhone}</strong></div>
+                            </div>
+                            <button className="booking-modal__button" type="button" onClick={closeBooking}>Finalizar
+                            </button>
+                        </div>
+                    </div>}
+                </div>
+
+            ) : (
+                <>
+                    <section className="hero" id="inicio">
+                        <div className="hero__overlay"/>
+
+                        <header className="navbar">
+                            <a className="brand" href="#inicio">
+                                <span className="brand__symbol">
+                                    <img
+                                        src="/logo-mirian.png"
+                                        alt="Logo Mirian Silva Nail Design"
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                            borderRadius: "50%",
+                                            display: "block",
+                                        }}
+                                    />
+                                </span>
+                                <span className="brand__text">
+                                    <strong>Mirian Silva</strong>
+                                    <small>Nail Design</small>
+                                </span>
+                            </a>
+
+                            <a className="navbar__button" href="/admin">
+                                Login ADM
+                            </a>
+                        </header>
+
+                        <div className="hero__content">
+                            <span className="hero__eyebrow">Beleza em cada detalhe</span>
+                            <h1>Mirian Silva<span>Nail Design</span></h1>
+                            <p>Cuidados exclusivos para unhas elegantes, saudáveis e cheias de personalidade.</p>
+
+                            <div className="hero__actions">
+                                <button
+                                    className="button button--primary"
+                                    type="button"
+                                    onClick={() => openClientAuth("signup")}
+                                >
+                                    Criar conta / Entrar
+                                </button>
+
+                                <a
+                                    className="button button--instagram"
+                                    href="https://www.instagram.com/nails.mirian.silva/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Instagram
+                                </a>
+
+                                <a
+                                    className="button button--whatsapp"
+                                    href="https://wa.me/5548998074518?text=Olá%2C%20Mirian!%20Gostaria%20de%20mais%20informações%20sobre%20os%20serviços."
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    WhatsApp
+                                </a>
+                            </div>
+                        </div>
+
+                        <div className="hero__decoration hero__decoration--one"/>
+                        <div className="hero__decoration hero__decoration--two"/>
+                    </section>
+                </>
+            )}
+
+
+            {showClientAuth && (
+                <div className="client-modal-backdrop" onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) setShowClientAuth(false);
+                }}>
+                    <section className="client-modal">
+                        <button className="client-modal__close" type="button" onClick={() => setShowClientAuth(false)}>×</button>
+                        <span className="client-modal__eyebrow">Área da cliente</span>
+                        <h2>{clientAuthMode === "login" ? "Entrar na sua conta" : "Criar sua conta"}</h2>
+                        <p>
+                            {clientAuthMode === "login"
+                                ? "Acesse seus agendamentos usando seu e-mail e senha."
+                                : "Crie sua conta para manter seus agendamentos vinculados ao seu perfil."}
+                        </p>
+
+                        <div className="client-auth-tabs">
+                            <button
+                                className={clientAuthMode === "login" ? "is-active" : ""}
+                                type="button"
+                                onClick={() => {
+                                    setClientAuthMode("login");
+                                    resetAuthMessages();
+                                }}
+                            >
+                                Entrar
+                            </button>
+                            <button
+                                className={clientAuthMode === "signup" ? "is-active" : ""}
+                                type="button"
+                                onClick={() => {
+                                    setClientAuthMode("signup");
+                                    resetAuthMessages();
+                                }}
+                            >
+                                Criar conta
+                            </button>
+                        </div>
+
+                        <form className="client-auth-form" onSubmit={submitClientAuth}>
+                            {clientAuthMode === "signup" && (
+                                <>
+                                    <label>
+                                        Nome completo
+                                        <input
+                                            value={authFullName}
+                                            onChange={(event) => setAuthFullName(event.target.value)}
+                                            autoComplete="name"
+                                            maxLength={80}
+                                            required
+                                        />
+                                    </label>
+                                    <label>
+                                        Telefone / WhatsApp
+                                        <input
+                                            type="tel"
+                                            inputMode="numeric"
+                                            value={authPhone}
+                                            onChange={(event) => setAuthPhone(formatBrazilianPhone(event.target.value))}
+                                            placeholder="(00) 00000-0000"
+                                            maxLength={15}
+                                            autoComplete="tel"
+                                            required
+                                        />
+                                    </label>
+                                </>
+                            )}
+
+                            <label>
+                                E-mail
+                                <input
+                                    type="email"
+                                    value={authEmail}
+                                    onChange={(event) => setAuthEmail(event.target.value)}
+                                    autoComplete="email"
+                                    required
+                                />
+                            </label>
+
+                            <label>
+                                Senha
+                                <input
+                                    type="password"
+                                    value={authPassword}
+                                    onChange={(event) => setAuthPassword(event.target.value)}
+                                    autoComplete={clientAuthMode === "login" ? "current-password" : "new-password"}
+                                    minLength={6}
+                                    required
+                                />
+                            </label>
+
+                            {authError && <p className="client-auth-message is-error">{authError}</p>}
+                            {authSuccess && <p className="client-auth-message is-success">{authSuccess}</p>}
+
+                            <button className="client-auth-submit" type="submit" disabled={isSubmittingAuth}>
+                                {isSubmittingAuth
+                                    ? "Aguarde..."
+                                    : clientAuthMode === "login"
+                                        ? "Entrar"
+                                        : "Criar minha conta"}
+                            </button>
+                        </form>
+                    </section>
+                </div>
+            )}
+            {showClientAccount && clientUserId && (
+                <div className="client-modal-backdrop" onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) setShowClientAccount(false);
+                }}>
+                    <section className="client-modal client-modal--account">
+                        <button className="client-modal__close" type="button" onClick={() => setShowClientAccount(false)}>×</button>
+                        <span className="client-modal__eyebrow">Minha conta</span>
+                        <h2>{clientProfile ? `Olá, ${clientProfile.full_name.split(/\s+/)[0]}!` : "Sua conta"}</h2>
+                        <p>Consulte seus dados e os agendamentos vinculados ao seu perfil.</p>
+
+                        {isLoadingClientAccount ? (
+                            <div className="client-account__empty">Carregando sua conta...</div>
+                        ) : clientProfile ? (
+                            <>
+                                <div className="client-account__profile">
+                                    <div><span>Nome</span><strong>{clientProfile.full_name}</strong></div>
+                                    <div><span>Telefone</span><strong>{formatBrazilianPhone(clientProfile.phone)}</strong></div>
+                                    <div><span>E-mail</span><strong>{clientProfile.email || clientUserEmail}</strong></div>
+                                </div>
+
+                                <div className="client-account__actions">
+                                    <button className="client-account__logout" type="button" onClick={() => void logoutClient()}>
+                                        Sair da conta
+                                    </button>
+                                </div>
+
+                                <section className="client-account__section" id="client-account-appointments">
+                                    <h3>Meus agendamentos</h3>
+                                    {clientAppointments.length > 0 ? (
+                                        <div className="client-account__appointments">
+                                            {clientAppointments.map((appointment) => (
+                                                <button
+                                                    className={
+                                                        isClientAppointmentEditable(appointment)
+                                                            ? "client-account__appointment is-editable"
+                                                            : "client-account__appointment"
+                                                    }
+                                                    key={appointment.id}
+                                                    type="button"
+                                                    disabled={!isClientAppointmentEditable(appointment)}
+                                                    onClick={() => openEditClientAppointment(appointment)}
+                                                >
+                                                    <div>
+                                                        <strong>{appointment.service_name}</strong>
+                                                        <span>
+                                                            {new Date(`${appointment.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}
+                                                            {" às "}
+                                                            {String(appointment.start_time).slice(0, 5)}
+                                                        </span>
+                                                        {isClientAppointmentEditable(appointment) && (
+                                                            <span className="client-account__appointment-hint">
+                                                                Toque para alterar dia, horário ou cancelar
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="client-account__status">
+                                                        {getClientAppointmentStatusLabel(appointment.status)}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="client-account__empty">
+                                            Você ainda não possui agendamentos vinculados a esta conta.
+                                        </div>
+                                    )}
+                                </section>
+                            </>
                         ) : (
-                            <div className="booking-times__empty">
-                                <strong>Nenhum horário disponível nesta data.</strong>
-                                <span>Volte e escolha outro dia para continuar.</span>
+                            <div className="client-account__empty">
+                                Sua conta está autenticada, mas o perfil ainda não foi vinculado. Saia e entre novamente; se continuar, fale com a Mirian.
                             </div>
                         )}
-                        <button className="booking-modal__button" type="button" disabled={!selectedTime}
-                                onClick={() => {
-                                    setBookingError("");
-                                    setBookingStep(4);
-                                }}>Revisar agendamento
-                        </button>
-                    </div>
-                </div>}
-
-                {bookingStep === 4 && <div className="booking-modal">
-                    <div className="booking-modal__content">
-                        <button className="booking-modal__close" type="button" onClick={() => {
-                            setBookingError("");
-                            setBookingStep(3);
-                        }} aria-label="Voltar para os horários">←
-                        </button>
-                        <span className="section-label">Confirmação</span><h3>Revise seu agendamento</h3><p>Confira as
-                        informações antes de confirmar a solicitação.</p>
-                        <div className="booking-modal__summary">
-                            <div><span>Cliente</span><strong>{clientName}</strong></div>
-                            <div><span>Telefone</span><strong>{clientPhone}</strong></div>
-                            <div><span>Serviço</span><strong>{selectedService}</strong></div>
-                            <div><span>Data</span><strong>{formatSelectedDate()}</strong></div>
-                            <div><span>Horário</span><strong>{selectedTime}</strong></div>
-                            <div><span>Valor</span><strong>{selectedServiceInformation?.price ?? ""}</strong></div>
-                        </div>
-                        {bookingError && <p className="booking-modal__error">{bookingError}</p>}
-                        <button className="booking-modal__button" type="button" disabled={isConfirmingBooking}
-                                onClick={confirmBooking}>{isConfirmingBooking ? "Confirmando..." : "Confirmar agendamento"}</button>
-                    </div>
-                </div>}
-
-                {bookingStep === 5 && <div className="booking-modal">
-                    <div className="booking-modal__content booking-success">
-                        <div className="booking-success__icon">✓</div>
-                        <span className="section-label">Agendamento realizado</span><h3>Seu agendamento foi confirmado
-                        com sucesso!</h3><p>Obrigado, {clientName}. Seu agendamento está confirmado e o horário já foi
-                        reservado para você.</p>
-                        <div className="booking-modal__summary">
-                            <div><span>Serviço</span><strong>{selectedService}</strong></div>
-                            <div><span>Data</span><strong>{formatSelectedDate()}</strong></div>
-                            <div><span>Horário</span><strong>{selectedTime}</strong></div>
-                            <div><span>Telefone</span><strong>{clientPhone}</strong></div>
-                        </div>
-                        <button className="booking-modal__button" type="button" onClick={closeBooking}>Finalizar
-                        </button>
-                    </div>
-                </div>}
-            </section>
+                    </section>
+                </div>
+            )}
         </main>
     );
 }
@@ -936,6 +2133,8 @@ type ClientProfile = {
     full_name: string;
     phone: string;
     email: string | null;
+    phone_digits?: string;
+    user_id?: string | null;
     created_at?: string;
     updated_at?: string;
 };
@@ -3622,6 +4821,8 @@ const adminEnhancementStyles = `
 `;
 
 
+const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
+
 function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -3736,16 +4937,37 @@ function AdminPanel() {
     }, [openedWhatsAppNotifications]);
 
     useEffect(() => {
+        function sessionIsMirianAdmin(session: {user?: {email?: string | null}} | null) {
+            return session?.user?.email?.trim().toLowerCase() === MIRIAN_ADMIN_EMAIL;
+        }
+
         async function checkSession() {
             const {data: {session}} = await supabase.auth.getSession();
-            setIsAuthenticated(Boolean(session));
+            const isAdmin = sessionIsMirianAdmin(session);
+
+            if (session && !isAdmin) {
+                await supabase.auth.signOut();
+            }
+
+            setIsAuthenticated(isAdmin);
             setIsCheckingSession(false);
         }
+
         void checkSession();
+
         const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
-            setIsAuthenticated(Boolean(session));
+            const isAdmin = sessionIsMirianAdmin(session);
+
+            if (session && !isAdmin) {
+                window.setTimeout(() => {
+                    void supabase.auth.signOut();
+                }, 0);
+            }
+
+            setIsAuthenticated(isAdmin);
             setIsCheckingSession(false);
         });
+
         return () => subscription.unsubscribe();
     }, []);
 
@@ -3817,13 +5039,32 @@ function AdminPanel() {
         event.preventDefault();
         setLoginError("");
         setIsLoggingIn(true);
-        const {error} = await supabase.auth.signInWithPassword({email: email.trim(), password});
-        if (error) {
+
+        const normalizedEmail = email.trim().toLowerCase();
+
+        if (normalizedEmail !== MIRIAN_ADMIN_EMAIL) {
+            setLoginError("Esta conta não possui acesso ao painel administrativo.");
+            setIsLoggingIn(false);
+            return;
+        }
+
+        const {data, error} = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
+        });
+
+        if (error || data.user?.email?.trim().toLowerCase() !== MIRIAN_ADMIN_EMAIL) {
+            if (data.session) {
+                await supabase.auth.signOut();
+            }
+
             setLoginError("E-mail ou senha incorretos.");
             setIsLoggingIn(false);
             return;
         }
+
         setPassword("");
+        setIsAuthenticated(true);
         setIsLoggingIn(false);
     }
 
@@ -4021,7 +5262,7 @@ function AdminPanel() {
     }
 
     function normalizeClientPhone(value: string) {
-        return value.replace(/\D/g, "");
+        return normalizeBrazilianPhoneDigits(value);
     }
 
     function resetNailRecordForm() {
