@@ -303,6 +303,168 @@ const clientAccountStyles = `
 .client-password-field input {
     padding-right: 88px;
 }
+
+.client-week-picker {
+    display: grid;
+    gap: 18px;
+    margin-top: 18px;
+}
+.client-week-picker__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.client-week-picker__month {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4d363e;
+    font-weight: 900;
+    text-transform: capitalize;
+}
+.client-week-picker__calendar-button,
+.client-week-picker__nav {
+    border: 1px solid #dbc5cc;
+    border-radius: 11px;
+    background: #fff;
+    color: #6d3445;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.client-week-picker__calendar-button {
+    padding: 9px 12px;
+}
+.client-week-picker__nav {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 1.15rem;
+}
+.client-week-picker__navs {
+    display: flex;
+    gap: 7px;
+}
+.client-week-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(76px, 1fr));
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 1px 8px;
+    scrollbar-width: thin;
+}
+.client-week-day {
+    min-width: 76px;
+    border: 1px solid #e0d0d5;
+    border-radius: 15px;
+    padding: 10px 7px;
+    background: #fff;
+    color: #5d464d;
+    text-align: center;
+    font: inherit;
+    cursor: pointer;
+}
+.client-week-day strong,
+.client-week-day span {
+    display: block;
+}
+.client-week-day span {
+    font-size: .71rem;
+    font-weight: 850;
+    text-transform: capitalize;
+    color: #8a7078;
+}
+.client-week-day strong {
+    margin-top: 5px;
+    font-size: .96rem;
+}
+.client-week-day.is-selected {
+    border-color: #9a5368;
+    background: #f7e9ed;
+    color: #6d3445;
+    box-shadow: 0 0 0 2px rgba(154,83,104,.12);
+}
+.client-week-day.is-selected span {
+    color: #9a5368;
+}
+.client-week-day.is-past {
+    opacity: .42;
+    cursor: not-allowed;
+}
+.client-week-times {
+    display: grid;
+    gap: 10px;
+}
+.client-week-times__title {
+    margin: 0;
+    color: #4d363e;
+    font-size: .9rem;
+    font-weight: 900;
+}
+.client-month-calendar {
+    border: 1px solid #eadde1;
+    border-radius: 18px;
+    padding: 14px;
+    background: #fff;
+}
+.client-month-calendar__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.client-month-calendar__header strong {
+    color: #4d363e;
+    text-transform: capitalize;
+}
+.client-month-calendar__grid,
+.client-month-calendar__weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+.client-month-calendar__weekdays span {
+    padding: 4px 0;
+    color: #9a7a84;
+    font-size: .68rem;
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
+}
+.client-month-calendar__day {
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 10px;
+    background: #faf5f7;
+    color: #5d464d;
+    font: inherit;
+    font-size: .78rem;
+    cursor: pointer;
+}
+.client-month-calendar__day.is-selected {
+    background: #8f3f58;
+    color: #fff;
+    font-weight: 900;
+}
+.client-month-calendar__day.is-past {
+    opacity: .3;
+    cursor: not-allowed;
+}
+.client-month-calendar__day.is-empty {
+    visibility: hidden;
+}
+@media (max-width: 700px) {
+    .client-week-picker__top {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .client-week-days {
+        grid-template-columns: repeat(7, 82px);
+    }
+}
+
 .client-password-toggle {
     position: absolute;
     top: 50%;
@@ -758,6 +920,12 @@ function PublicSite() {
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
     const [editingClientAppointment, setEditingClientAppointment] = useState<PublicClientAppointment | null>(null);
     const [isCancellingClientAppointment, setIsCancellingClientAppointment] = useState(false);
+    const [weekReferenceDate, setWeekReferenceDate] = useState(() => formatDateForInput(new Date()));
+    const [showMonthCalendar, setShowMonthCalendar] = useState(false);
+    const [calendarMonth, setCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
 
     function normalizeRpcRow<T>(data: T | T[] | null): T | null {
         if (!data) return null;
@@ -1009,7 +1177,8 @@ function PublicSite() {
 
         setEditingClientAppointment(appointment);
         setSelectedService(appointment.service_name);
-        setSelectedDate("");
+        setSelectedDate(appointment.appointment_date);
+        setWeekReferenceDate(appointment.appointment_date);
         setSelectedTime("");
         setBookingError("");
         setClientName(clientProfile?.full_name ?? "");
@@ -1224,6 +1393,89 @@ function PublicSite() {
         (service) => service.name === selectedService,
     );
 
+    function parseLocalDate(date: string) {
+        return new Date(`${date}T12:00:00`);
+    }
+
+    function addDays(date: Date, amount: number) {
+        const result = new Date(date);
+        result.setDate(result.getDate() + amount);
+        return result;
+    }
+
+    function startOfCalendarWeek(date: Date) {
+        const result = new Date(date);
+        const day = result.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        result.setDate(result.getDate() + diffToMonday);
+        return result;
+    }
+
+    function getWeekDates(referenceDate: string) {
+        const start = startOfCalendarWeek(parseLocalDate(referenceDate));
+        return Array.from({length: 7}, (_, index) => formatDateForInput(addDays(start, index)));
+    }
+
+    function selectBookingDate(date: string) {
+        if (date < today) return;
+
+        setSelectedDate(date);
+        setWeekReferenceDate(date);
+        setSelectedTime("");
+        setBookingError("");
+        setShowMonthCalendar(false);
+    }
+
+    function moveBookingWeek(amount: number) {
+        const currentStart = startOfCalendarWeek(parseLocalDate(weekReferenceDate));
+        const nextReference = formatDateForInput(addDays(currentStart, amount * 7));
+        setWeekReferenceDate(nextReference);
+
+        const nextWeek = getWeekDates(nextReference);
+        const firstSelectable = nextWeek.find((date) => date >= today);
+
+        if (firstSelectable) {
+            setSelectedDate(firstSelectable);
+            setSelectedTime("");
+            setBookingError("");
+        }
+    }
+
+    function openMonthCalendar() {
+        const reference = selectedDate || weekReferenceDate || today;
+        const parsed = parseLocalDate(reference);
+        setCalendarMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+        setShowMonthCalendar((current) => !current);
+    }
+
+    function moveCalendarMonth(amount: number) {
+        setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
+    }
+
+    function getMonthCalendarCells() {
+        const year = calendarMonth.getFullYear();
+        const month = calendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Grade começa na segunda-feira.
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({length: leadingEmpty}, () => null),
+            ...Array.from({length: daysInMonth}, (_, index) => {
+                const date = new Date(year, month, index + 1);
+                return formatDateForInput(date);
+            }),
+        ];
+    }
+
+    const visibleWeekDates = useMemo(
+        () => getWeekDates(weekReferenceDate),
+        [weekReferenceDate],
+    );
+
     function isWeekend(date: string) {
         const day = new Date(`${date}T12:00:00`).getDay();
         return day === 0 || day === 6;
@@ -1350,6 +1602,8 @@ function PublicSite() {
         setSelectedService("");
         setSelectedDate("");
         setSelectedTime("");
+        setWeekReferenceDate(formatDateForInput(new Date()));
+        setShowMonthCalendar(false);
         setEditingClientAppointment(null);
         setBookingError("");
     }
@@ -1667,6 +1921,9 @@ function PublicSite() {
                                         onClick={() => {
                                             setEditingClientAppointment(null);
                                             selectService(service.name);
+                                            const initialDate = formatDateForInput(new Date());
+                                            setSelectedDate(initialDate);
+                                            setWeekReferenceDate(initialDate);
                                             setClientName(clientProfile?.full_name ?? "");
                                             setClientPhone(clientProfile ? formatBrazilianPhone(clientProfile.phone) : "");
                                             setBookingStep(2);
@@ -1682,16 +1939,29 @@ function PublicSite() {
 
                     {bookingStep === 2 && <div className="booking-modal">
                         <div className="booking-modal__content">
-                            <button className="booking-modal__close" type="button" onClick={() => setBookingStep(1)}
-                                    aria-label="Fechar escolha da data">×
+                            <button
+                                className="booking-modal__close"
+                                type="button"
+                                onClick={() => {
+                                    setBookingError("");
+                                    setShowMonthCalendar(false);
+                                    setBookingStep(1);
+                                }}
+                                aria-label="Fechar agenda"
+                            >
+                                ×
                             </button>
-                            <span className="section-label">{editingClientAppointment ? "Editar agendamento" : "Escolha a data"}</span>
-                            <h3>{editingClientAppointment ? "Escolha o novo dia" : "Qual o melhor dia para você?"}</h3>
+
+                            <span className="section-label">
+                            {editingClientAppointment ? "Editar agendamento" : "Escolha data e horário"}
+                        </span>
+                            <h3>
+                                {editingClientAppointment ? "Escolha o novo dia e horário" : "Quando fica melhor para você?"}
+                            </h3>
                             <p>
-                                {editingClientAppointment
-                                    ? "Escolha uma nova data e depois um novo horário disponível."
-                                    : "As clientes podem escolher qualquer data futura."}
+                                Toque em qualquer dia da semana para ver os horários disponíveis sem precisar voltar.
                             </p>
+
                             {editingClientAppointment && (
                                 <div className="client-edit-current">
                                     <span>Agendamento atual</span>
@@ -1702,86 +1972,199 @@ function PublicSite() {
                                     </strong>
                                 </div>
                             )}
-                            <input className="booking-modal__date" type="date" min={today}
-                                   value={selectedDate} onChange={(event) => {
-                                setSelectedDate(event.target.value);
-                                setSelectedTime("");
-                                setBookingError("");
-                            }}/>
-                            <div className="booking-modal__availability"><strong>Horários de atendimento</strong><span>Segunda a sexta: 07:00 até o último início às 19:00</span><span>Sábado e domingo: 07:00 até o último início às 13:00</span>
-                            </div>
-                            <div className="client-edit-actions">
-                                <button className="booking-modal__button" type="button"
-                                        disabled={!selectedDate || isLoadingAppointments}
-                                        onClick={() => setBookingStep(3)}>Continuar para horários
-                                </button>
-                                {editingClientAppointment && (
-                                    <button
-                                        className="client-edit-cancel"
-                                        type="button"
-                                        disabled={isCancellingClientAppointment}
-                                        onClick={() => void cancelEditingClientAppointment()}
-                                    >
-                                        {isCancellingClientAppointment ? "Cancelando..." : "Cancelar agendamento"}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>}
 
-
-                    {bookingStep === 3 && <div className="booking-modal">
-                        <div className="booking-modal__content">
-                            <button className="booking-modal__close" type="button" onClick={() => {
-                                setBookingError("");
-                                setBookingStep(2);
-                            }} aria-label="Voltar para a escolha da data">←
-                            </button>
-                            <span className="section-label">Escolha o horário</span><h3>Qual horário fica melhor?</h3><p>Os
-                            horários são calculados conforme os atendimentos já registrados e a duração do serviço.</p>
-                            <div className="booking-modal__summary">
-                                <div><span>Serviço</span><strong>{selectedService}</strong></div>
-                                <div><span>Data escolhida</span><strong>{formatSelectedDate()}</strong></div>
-                                <div><span>Duração</span><strong>{selectedServiceInformation?.duration}</strong></div>
-                                <div>
-                                    <span>Tipo de agenda</span><strong>{isWeekend(selectedDate) ? "Fim de semana" : "Segunda a sexta"}</strong>
-                                </div>
-                            </div>
-                            {bookingError && <p className="booking-modal__error">{bookingError}</p>}
-                            {isLoadingAppointments ? (
-                                <p>Carregando horários disponíveis...</p>
-                            ) : availableTimes.length > 0 ? (
-                                <div className="booking-times">
-                                    {availableTimes.map((time) => (
+                            <div className="client-week-picker">
+                                <div className="client-week-picker__top">
+                                    <div className="client-week-picker__month">
+                                        <strong>
+                                            {parseLocalDate(selectedDate || weekReferenceDate).toLocaleDateString("pt-BR", {
+                                                month: "long",
+                                                year: "numeric",
+                                            })}
+                                        </strong>
                                         <button
-                                            key={time}
-                                            className={
-                                                selectedTime === time
-                                                    ? "booking-time booking-time--selected"
-                                                    : "booking-time"
-                                            }
+                                            className="client-week-picker__calendar-button"
                                             type="button"
-                                            onClick={() => {
-                                                setSelectedTime(time);
-                                                setBookingError("");
-                                            }}
+                                            onClick={openMonthCalendar}
+                                            aria-label="Abrir calendário do mês"
                                         >
-                                            {time}
+                                            📅
                                         </button>
-                                    ))}
+                                    </div>
+
+                                    <div className="client-week-picker__navs">
+                                        <button
+                                            className="client-week-picker__nav"
+                                            type="button"
+                                            onClick={() => moveBookingWeek(-1)}
+                                            aria-label="Semana anterior"
+                                        >
+                                            ‹
+                                        </button>
+                                        <button
+                                            className="client-week-picker__nav"
+                                            type="button"
+                                            onClick={() => moveBookingWeek(1)}
+                                            aria-label="Próxima semana"
+                                        >
+                                            ›
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="booking-times__empty">
-                                    <strong>Nenhum horário disponível nesta data.</strong>
-                                    <span>Volte e escolha outro dia para continuar.</span>
+
+                                {showMonthCalendar && (
+                                    <div className="client-month-calendar">
+                                        <div className="client-month-calendar__header">
+                                            <button
+                                                className="client-week-picker__nav"
+                                                type="button"
+                                                onClick={() => moveCalendarMonth(-1)}
+                                                aria-label="Mês anterior"
+                                            >
+                                                ‹
+                                            </button>
+                                            <strong>
+                                                {calendarMonth.toLocaleDateString("pt-BR", {
+                                                    month: "long",
+                                                    year: "numeric",
+                                                })}
+                                            </strong>
+                                            <button
+                                                className="client-week-picker__nav"
+                                                type="button"
+                                                onClick={() => moveCalendarMonth(1)}
+                                                aria-label="Próximo mês"
+                                            >
+                                                ›
+                                            </button>
+                                        </div>
+
+                                        <div className="client-month-calendar__weekdays">
+                                            {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day) => (
+                                                <span key={day}>{day}</span>
+                                            ))}
+                                        </div>
+
+                                        <div className="client-month-calendar__grid">
+                                            {getMonthCalendarCells().map((date, index) => {
+                                                if (!date) {
+                                                    return <span className="client-month-calendar__day is-empty" key={`empty-${index}`}/>;
+                                                }
+
+                                                const isPast = date < today;
+
+                                                return (
+                                                    <button
+                                                        key={date}
+                                                        type="button"
+                                                        disabled={isPast}
+                                                        className={[
+                                                            "client-month-calendar__day",
+                                                            date === selectedDate ? "is-selected" : "",
+                                                            isPast ? "is-past" : "",
+                                                        ].filter(Boolean).join(" ")}
+                                                        onClick={() => selectBookingDate(date)}
+                                                    >
+                                                        {parseLocalDate(date).getDate()}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="client-week-days">
+                                    {visibleWeekDates.map((date) => {
+                                        const parsed = parseLocalDate(date);
+                                        const isPast = date < today;
+
+                                        return (
+                                            <button
+                                                key={date}
+                                                type="button"
+                                                disabled={isPast}
+                                                className={[
+                                                    "client-week-day",
+                                                    date === selectedDate ? "is-selected" : "",
+                                                    isPast ? "is-past" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => selectBookingDate(date)}
+                                            >
+                                            <span>
+                                                {parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}
+                                            </span>
+                                                <strong>
+                                                    {parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}
+                                                </strong>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            )}
-                            <button className="booking-modal__button" type="button" disabled={!selectedTime}
-                                    onClick={() => {
-                                        setBookingError("");
-                                        setBookingStep(4);
-                                    }}>Revisar agendamento
-                            </button>
+
+                                <div className="client-week-times">
+                                    <p className="client-week-times__title">
+                                        {selectedDate
+                                            ? `Horários disponíveis em ${parseLocalDate(selectedDate).toLocaleDateString("pt-BR")}`
+                                            : "Escolha um dia"}
+                                    </p>
+
+                                    {bookingError && <p className="booking-modal__error">{bookingError}</p>}
+
+                                    {isLoadingAppointments ? (
+                                        <p>Carregando horários disponíveis...</p>
+                                    ) : selectedDate && availableTimes.length > 0 ? (
+                                        <div className="booking-times">
+                                            {availableTimes.map((time) => (
+                                                <button
+                                                    key={time}
+                                                    className={
+                                                        selectedTime === time
+                                                            ? "booking-time booking-time--selected"
+                                                            : "booking-time"
+                                                    }
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedTime(time);
+                                                        setBookingError("");
+                                                    }}
+                                                >
+                                                    {time}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : selectedDate ? (
+                                        <div className="booking-times__empty">
+                                            <strong>Nenhum horário disponível neste dia.</strong>
+                                            <span>Toque em outro dia da semana para consultar os horários.</span>
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                <div className="client-edit-actions">
+                                    <button
+                                        className="booking-modal__button"
+                                        type="button"
+                                        disabled={!selectedDate || !selectedTime}
+                                        onClick={() => {
+                                            setBookingError("");
+                                            setBookingStep(4);
+                                        }}
+                                    >
+                                        Revisar agendamento
+                                    </button>
+
+                                    {editingClientAppointment && (
+                                        <button
+                                            className="client-edit-cancel"
+                                            type="button"
+                                            disabled={isCancellingClientAppointment}
+                                            onClick={() => void cancelEditingClientAppointment()}
+                                        >
+                                            {isCancellingClientAppointment ? "Cancelando..." : "Cancelar agendamento"}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>}
 
@@ -1790,8 +2173,8 @@ function PublicSite() {
                         <div className="booking-modal__content">
                             <button className="booking-modal__close" type="button" onClick={() => {
                                 setBookingError("");
-                                setBookingStep(3);
-                            }} aria-label="Voltar para os horários">←
+                                setBookingStep(2);
+                            }} aria-label="Voltar para data e horários">←
                             </button>
                             <span className="section-label">{editingClientAppointment ? "Confirmar alteração" : "Confirmação"}</span>
                             <h3>{editingClientAppointment ? "Revise o novo dia e horário" : "Revise seu agendamento"}</h3>
