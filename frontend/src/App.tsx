@@ -4825,6 +4825,7 @@ const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
 
 function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
+    const [adminNow, setAdminNow] = useState(() => new Date());
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -4924,6 +4925,15 @@ function AdminPanel() {
         const timer = window.setInterval(() => setNotificationClock(Date.now()), 60_000);
         return () => window.clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        const clock = window.setInterval(() => {
+            setAdminNow(new Date());
+        }, 30000);
+
+        return () => window.clearInterval(clock);
+    }, []);
+
 
     useEffect(() => {
         try {
@@ -5210,35 +5220,6 @@ function AdminPanel() {
         setAppointmentEditError("");
     }
 
-    async function completeAppointment(appointment: AdminAppointment) {
-        if (!window.confirm(`Marcar o atendimento de ${appointment.client_name} como concluído?`)) return;
-
-        const {error} = await supabase
-            .from("appointments")
-            .update({status: "completed"})
-            .eq("id", appointment.id);
-
-        if (error) {
-            console.error("Erro ao concluir atendimento:", error);
-            setPanelError("Não foi possível concluir o atendimento.");
-            return;
-        }
-
-        setAppointments((current) =>
-            current.map((item) =>
-                item.id === appointment.id
-                    ? {...item, status: "completed"}
-                    : item,
-            ),
-        );
-
-        setSelectedAdminAppointment((current) =>
-            current?.id === appointment.id
-                ? {...current, status: "completed"}
-                : current,
-        );
-    }
-
     async function cancelAppointment(appointment: AdminAppointment) {
         if (!window.confirm(`Cancelar o agendamento de ${appointment.client_name}?`)) return;
         const {error} = await supabase.from("appointments").update({status: "cancelled"}).eq("id", appointment.id);
@@ -5247,17 +5228,6 @@ function AdminPanel() {
             return;
         }
         setAppointments((current) => current.map((item) => item.id === appointment.id ? {...item, status: "cancelled"} : item));
-        setSelectedAdminAppointment((current) => current?.id === appointment.id ? {...current, status: "cancelled"} : current);
-    }
-
-    async function deleteAppointment(appointment: AdminAppointment) {
-        if (!window.confirm(`Excluir definitivamente o agendamento de ${appointment.client_name}?`)) return;
-        const {error} = await supabase.from("appointments").delete().eq("id", appointment.id);
-        if (error) {
-            setAppointmentEditError("Não foi possível excluir o agendamento.");
-            return;
-        }
-        setAppointments((current) => current.filter((item) => item.id !== appointment.id));
         setSelectedAdminAppointment(null);
     }
 
@@ -5710,15 +5680,37 @@ function AdminPanel() {
         return Array.from({length: 7}, (_, index) => addDaysToInputDate(monday, index));
     }, [agendaDate]);
 
+    function shouldShowAppointmentInAdminAgenda(appointment: AdminAppointment) {
+        if (
+            appointment.status === "cancelled" ||
+            appointment.status === "completed" ||
+            appointment.status === "no-show"
+        ) {
+            return false;
+        }
+
+        return getAppointmentDateTime(appointment).getTime() > adminNow.getTime();
+    }
+
     const agendaAppointments = useMemo(() =>
-            appointments.filter((item) => item.appointment_date === agendaDate)
+            appointments
+                .filter(
+                    (item) =>
+                        item.appointment_date === agendaDate &&
+                        shouldShowAppointmentInAdminAgenda(item),
+                )
                 .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
-        [appointments, agendaDate]);
+        [appointments, agendaDate, adminNow]);
 
     const weeklyAppointments = useMemo(() =>
-            appointments.filter((item) => weekDates.includes(item.appointment_date))
+            appointments
+                .filter(
+                    (item) =>
+                        weekDates.includes(item.appointment_date) &&
+                        shouldShowAppointmentInAdminAgenda(item),
+                )
                 .sort((a, b) => `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(`${b.appointment_date}${String(b.start_time).slice(0, 5)}`)),
-        [appointments, weekDates]);
+        [appointments, weekDates, adminNow]);
 
     function addMonthsToFinanceMonth(monthValue: string, amount: number) {
         const [year, month] = monthValue.split("-").map(Number);
@@ -5740,15 +5732,27 @@ function AdminPanel() {
     );
 
     const completedFinanceAppointments = useMemo(
-        () => financeAppointments.filter((appointment) => appointment.status === "completed"),
-        [financeAppointments],
+        () => financeAppointments.filter(
+            (appointment) =>
+                appointment.status !== "cancelled" &&
+                appointment.status !== "no-show" &&
+                (
+                    appointment.status === "completed" ||
+                    getAppointmentDateTime(appointment).getTime() <= adminNow.getTime()
+                ),
+        ),
+        [financeAppointments, adminNow],
     );
 
     const scheduledFinanceAppointments = useMemo(
         () => financeAppointments.filter(
-            (appointment) => appointment.status === "confirmed" || appointment.status === "pending",
+            (appointment) =>
+                appointment.status !== "cancelled" &&
+                appointment.status !== "no-show" &&
+                appointment.status !== "completed" &&
+                getAppointmentDateTime(appointment).getTime() > adminNow.getTime(),
         ),
-        [financeAppointments],
+        [financeAppointments, adminNow],
     );
 
     const completedRevenueCents = useMemo(
@@ -5781,7 +5785,11 @@ function AdminPanel() {
                 scheduledCents: 0,
             };
 
-            if (appointment.status === "completed") {
+            const isAutomaticallyCompleted =
+                appointment.status === "completed" ||
+                getAppointmentDateTime(appointment).getTime() <= adminNow.getTime();
+
+            if (isAutomaticallyCompleted) {
                 current.completedCount += 1;
                 current.completedCents += appointment.price_cents ?? 0;
             } else {
@@ -5795,7 +5803,7 @@ function AdminPanel() {
         return Array.from(summary.values()).sort(
             (a, b) => (b.completedCents + b.scheduledCents) - (a.completedCents + a.scheduledCents),
         );
-    }, [completedFinanceAppointments, scheduledFinanceAppointments]);
+    }, [completedFinanceAppointments, scheduledFinanceAppointments, adminNow]);
 
     function getNotificationKey(appointmentId: string, type: WhatsAppNotificationType) {
         return `${appointmentId}:${type}`;
@@ -5988,12 +5996,7 @@ function AdminPanel() {
                 </div>
                 <div className="admin-booking-card__footer" onClick={(event) => event.stopPropagation()}>
                     <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar detalhes</button>
-                    {appointment.status !== "cancelled" && appointment.status !== "completed" && (
-                        <button type="button" onClick={() => void completeAppointment(appointment)}>Concluir atendimento</button>
-                    )}
-                    {appointment.status !== "cancelled" && appointment.status !== "completed" && (
-                        <button type="button" onClick={() => void cancelAppointment(appointment)}>Cancelar</button>
-                    )}
+                    <button type="button" onClick={() => void cancelAppointment(appointment)}>Cancelar</button>
                     {dueTypes.map((type) => {
                         const key = getNotificationKey(appointment.id, type);
                         const wasOpened = Boolean(openedWhatsAppNotifications[key]);
@@ -6220,7 +6223,7 @@ function AdminPanel() {
                         </section>
 
                         <p className="admin-finance__note">
-                            Agendamentos cancelados ou marcados como não compareceu não entram nos valores financeiros.
+                            Ao chegar o horário, o agendamento é considerado realizado automaticamente. Cancelados e não comparecimentos não entram nos valores financeiros.
                         </p>
                     </section>
                 ) : adminView === "settings" ? (
@@ -6355,7 +6358,7 @@ function AdminPanel() {
                 {selectedAdminAppointment && (
                     <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedAdminAppointment(null);}}>
                         <section className="admin-modal">
-                            <div className="admin-modal__header"><div><h2>Editar agendamento</h2><p>Altere os dados, cancele ou exclua.</p></div><button className="admin-modal__close" type="button" onClick={() => setSelectedAdminAppointment(null)}>×</button></div>
+                            <div className="admin-modal__header"><div><h2>Editar agendamento</h2><p>Altere os dados ou cancele o agendamento.</p></div><button className="admin-modal__close" type="button" onClick={() => setSelectedAdminAppointment(null)}>×</button></div>
                             <div className="admin-modal__body">
                                 <div className="admin-edit-form">
                                     <label>Nome da cliente<input value={editAppointmentName} onChange={(event) => setEditAppointmentName(event.target.value)}/></label>
@@ -6367,13 +6370,7 @@ function AdminPanel() {
                                     {appointmentEditError && <p className="admin-reschedule__message admin-edit-form__full">{appointmentEditError}</p>}
                                     <div className="admin-edit-actions">
                                         <button className="save" type="button" disabled={isSavingAppointment} onClick={() => void saveAppointmentChanges()}>{isSavingAppointment ? "Salvando..." : "Salvar alterações"}</button>
-                                        {selectedAdminAppointment.status !== "cancelled" && selectedAdminAppointment.status !== "completed" && (
-                                            <button className="save" type="button" onClick={() => void completeAppointment(selectedAdminAppointment)}>Concluir atendimento</button>
-                                        )}
-                                        {selectedAdminAppointment.status !== "cancelled" && selectedAdminAppointment.status !== "completed" && (
-                                            <button className="cancel" type="button" onClick={() => void cancelAppointment(selectedAdminAppointment)}>Cancelar agendamento</button>
-                                        )}
-                                        <button className="delete" type="button" onClick={() => void deleteAppointment(selectedAdminAppointment)}>Excluir agendamento</button>
+                                        <button className="cancel" type="button" onClick={() => void cancelAppointment(selectedAdminAppointment)}>Cancelar agendamento</button>
                                         <button className="close" type="button" onClick={() => setSelectedAdminAppointment(null)}>Fechar</button>
                                     </div>
                                 </div>
