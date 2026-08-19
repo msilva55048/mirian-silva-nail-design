@@ -3824,10 +3824,10 @@ function buildWhatsAppMessage(
     const time = String(appointment.start_time).slice(0, 5);
 
     if (type === "attendance-confirmation") {
-        return `Olá, ${firstName}! Seu atendimento com a Mirian Silva Nail Design está marcado para amanhã, dia ${date}, às ${time}.\n\nPoderia confirmar seu comparecimento?`;
+        return `Oie ${firstName}! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia ${date}, às ${time}. Posso confirmar sua presença? 💅`;
     }
 
-    return `Olá, ${firstName}! Passando para lembrar que seu atendimento com a Mirian Silva Nail Design será hoje às ${time}.\n\nEsperamos você! 💅`;
+    return `Oie ${firstName}! Tudo bem? Passando para lembrar do nosso horário de hoje, às ${time}. Estarei te esperando. 💅`;
 }
 
 function getWhatsAppNotificationLabel(type: WhatsAppNotificationType) {
