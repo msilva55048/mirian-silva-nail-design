@@ -5200,6 +5200,33 @@ const adminEnhancementStyles = `
     white-space: nowrap;
 }
 
+.admin-nail-record__top-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-nail-record__delete {
+    border: 1px solid #e6b8bf;
+    border-radius: 9px;
+    padding: 7px 10px;
+    background: #fff1f3;
+    color: #a23f4d;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.admin-nail-record__delete:hover {
+    background: #ffe5e9;
+}
+
+.admin-nail-record__delete:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
 .admin-nail-record__notes {
     margin: 10px 0 0;
     color: #654d55;
@@ -5346,6 +5373,7 @@ function AdminPanel() {
     const [nailRecordError, setNailRecordError] = useState("");
     const [nailRecordSuccess, setNailRecordSuccess] = useState("");
     const [isSavingNailRecord, setIsSavingNailRecord] = useState(false);
+    const [deletingNailRecordId, setDeletingNailRecordId] = useState<string | null>(null);
 
     const nailRecordFilePreviews = useMemo(
         () => nailRecordFiles.map((file) => ({
@@ -5988,6 +6016,71 @@ function AdminPanel() {
             );
         } finally {
             setIsSavingNailRecord(false);
+        }
+    }
+
+    async function deleteNailRecord(record: NailRecord) {
+        if (!selectedClient || deletingNailRecordId) {
+            return;
+        }
+
+        const confirmed = window.confirm(
+            "Deseja realmente excluir este registro da unha? As fotos e observações deste registro serão apagadas permanentemente.",
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingNailRecordId(record.id);
+        setNailRecordError("");
+        setNailRecordSuccess("");
+
+        try {
+            const photoPaths = record.photos
+                .map((photo) => photo.photo_path)
+                .filter(Boolean);
+
+            if (photoPaths.length) {
+                const {error: storageError} = await supabase
+                    .storage
+                    .from("nail-records")
+                    .remove(photoPaths);
+
+                if (storageError) {
+                    throw storageError;
+                }
+            }
+
+            const {error: photoDeleteError} = await supabase
+                .from("nail_record_photos")
+                .delete()
+                .eq("nail_record_id", record.id);
+
+            if (photoDeleteError) {
+                throw photoDeleteError;
+            }
+
+            const {error: recordDeleteError} = await supabase
+                .from("nail_records")
+                .delete()
+                .eq("id", record.id);
+
+            if (recordDeleteError) {
+                throw recordDeleteError;
+            }
+
+            setNailRecords((current) =>
+                current.filter((item) => item.id !== record.id),
+            );
+            setNailRecordSuccess("Registro da unha excluído com sucesso.");
+        } catch (error) {
+            console.error("Erro ao excluir registro da unha:", error);
+            setNailRecordError(
+                "Não foi possível excluir o registro da unha. Tente novamente.",
+            );
+        } finally {
+            setDeletingNailRecordId(null);
         }
     }
 
@@ -6939,15 +7032,25 @@ function AdminPanel() {
                                             <article className="admin-nail-record" key={record.id}>
                                                 <div className="admin-nail-record__top">
                                                     <strong>Registro fotográfico</strong>
-                                                    <span>
-                                                        {new Date(record.created_at).toLocaleString("pt-BR", {
-                                                            day: "2-digit",
-                                                            month: "2-digit",
-                                                            year: "numeric",
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                        })}
-                                                    </span>
+                                                    <div className="admin-nail-record__top-actions">
+                                                        <span>
+                                                            {new Date(record.created_at).toLocaleString("pt-BR", {
+                                                                day: "2-digit",
+                                                                month: "2-digit",
+                                                                year: "numeric",
+                                                                hour: "2-digit",
+                                                                minute: "2-digit",
+                                                            })}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            className="admin-nail-record__delete"
+                                                            disabled={deletingNailRecordId === record.id}
+                                                            onClick={() => void deleteNailRecord(record)}
+                                                        >
+                                                            {deletingNailRecordId === record.id ? "Excluindo..." : "Excluir"}
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <p className="admin-nail-record__notes">
@@ -7038,3 +7141,4 @@ function App() {
 }
 
 export default App;
+
