@@ -1538,75 +1538,33 @@ function PublicSite() {
         if (!date) return [];
 
         const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
-        const configuredHours = businessHours[dayOfWeek];
-        const openingTime = configuredHours
-            ? timeToMinutes(configuredHours.startTime)
-            : 7 * 60;
-
         const weekend = dayOfWeek === 0 || dayOfWeek === 6;
-        const defaultInterval = 30;
         const occupiedIntervals = getOccupiedIntervals(date);
-        const generatedTimes: number[] = [];
 
         /*
-         * DISPONIBILIDADE DA CLIENTE
+         * AGENDA PÚBLICA ATUAL DA MIRIAN
          *
-         * Segunda a sexta:
-         * - 1º período: início entre 07:00 e 13:00;
-         * - o serviço iniciado no 1º período precisa terminar até 15:00;
-         * - intervalo reservado da Mirian: 15:00 até 17:00;
-         * - 2º período: início entre 17:00 e 19:00;
-         * - 19:00 continua sendo um horário válido de início.
+         * Segunda a sexta, enquanto ela continua trabalhando como CLT,
+         * as clientes podem iniciar atendimento SOMENTE nestes horários:
+         * 07:00, 19:30 e 21:00.
          *
-         * Sábado e domingo permanecem com a regra atual:
-         * - início entre 07:00 e 13:00.
+         * Sábado e domingo mantêm a regra atual, das 07:00 às 13:00,
+         * em intervalos de 30 minutos.
          *
-         * O painel ADM não usa este intervalo e continua podendo
-         * realizar encaixes no período das 15:00 às 17:00.
+         * A duração do serviço continua sendo considerada normalmente:
+         * um horário deixa de aparecer se o período ocupado pelo serviço
+         * entrar em conflito com outro agendamento ou bloqueio.
          */
-        const firstPeriodLastStart = 13 * 60;
-        const breakStart = 15 * 60;
-        const secondPeriodStart = 17 * 60;
-        const weekdayLastStart = 19 * 60;
-        const weekendLastStart = 13 * 60;
-        const lastStartingTime = weekend ? weekendLastStart : weekdayLastStart;
-
-        let cursor = openingTime;
-        let safetyCounter = 0;
-
-        while (cursor <= lastStartingTime && safetyCounter < 100) {
-            safetyCounter += 1;
-
-            const intervalAtCursor = occupiedIntervals.find(
-                (interval) => interval.start <= cursor && interval.end > cursor,
-            );
-
-            if (intervalAtCursor) {
-                cursor = intervalAtCursor.end;
-                continue;
-            }
-
-            generatedTimes.push(cursor);
-            cursor += defaultInterval;
-        }
+        const generatedTimes = weekend
+            ? Array.from(
+                {length: Math.floor((13 * 60 - 7 * 60) / 30) + 1},
+                (_, index) => 7 * 60 + index * 30,
+            )
+            : [7 * 60, 19 * 60 + 30, 21 * 60];
 
         return generatedTimes
             .filter((start) => {
                 const end = start + serviceDurationMinutes;
-
-                if (!weekend) {
-                    const fitsFirstPeriod =
-                        start <= firstPeriodLastStart &&
-                        end <= breakStart;
-
-                    const fitsSecondPeriod =
-                        start >= secondPeriodStart &&
-                        start <= weekdayLastStart;
-
-                    if (!fitsFirstPeriod && !fitsSecondPeriod) {
-                        return false;
-                    }
-                }
 
                 const hasConflict = occupiedIntervals.some((interval) =>
                     intervalsOverlap(start, end, interval.start, interval.end),
@@ -1723,6 +1681,26 @@ function PublicSite() {
             const selectedStart = timeToMinutes(selectedTime);
             const selectedEnd =
                 selectedStart + selectedServiceInformation.durationMinutes;
+
+            const selectedDayOfWeek = new Date(`${selectedDate}T12:00:00`).getDay();
+            const selectedIsWeekend =
+                selectedDayOfWeek === 0 || selectedDayOfWeek === 6;
+
+            const allowedPublicStarts = selectedIsWeekend
+                ? Array.from(
+                    {length: Math.floor((13 * 60 - 7 * 60) / 30) + 1},
+                    (_, index) => 7 * 60 + index * 30,
+                )
+                : [7 * 60, 19 * 60 + 30, 21 * 60];
+
+            if (!allowedPublicStarts.includes(selectedStart)) {
+                setSelectedTime("");
+                setBookingStep(3);
+                setBookingError(
+                    "Este horário não faz parte da agenda disponível da Mirian. Escolha outro horário.",
+                );
+                return;
+            }
 
             const hasAppointmentConflict =
                 appointmentsForSelectedDate.some((appointment) => {
@@ -6502,15 +6480,13 @@ function AdminPanel() {
 
         const openingTime = getMinutesFromTime(configuredHours.start_time);
 
-        // O ADM mantém a agenda integral, sem o intervalo público das 15:00 às 17:00.
-        // Segunda a sexta: pode iniciar atendimentos normalmente até 19:00.
+        // O ADM mantém liberdade para fazer encaixes.
+        // Segunda a sexta: grade integral de 07:00 até 21:00.
         // Sábado e domingo permanecem com o limite atual de 13:00.
-        const publicLastStartingTime = (date.getDay() === 0 || date.getDay() === 6) ? 13 * 60 : 19 * 60;
-        const configuredLastStartingTime = getMinutesFromTime(configuredHours.end_time);
-        const lastStartingTime = Math.min(
-            publicLastStartingTime,
-            configuredLastStartingTime,
-        );
+        const lastStartingTime =
+            (date.getDay() === 0 || date.getDay() === 6)
+                ? 13 * 60
+                : 21 * 60;
 
         const occupied: TimeInterval[] = [
             ...appointments
@@ -6865,7 +6841,8 @@ function AdminPanel() {
 
     const blockAvailableTimes = useMemo(() => {
         const day = new Date(`${blockDate}T12:00:00`).getDay();
-        const lastStart = day === 0 || day === 6 ? 13 * 60 : 19 * 60;
+        // O ADM pode bloquear qualquer período da grade integral nos dias úteis.
+        const lastStart = day === 0 || day === 6 ? 13 * 60 : 21 * 60;
         const occupied = appointments.filter((item) => item.appointment_date === blockDate && item.status !== "cancelled")
             .map((item) => {
                 const start = getMinutesFromTime(item.start_time);
