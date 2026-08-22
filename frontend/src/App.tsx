@@ -5756,6 +5756,7 @@ function AdminPanel() {
         }
 
         const service = adminServices.find((item) => item.name === manualServiceName);
+
         if (!service) {
             setManualError("Escolha um serviço válido.");
             return;
@@ -5769,33 +5770,13 @@ function AdminPanel() {
         setIsSavingManualAppointment(true);
 
         try {
-            let profileId = selectedManualClient.profileId;
-            let profileName = selectedManualClient.name;
-
-            if (!profileId) {
-                const profile = await ensureClientProfile({
-                    key: selectedManualClient.key,
-                    name: selectedManualClient.name,
-                    phone: selectedManualClient.phone,
-                    email: selectedManualClient.email,
-                    appointments: [],
-                    lastAppointment: null,
-                    nextAppointment: null,
-                });
-
-                profileId = profile.id;
-                profileName = profile.full_name;
-
-                setAdminClientProfiles((current) => {
-                    if (current.some((item) => item.id === profile.id)) return current;
-                    return [...current, profile].sort((a, b) => a.full_name.localeCompare(b.full_name, "pt-BR"));
-                });
-            }
-
-            const {data: createdAppointmentId, error: createError} = await supabase.rpc(
+            const {data: createdData, error: createError} = await supabase.rpc(
                 "admin_create_client_appointment",
                 {
-                    p_client_profile_id: profileId,
+                    p_client_profile_id: selectedManualClient.profileId,
+                    p_client_name: selectedManualClient.name,
+                    p_client_phone: selectedManualClient.phone,
+                    p_client_email: selectedManualClient.email || null,
                     p_service_name: service.name,
                     p_appointment_date: manualDate,
                     p_start_time: manualTime,
@@ -5804,37 +5785,67 @@ function AdminPanel() {
                 },
             );
 
-            if (createError || !createdAppointmentId) {
+            if (createError) {
                 console.error("Erro detalhado ao criar agendamento administrativo:", createError);
-                throw createError ?? new Error("A função administrativa não retornou o agendamento criado.");
+
+                const details = [
+                    createError.message,
+                    createError.details,
+                    createError.hint,
+                    createError.code ? `Código ${createError.code}` : "",
+                ].filter(Boolean).join(" • ");
+
+                throw new Error(details || "O Supabase recusou a criação do agendamento.");
             }
 
-            const {data: createdAppointment, error: reloadError} = await supabase
-                .from("appointments")
-                .select("id, client_id, client_name, client_phone, client_email, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at")
-                .eq("id", createdAppointmentId)
-                .single();
+            const createdRow = Array.isArray(createdData)
+                ? createdData[0]
+                : createdData;
 
-            if (reloadError || !createdAppointment) {
-                console.error("Agendamento foi criado, mas não foi possível recarregar:", reloadError);
-                throw reloadError ?? new Error("Agendamento criado, mas não foi possível recarregar os dados.");
+            if (!createdRow?.id) {
+                console.error("Retorno inesperado da função administrativa:", createdData);
+                throw new Error("O agendamento não retornou os dados esperados.");
             }
 
-            setAppointments((current) => [...current, createdAppointment as AdminAppointment]);
-            setManualSuccess(`Agendamento de ${profileName} criado com sucesso e vinculado ao perfil da cliente.`);
+            const createdAppointment = createdRow as AdminAppointment;
+
+            setAppointments((current) => [
+                ...current.filter((item) => item.id !== createdAppointment.id),
+                createdAppointment,
+            ]);
+
+            if (createdRow.client_id) {
+                setAdminClientProfiles((current) => {
+                    if (current.some((profile) => profile.id === createdRow.client_id)) {
+                        return current;
+                    }
+
+                    return [
+                        ...current,
+                        {
+                            id: createdRow.client_id,
+                            full_name: createdRow.client_name,
+                            phone: createdRow.client_phone,
+                            email: createdRow.client_email,
+                        } as ClientProfile,
+                    ].sort((a, b) => a.full_name.localeCompare(b.full_name, "pt-BR"));
+                });
+            }
+
+            setManualSuccess(
+                `Agendamento de ${createdRow.client_name} criado com sucesso e vinculado ao perfil da cliente.`,
+            );
             setAgendaDate(manualDate);
             setManualTime("");
         } catch (error) {
             console.error("Erro ao criar agendamento:", error);
+
             const message =
-                error && typeof error === "object" && "message" in error
-                    ? String((error as {message?: unknown}).message ?? "")
-                    : "";
-            setManualError(
-                message
-                    ? `Não foi possível criar o agendamento: ${message}`
-                    : "Não foi possível criar o agendamento.",
-            );
+                error instanceof Error
+                    ? error.message
+                    : "Erro desconhecido retornado pelo Supabase.";
+
+            setManualError(`Não foi possível criar o agendamento: ${message}`);
         } finally {
             setIsSavingManualAppointment(false);
         }
