@@ -1502,11 +1502,6 @@ function PublicSite() {
         [weekReferenceDate],
     );
 
-    function isWeekend(date: string) {
-        const day = new Date(`${date}T12:00:00`).getDay();
-        return day === 0 || day === 6;
-    }
-
     function getOccupiedIntervals(date: string) {
         const appointmentIntervals = appointments
             .filter(
@@ -1548,13 +1543,33 @@ function PublicSite() {
             ? timeToMinutes(configuredHours.startTime)
             : 7 * 60;
 
-        // O horário final representa o último horário em que um atendimento pode começar.
-        // Segunda a sexta: último início às 19:00.
-        // Sábado e domingo: último início às 13:00.
-        const lastStartingTime = isWeekend(date) ? 13 * 60 : 19 * 60;
+        const weekend = dayOfWeek === 0 || dayOfWeek === 6;
         const defaultInterval = 30;
         const occupiedIntervals = getOccupiedIntervals(date);
         const generatedTimes: number[] = [];
+
+        /*
+         * DISPONIBILIDADE DA CLIENTE
+         *
+         * Segunda a sexta:
+         * - 1º período: início entre 07:00 e 13:00;
+         * - o serviço iniciado no 1º período precisa terminar até 15:00;
+         * - intervalo reservado da Mirian: 15:00 até 17:00;
+         * - 2º período: início entre 17:00 e 19:00;
+         * - 19:00 continua sendo um horário válido de início.
+         *
+         * Sábado e domingo permanecem com a regra atual:
+         * - início entre 07:00 e 13:00.
+         *
+         * O painel ADM não usa este intervalo e continua podendo
+         * realizar encaixes no período das 15:00 às 17:00.
+         */
+        const firstPeriodLastStart = 13 * 60;
+        const breakStart = 15 * 60;
+        const secondPeriodStart = 17 * 60;
+        const weekdayLastStart = 19 * 60;
+        const weekendLastStart = 13 * 60;
+        const lastStartingTime = weekend ? weekendLastStart : weekdayLastStart;
 
         let cursor = openingTime;
         let safetyCounter = 0;
@@ -1578,6 +1593,21 @@ function PublicSite() {
         return generatedTimes
             .filter((start) => {
                 const end = start + serviceDurationMinutes;
+
+                if (!weekend) {
+                    const fitsFirstPeriod =
+                        start <= firstPeriodLastStart &&
+                        end <= breakStart;
+
+                    const fitsSecondPeriod =
+                        start >= secondPeriodStart &&
+                        start <= weekdayLastStart;
+
+                    if (!fitsFirstPeriod && !fitsSecondPeriod) {
+                        return false;
+                    }
+                }
+
                 const hasConflict = occupiedIntervals.some((interval) =>
                     intervalsOverlap(start, end, interval.start, interval.end),
                 );
@@ -6470,7 +6500,17 @@ function AdminPanel() {
         if (!configuredHours) return [] as string[];
 
         const openingTime = getMinutesFromTime(configuredHours.start_time);
-        const lastStartingTime = getMinutesFromTime(configuredHours.end_time);
+
+        // O ADM mantém a agenda integral, sem o intervalo público das 15:00 às 17:00.
+        // Segunda a sexta: pode iniciar atendimentos normalmente até 19:00.
+        // Sábado e domingo permanecem com o limite atual de 13:00.
+        const publicLastStartingTime = (date.getDay() === 0 || date.getDay() === 6) ? 13 * 60 : 19 * 60;
+        const configuredLastStartingTime = getMinutesFromTime(configuredHours.end_time);
+        const lastStartingTime = Math.min(
+            publicLastStartingTime,
+            configuredLastStartingTime,
+        );
+
         const occupied: TimeInterval[] = [
             ...appointments
                 .filter((appointment) =>
