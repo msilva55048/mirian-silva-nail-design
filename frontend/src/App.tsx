@@ -916,14 +916,24 @@ function PublicSite() {
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
     const [services, setServices] = useState<Service[]>(fallbackServices);
-    const [businessHours, setBusinessHours] = useState<Record<number, { startTime: string; endTime: string }>>({
-        0: {startTime: "07:00", endTime: "13:00"},
-        1: {startTime: "07:00", endTime: "19:00"},
-        2: {startTime: "07:00", endTime: "19:00"},
-        3: {startTime: "07:00", endTime: "19:00"},
-        4: {startTime: "07:00", endTime: "19:00"},
-        5: {startTime: "07:00", endTime: "19:00"},
-        6: {startTime: "07:00", endTime: "13:00"},
+    const [businessHours, setBusinessHours] = useState<Record<number, {
+        isOpen: boolean;
+        morningEnabled: boolean;
+        morningStart: string;
+        morningEnd: string;
+        morningSlotIntervalMinutes: number;
+        afternoonEnabled: boolean;
+        afternoonStart: string;
+        afternoonEnd: string;
+        afternoonSlotIntervalMinutes: number;
+    }>>({
+        0: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "13:00", morningSlotIntervalMinutes: 30, afternoonEnabled: false, afternoonStart: "14:00", afternoonEnd: "14:00", afternoonSlotIntervalMinutes: 30},
+        1: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
+        2: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
+        3: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
+        4: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
+        5: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
+        6: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "13:00", morningSlotIntervalMinutes: 30, afternoonEnabled: false, afternoonStart: "14:00", afternoonEnd: "14:00", afternoonSlotIntervalMinutes: 30},
     });
 
     const [clientUserId, setClientUserId] = useState<string | null>(null);
@@ -1280,7 +1290,7 @@ function PublicSite() {
                         .order("name", {ascending: true}),
                     supabase
                         .from("business_hours")
-                        .select("day_of_week, start_time, end_time")
+                        .select("day_of_week, is_open, morning_enabled, morning_start_time, morning_end_time, morning_slot_interval_minutes, afternoon_enabled, afternoon_start_time, afternoon_end_time, afternoon_slot_interval_minutes")
                         .order("day_of_week", {ascending: true}),
                 ]);
 
@@ -1303,8 +1313,15 @@ function PublicSite() {
                         hoursData.map((hours) => [
                             hours.day_of_week,
                             {
-                                startTime: String(hours.start_time).slice(0, 5),
-                                endTime: String(hours.end_time).slice(0, 5),
+                                isOpen: Boolean(hours.is_open),
+                                morningEnabled: Boolean(hours.morning_enabled),
+                                morningStart: String(hours.morning_start_time ?? "07:00").slice(0, 5),
+                                morningEnd: String(hours.morning_end_time ?? "07:00").slice(0, 5),
+                                morningSlotIntervalMinutes: Number(hours.morning_slot_interval_minutes ?? 30),
+                                afternoonEnabled: Boolean(hours.afternoon_enabled),
+                                afternoonStart: String(hours.afternoon_start_time ?? "19:30").slice(0, 5),
+                                afternoonEnd: String(hours.afternoon_end_time ?? "21:00").slice(0, 5),
+                                afternoonSlotIntervalMinutes: Number(hours.afternoon_slot_interval_minutes ?? 30),
                             },
                         ]),
                     ),
@@ -1535,33 +1552,57 @@ function PublicSite() {
         return startMinutes <= currentMinutes;
     }
 
+    function getConfiguredPublicStartMinutes(date: string) {
+        if (!date) return [] as number[];
+
+        const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+        const hours = businessHours[dayOfWeek];
+
+        if (!hours || !hours.isOpen) return [] as number[];
+
+        const result: number[] = [];
+
+        const appendShift = (
+            enabled: boolean,
+            startTime: string,
+            endTime: string,
+            intervalMinutes: number,
+        ) => {
+            if (!enabled) return;
+
+            const start = timeToMinutes(startTime);
+            const end = timeToMinutes(endTime);
+            const safeInterval = Math.max(1, intervalMinutes || 30);
+
+            if (end < start) return;
+
+            for (let cursor = start; cursor <= end; cursor += safeInterval) {
+                result.push(cursor);
+            }
+        };
+
+        appendShift(
+            hours.morningEnabled,
+            hours.morningStart,
+            hours.morningEnd,
+            hours.morningSlotIntervalMinutes,
+        );
+
+        appendShift(
+            hours.afternoonEnabled,
+            hours.afternoonStart,
+            hours.afternoonEnd,
+            hours.afternoonSlotIntervalMinutes,
+        );
+
+        return [...new Set(result)].sort((a, b) => a - b);
+    }
+
     function getAvailableTimes(date: string, serviceDurationMinutes: number) {
         if (!date) return [];
 
-        const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
-        const weekend = dayOfWeek === 0 || dayOfWeek === 6;
         const occupiedIntervals = getOccupiedIntervals(date);
-
-        /*
-         * AGENDA PÚBLICA ATUAL DA MIRIAN
-         *
-         * Segunda a sexta, enquanto ela continua trabalhando como CLT,
-         * as clientes podem iniciar atendimento SOMENTE nestes horários:
-         * 07:00, 19:30 e 21:00.
-         *
-         * Sábado e domingo mantêm a regra atual, das 07:00 às 13:00,
-         * em intervalos de 30 minutos.
-         *
-         * A duração do serviço continua sendo considerada normalmente:
-         * um horário deixa de aparecer se o período ocupado pelo serviço
-         * entrar em conflito com outro agendamento ou bloqueio.
-         */
-        const generatedTimes = weekend
-            ? Array.from(
-                {length: Math.floor((13 * 60 - 7 * 60) / 30) + 1},
-                (_, index) => 7 * 60 + index * 30,
-            )
-            : [7 * 60, 19 * 60 + 30, 21 * 60];
+        const generatedTimes = getConfiguredPublicStartMinutes(date);
 
         return generatedTimes
             .filter((start) => {
@@ -1683,16 +1724,7 @@ function PublicSite() {
             const selectedEnd =
                 selectedStart + selectedServiceInformation.durationMinutes;
 
-            const selectedDayOfWeek = new Date(`${selectedDate}T12:00:00`).getDay();
-            const selectedIsWeekend =
-                selectedDayOfWeek === 0 || selectedDayOfWeek === 6;
-
-            const allowedPublicStarts = selectedIsWeekend
-                ? Array.from(
-                    {length: Math.floor((13 * 60 - 7 * 60) / 30) + 1},
-                    (_, index) => 7 * 60 + index * 30,
-                )
-                : [7 * 60, 19 * 60 + 30, 21 * 60];
+            const allowedPublicStarts = getConfiguredPublicStartMinutes(selectedDate);
 
             if (!allowedPublicStarts.includes(selectedStart)) {
                 setSelectedTime("");
@@ -2580,8 +2612,17 @@ type AdminServiceSetting = {
 type AdminBusinessHour = {
     id: number;
     day_of_week: number;
+    is_open: boolean;
     start_time: string;
     end_time: string;
+    morning_enabled: boolean;
+    morning_start_time: string;
+    morning_end_time: string;
+    morning_slot_interval_minutes: number;
+    afternoon_enabled: boolean;
+    afternoon_start_time: string;
+    afternoon_end_time: string;
+    afternoon_slot_interval_minutes: number;
 };
 
 type AdminClient = {
@@ -5697,6 +5738,152 @@ const adminServiceManagerStyles = `
 }
 `;
 
+
+const adminHoursSettingsStyles = `
+.admin-hours-settings-page {
+    display: grid;
+    gap: 20px;
+}
+.admin-hours-settings-list {
+    display: grid;
+    gap: 14px;
+}
+.admin-hours-day-card {
+    border: 1px solid rgba(157, 95, 115, .18);
+    border-radius: 22px;
+    padding: 18px;
+    background: #fff;
+    box-shadow: 0 12px 34px rgba(91, 55, 67, .06);
+}
+.admin-hours-day-card.is-closed {
+    background: #faf7f8;
+}
+.admin-hours-day-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.admin-hours-day-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #3f3035;
+    font-weight: 900;
+    font-size: 1.08rem;
+}
+.admin-hours-day-toggle input,
+.admin-hours-shift__title input {
+    width: 20px;
+    height: 20px;
+    accent-color: #9b4763;
+}
+.admin-hours-close-day {
+    border: 1px solid #dfc7cf;
+    border-radius: 11px;
+    padding: 8px 10px;
+    background: #fff8fa;
+    color: #8d5265;
+    font: inherit;
+    font-size: .75rem;
+    font-weight: 900;
+}
+.admin-hours-shifts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.admin-hours-shift {
+    border: 1px solid #eadce0;
+    border-radius: 16px;
+    padding: 14px;
+    background: #fffafb;
+}
+.admin-hours-shift.is-disabled {
+    opacity: .58;
+}
+.admin-hours-shift__title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.admin-hours-shift__title > strong {
+    color: #60434d;
+    font-size: .9rem;
+}
+.admin-hours-shift__title label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #936174;
+    font-size: .72rem;
+    font-weight: 900;
+}
+.admin-hours-time-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.admin-hours-time-grid label {
+    display: grid;
+    gap: 6px;
+}
+.admin-hours-time-grid label span {
+    color: #8a737b;
+    font-size: .72rem;
+    font-weight: 800;
+}
+.admin-hours-time-grid input {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    border: 1px solid #dfd0d5;
+    border-radius: 11px;
+    padding: 0 10px;
+    background: #fff;
+    color: #46343a;
+    font: inherit;
+}
+.admin-hours-day-card__save {
+    width: 100%;
+    margin-top: 14px;
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #a45d73, #723d4d);
+    color: #fff;
+    font: inherit;
+    font-weight: 900;
+}
+.admin-hours-settings-note {
+    border: 1px solid #ead9df;
+    border-radius: 18px;
+    padding: 16px;
+    background: #fff9fb;
+    color: #6d5059;
+}
+.admin-hours-settings-note strong {
+    display: block;
+    margin-bottom: 5px;
+}
+.admin-hours-settings-note p {
+    margin: 0;
+    line-height: 1.55;
+}
+@media (max-width: 720px) {
+    .admin-hours-shifts {
+        grid-template-columns: 1fr;
+    }
+    .admin-hours-day-card__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+`;
+
 function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [adminNow, setAdminNow] = useState(() => new Date());
@@ -5722,7 +5909,7 @@ function AdminPanel() {
         }
     });
 
-    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings">("agenda");
+    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings" | "hours-settings">("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
     const [financeMonth, setFinanceMonth] = useState(() => formatDateForInput(new Date()).slice(0, 7));
 
@@ -5803,6 +5990,9 @@ function AdminPanel() {
     const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
     const [expandedServiceId, setExpandedServiceId] = useState<number | null>(null);
     const [deletingServiceId, setDeletingServiceId] = useState<number | null>(null);
+    const [savingBusinessHourId, setSavingBusinessHourId] = useState<number | null>(null);
+    const [hoursSettingsError, setHoursSettingsError] = useState("");
+    const [hoursSettingsSuccess, setHoursSettingsSuccess] = useState("");
 
     const allDayTimes = useMemo(
         () => Array.from({length: 48}, (_, index) => minutesToTime(index * 30)),
@@ -5885,7 +6075,7 @@ function AdminPanel() {
                     .order("price_cents", {ascending: false})
                     .order("name", {ascending: true}),
                 supabase.from("business_hours")
-                    .select("id, day_of_week, start_time, end_time")
+                    .select("id, day_of_week, is_open, start_time, end_time, morning_enabled, morning_start_time, morning_end_time, morning_slot_interval_minutes, afternoon_enabled, afternoon_start_time, afternoon_end_time, afternoon_slot_interval_minutes")
                     .order("day_of_week", {ascending: true}),
                 supabase.from("client_profiles")
                     .select("id, full_name, phone, email, phone_digits, user_id, created_at, updated_at")
@@ -5905,8 +6095,17 @@ function AdminPanel() {
             setAdminClientProfiles((clientProfileData ?? []) as ClientProfile[]);
             setAdminBusinessHours(((hoursData ?? []) as AdminBusinessHour[]).map((hours) => ({
                 ...hours,
-                start_time: String(hours.start_time).slice(0, 5),
-                end_time: String(hours.end_time).slice(0, 5),
+                is_open: Boolean(hours.is_open),
+                start_time: String(hours.start_time ?? "07:00").slice(0, 5),
+                end_time: String(hours.end_time ?? "21:00").slice(0, 5),
+                morning_enabled: Boolean(hours.morning_enabled),
+                morning_start_time: String(hours.morning_start_time ?? "07:00").slice(0, 5),
+                morning_end_time: String(hours.morning_end_time ?? "07:00").slice(0, 5),
+                morning_slot_interval_minutes: Number(hours.morning_slot_interval_minutes ?? 30),
+                afternoon_enabled: Boolean(hours.afternoon_enabled),
+                afternoon_start_time: String(hours.afternoon_start_time ?? "19:30").slice(0, 5),
+                afternoon_end_time: String(hours.afternoon_end_time ?? "21:00").slice(0, 5),
+                afternoon_slot_interval_minutes: Number(hours.afternoon_slot_interval_minutes ?? 30),
             })));
             if (serviceData?.length) setManualServiceName(serviceData[0].name);
             setIsLoading(false);
@@ -6717,18 +6916,9 @@ function AdminPanel() {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
         const date = new Date(`${manualDate}T12:00:00`);
-        const configuredHours = adminBusinessHours.find((hours) => hours.day_of_week === date.getDay());
-        if (!configuredHours) return [] as string[];
+        const configuredIntervals = getAdminConfiguredIntervals(date.getDay());
 
-        const openingTime = getMinutesFromTime(configuredHours.start_time);
-
-        // O ADM mantém liberdade para fazer encaixes.
-        // Segunda a sexta: grade integral de 07:00 até 21:00.
-        // Sábado e domingo permanecem com o limite atual de 13:00.
-        const lastStartingTime =
-            (date.getDay() === 0 || date.getDay() === 6)
-                ? 13 * 60
-                : 21 * 60;
+        if (!configuredIntervals.length) return [] as string[];
 
         const occupied: TimeInterval[] = [
             ...appointments
@@ -6753,21 +6943,30 @@ function AdminPanel() {
         const now = new Date();
         const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const result: string[] = [];
+        const result: number[] = [];
 
-        for (let start = openingTime; start <= lastStartingTime; start += 30) {
-            const end = start + manualSelectedService.duration_minutes;
-            const isPastToday = manualDate === today && start <= currentMinutes;
-            const hasConflict = merged.some((interval) =>
-                intervalsOverlap(start, end, interval.start, interval.end),
-            );
+        configuredIntervals.forEach((interval) => {
+            for (let start = interval.start; start < interval.end; start += 30) {
+                const end = start + manualSelectedService.duration_minutes;
+                const isPastToday = manualDate === today && start <= currentMinutes;
+                const hasConflict = merged.some((occupiedInterval) =>
+                    intervalsOverlap(
+                        start,
+                        end,
+                        occupiedInterval.start,
+                        occupiedInterval.end,
+                    ),
+                );
 
-            if (!isPastToday && !hasConflict) {
-                result.push(minutesToTime(start));
+                if (!isPastToday && !hasConflict) {
+                    result.push(start);
+                }
             }
-        }
+        });
 
-        return result;
+        return [...new Set(result)]
+            .sort((a, b) => a - b)
+            .map(minutesToTime);
     }, [
         manualDate,
         manualSelectedService,
@@ -7083,19 +7282,46 @@ function AdminPanel() {
 
     const blockAvailableTimes = useMemo(() => {
         const day = new Date(`${blockDate}T12:00:00`).getDay();
-        // O ADM pode bloquear qualquer período da grade integral nos dias úteis.
-        const lastStart = day === 0 || day === 6 ? 13 * 60 : 21 * 60;
-        const occupied = appointments.filter((item) => item.appointment_date === blockDate && item.status !== "cancelled")
+        const configuredIntervals = getAdminConfiguredIntervals(day);
+
+        if (!configuredIntervals.length) return [] as string[];
+
+        const occupied = appointments
+            .filter(
+                (item) =>
+                    item.appointment_date === blockDate &&
+                    item.status !== "cancelled",
+            )
             .map((item) => {
                 const start = getMinutesFromTime(item.start_time);
                 return {start, end: start + item.duration_minutes};
             });
-        const blocked = adminBlocks.filter((item) => item.block_date === blockDate)
-            .map((item) => ({start: getMinutesFromTime(item.start_time), end: getMinutesFromTime(item.end_time)}));
-        return Array.from({length: Math.floor((lastStart - 7 * 60) / 30) + 1}, (_, index) => 7 * 60 + index * 30)
-            .filter((start) => ![...occupied, ...blocked].some((interval) => intervalsOverlap(start, start + 30, interval.start, interval.end)))
+
+        const blocked = adminBlocks
+            .filter((item) => item.block_date === blockDate)
+            .map((item) => ({
+                start: getMinutesFromTime(item.start_time),
+                end: getMinutesFromTime(item.end_time),
+            }));
+
+        const result: number[] = [];
+
+        configuredIntervals.forEach((interval) => {
+            for (let start = interval.start; start < interval.end; start += 30) {
+                const isOccupied = [...occupied, ...blocked].some((item) =>
+                    intervalsOverlap(start, start + 30, item.start, item.end),
+                );
+
+                if (!isOccupied) {
+                    result.push(start);
+                }
+            }
+        });
+
+        return [...new Set(result)]
+            .sort((a, b) => a - b)
             .map(minutesToTime);
-    }, [appointments, adminBlocks, blockDate]);
+    }, [appointments, adminBlocks, blockDate, adminBusinessHours]);
 
     useEffect(() => {
         setSelectedBlockTimes((current) => current.filter((time) => blockAvailableTimes.includes(time)));
@@ -7310,6 +7536,120 @@ function AdminPanel() {
         setDeletingServiceId(null);
     }
 
+    const adminDayNames = [
+        "Domingo",
+        "Segunda-feira",
+        "Terça-feira",
+        "Quarta-feira",
+        "Quinta-feira",
+        "Sexta-feira",
+        "Sábado",
+    ];
+
+    function updateAdminBusinessHour(
+        hoursId: number,
+        field: keyof AdminBusinessHour,
+        value: string | boolean | number,
+    ) {
+        setAdminBusinessHours((current) =>
+            current.map((hours) =>
+                hours.id === hoursId
+                    ? {...hours, [field]: value}
+                    : hours,
+            ),
+        );
+    }
+
+    async function saveAdminBusinessHour(hours: AdminBusinessHour) {
+        setHoursSettingsError("");
+        setHoursSettingsSuccess("");
+
+        if (
+            hours.is_open &&
+            !hours.morning_enabled &&
+            !hours.afternoon_enabled
+        ) {
+            setHoursSettingsError(
+                `${adminDayNames[hours.day_of_week]} está ativo, mas nenhuma jornada foi habilitada.`,
+            );
+            return;
+        }
+
+        const invalidMorning =
+            hours.is_open &&
+            hours.morning_enabled &&
+            getMinutesFromTime(hours.morning_end_time) <
+            getMinutesFromTime(hours.morning_start_time);
+
+        const invalidAfternoon =
+            hours.is_open &&
+            hours.afternoon_enabled &&
+            getMinutesFromTime(hours.afternoon_end_time) <
+            getMinutesFromTime(hours.afternoon_start_time);
+
+        if (invalidMorning || invalidAfternoon) {
+            setHoursSettingsError(
+                "O horário final da jornada não pode ser anterior ao horário inicial.",
+            );
+            return;
+        }
+
+        setSavingBusinessHourId(hours.id);
+
+        const {error} = await supabase
+            .from("business_hours")
+            .update({
+                is_open: hours.is_open,
+                morning_enabled: hours.morning_enabled,
+                morning_start_time: hours.morning_start_time,
+                morning_end_time: hours.morning_end_time,
+                morning_slot_interval_minutes: hours.morning_slot_interval_minutes,
+                afternoon_enabled: hours.afternoon_enabled,
+                afternoon_start_time: hours.afternoon_start_time,
+                afternoon_end_time: hours.afternoon_end_time,
+                afternoon_slot_interval_minutes: hours.afternoon_slot_interval_minutes,
+            })
+            .eq("id", hours.id);
+
+        if (error) {
+            console.error("Erro ao salvar configuração de horários:", error);
+            setHoursSettingsError("Não foi possível salvar os horários.");
+            setSavingBusinessHourId(null);
+            return;
+        }
+
+        setHoursSettingsSuccess(
+            `${adminDayNames[hours.day_of_week]} atualizado com sucesso.`,
+        );
+        setSavingBusinessHourId(null);
+    }
+
+    function getAdminConfiguredIntervals(dayOfWeek: number) {
+        const hours = adminBusinessHours.find(
+            (item) => item.day_of_week === dayOfWeek,
+        );
+
+        if (!hours || !hours.is_open) return [] as TimeInterval[];
+
+        const intervals: TimeInterval[] = [];
+
+        if (hours.morning_enabled) {
+            intervals.push({
+                start: getMinutesFromTime(hours.morning_start_time),
+                end: getMinutesFromTime(hours.morning_end_time) + 30,
+            });
+        }
+
+        if (hours.afternoon_enabled) {
+            intervals.push({
+                start: getMinutesFromTime(hours.afternoon_start_time),
+                end: getMinutesFromTime(hours.afternoon_end_time) + 30,
+            });
+        }
+
+        return intervals;
+    }
+
     function getAppointmentStatusLabel(status: AdminAppointment["status"]) {
         if (status === "completed") return "Concluído";
         if (status === "cancelled") return "Cancelado";
@@ -7371,13 +7711,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminHoursSettingsStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminHoursSettingsStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -7395,7 +7735,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminHoursSettingsStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -7407,7 +7747,8 @@ function AdminPanel() {
                     <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configurações</strong><span>Gerencie os serviços do site.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "hours-settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("hours-settings")}><strong>Configuração de horários</strong><span>Defina a jornada semanal da Mirian.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -7582,7 +7923,7 @@ function AdminPanel() {
                         <div className="admin-settings__intro">
                             <div>
                                 <span className="admin-settings__eyebrow">Configurações do site</span>
-                                <h2>Serviços</h2>
+                                <h2>Configuração de serviços</h2>
                                 <p>Cadastre, edite ou exclua os serviços. A lista é organizada do maior para o menor valor.</p>
                             </div>
                         </div>
@@ -7809,6 +8150,245 @@ function AdminPanel() {
                                 })}
                             </div>
                         </section>
+                    </section>
+                ) : adminView === "hours-settings" ? (
+                    <section className="admin-hours-settings-page">
+                        <div className="admin-settings__intro">
+                            <div>
+                                <span className="admin-settings__eyebrow">Configuração semanal</span>
+                                <h2>Configuração de horários</h2>
+                                <p>
+                                    Defina a jornada padrão de cada dia. Essa configuração se repete
+                                    automaticamente em todas as semanas.
+                                </p>
+                            </div>
+                        </div>
+
+                        {hoursSettingsError && (
+                            <p className="admin-settings__message admin-settings__message--error">
+                                {hoursSettingsError}
+                            </p>
+                        )}
+
+                        {hoursSettingsSuccess && (
+                            <p className="admin-settings__message admin-settings__message--success">
+                                {hoursSettingsSuccess}
+                            </p>
+                        )}
+
+                        <div className="admin-hours-settings-list">
+                            {adminBusinessHours.map((hours) => (
+                                <article
+                                    className={`admin-hours-day-card${
+                                        !hours.is_open ? " is-closed" : ""
+                                    }`}
+                                    key={hours.id}
+                                >
+                                    <div className="admin-hours-day-card__header">
+                                        <label className="admin-hours-day-toggle">
+                                            <input
+                                                type="checkbox"
+                                                checked={hours.is_open}
+                                                onChange={(event) =>
+                                                    updateAdminBusinessHour(
+                                                        hours.id,
+                                                        "is_open",
+                                                        event.target.checked,
+                                                    )
+                                                }
+                                            />
+                                            <span>{adminDayNames[hours.day_of_week]}</span>
+                                        </label>
+
+                                        <button
+                                            type="button"
+                                            className="admin-hours-close-day"
+                                            onClick={() =>
+                                                updateAdminBusinessHour(
+                                                    hours.id,
+                                                    "is_open",
+                                                    !hours.is_open,
+                                                )
+                                            }
+                                        >
+                                            {hours.is_open
+                                                ? "Bloquear dia inteiro"
+                                                : "Liberar dia"}
+                                        </button>
+                                    </div>
+
+                                    <div className="admin-hours-shifts">
+                                        <section
+                                            className={`admin-hours-shift${
+                                                !hours.morning_enabled
+                                                    ? " is-disabled"
+                                                    : ""
+                                            }`}
+                                        >
+                                            <div className="admin-hours-shift__title">
+                                                <strong>Jornada da manhã</strong>
+                                                <label>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={hours.morning_enabled}
+                                                        disabled={!hours.is_open}
+                                                        onChange={(event) =>
+                                                            updateAdminBusinessHour(
+                                                                hours.id,
+                                                                "morning_enabled",
+                                                                event.target.checked,
+                                                            )
+                                                        }
+                                                    />
+                                                    <span>
+                                                        {hours.morning_enabled
+                                                            ? "Ativa"
+                                                            : "Bloqueada"}
+                                                    </span>
+                                                </label>
+                                            </div>
+
+                                            <div className="admin-hours-time-grid">
+                                                <label>
+                                                    <span>Início</span>
+                                                    <input
+                                                        type="time"
+                                                        step="1800"
+                                                        value={hours.morning_start_time}
+                                                        disabled={
+                                                            !hours.is_open ||
+                                                            !hours.morning_enabled
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateAdminBusinessHour(
+                                                                hours.id,
+                                                                "morning_start_time",
+                                                                event.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </label>
+
+                                                <label>
+                                                    <span>Fim</span>
+                                                    <input
+                                                        type="time"
+                                                        step="1800"
+                                                        value={hours.morning_end_time}
+                                                        disabled={
+                                                            !hours.is_open ||
+                                                            !hours.morning_enabled
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateAdminBusinessHour(
+                                                                hours.id,
+                                                                "morning_end_time",
+                                                                event.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </label>
+                                            </div>
+                                        </section>
+
+                                        <section
+                                            className={`admin-hours-shift${
+                                                !hours.afternoon_enabled
+                                                    ? " is-disabled"
+                                                    : ""
+                                            }`}
+                                        >
+                                            <div className="admin-hours-shift__title">
+                                                <strong>Jornada da tarde/noite</strong>
+                                                <label>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={hours.afternoon_enabled}
+                                                        disabled={!hours.is_open}
+                                                        onChange={(event) =>
+                                                            updateAdminBusinessHour(
+                                                                hours.id,
+                                                                "afternoon_enabled",
+                                                                event.target.checked,
+                                                            )
+                                                        }
+                                                    />
+                                                    <span>
+                                                        {hours.afternoon_enabled
+                                                            ? "Ativa"
+                                                            : "Bloqueada"}
+                                                    </span>
+                                                </label>
+                                            </div>
+
+                                            <div className="admin-hours-time-grid">
+                                                <label>
+                                                    <span>Início</span>
+                                                    <input
+                                                        type="time"
+                                                        step="1800"
+                                                        value={hours.afternoon_start_time}
+                                                        disabled={
+                                                            !hours.is_open ||
+                                                            !hours.afternoon_enabled
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateAdminBusinessHour(
+                                                                hours.id,
+                                                                "afternoon_start_time",
+                                                                event.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </label>
+
+                                                <label>
+                                                    <span>Fim</span>
+                                                    <input
+                                                        type="time"
+                                                        step="1800"
+                                                        value={hours.afternoon_end_time}
+                                                        disabled={
+                                                            !hours.is_open ||
+                                                            !hours.afternoon_enabled
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateAdminBusinessHour(
+                                                                hours.id,
+                                                                "afternoon_end_time",
+                                                                event.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </label>
+                                            </div>
+                                        </section>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="admin-hours-day-card__save"
+                                        disabled={savingBusinessHourId === hours.id}
+                                        onClick={() =>
+                                            void saveAdminBusinessHour(hours)
+                                        }
+                                    >
+                                        {savingBusinessHourId === hours.id
+                                            ? "Salvando..."
+                                            : "Salvar este dia"}
+                                    </button>
+                                </article>
+                            ))}
+                        </div>
+
+                        <div className="admin-hours-settings-note">
+                            <strong>Bloqueio pontual continua separado</strong>
+                            <p>
+                                Use “Bloquear horários” na agenda quando precisar fechar somente
+                                um horário específico de uma data. A configuração acima é semanal
+                                e recorrente.
+                            </p>
+                        </div>
                     </section>
                 ) : adminView === "clients" ? (
                     <section className="admin-clients">
