@@ -2536,6 +2536,7 @@ function PublicSite() {
 
 type AdminAppointment = {
     id: string;
+    client_id?: string | null;
     client_name: string;
     client_phone: string;
     client_email: string | null;
@@ -2593,6 +2594,15 @@ type ClientProfile = {
     user_id?: string | null;
     created_at?: string;
     updated_at?: string;
+};
+
+type AdminBookingClient = {
+    key: string;
+    profileId: string | null;
+    name: string;
+    phone: string;
+    email: string;
+    userId?: string | null;
 };
 
 type NailRecordPhoto = {
@@ -5301,6 +5311,143 @@ const adminEnhancementStyles = `
     }
 }
 
+
+
+.admin-manual-booking {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.admin-manual-booking__section {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid #eadde1;
+    border-radius: 18px;
+    background: #fff;
+}
+
+.admin-manual-booking__step {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a86175, #6d3445);
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 900;
+}
+
+.admin-manual-booking__content { min-width: 0; }
+.admin-manual-booking__content h3 { margin: 0; color: #4d363e; }
+.admin-manual-booking__content > p { margin: 6px 0 14px; color: #80666e; font-size: .84rem; }
+
+.admin-manual-booking__service,
+.admin-client-picker > input {
+    width: 100%; box-sizing: border-box; border: 1px solid #dbc5cc; border-radius: 13px;
+    padding: 12px 13px; background: #fff; color: #35272c; font: inherit;
+}
+
+.admin-client-picker { position: relative; }
+.admin-client-picker__results {
+    position: absolute; z-index: 20; top: calc(100% + 7px); left: 0; right: 0; max-height: 300px;
+    overflow: auto; border: 1px solid #dbc5cc; border-radius: 14px; padding: 6px; background: #fff;
+    box-shadow: 0 16px 40px rgba(83,48,58,.14);
+}
+.admin-client-picker__results button {
+    width: 100%; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; align-items: center;
+    border: 0; border-radius: 11px; padding: 9px; background: transparent; color: #4d363e; text-align: left; cursor: pointer;
+}
+.admin-client-picker__results button:hover { background: #faf5f7; }
+.admin-client-picker__results strong, .admin-client-picker__results small { display: block; }
+.admin-client-picker__results small { margin-top: 3px; color: #8a7078; }
+.admin-client-picker__avatar {
+    width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%;
+    background: #f1e2e7; color: #7a4052; font-size: .72rem; font-weight: 900;
+}
+.admin-client-picker__empty { padding: 14px; color: #80666e; text-align: center; }
+
+.admin-selected-client {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px;
+    padding: 13px 14px; border: 1px solid #e2ccd3; border-radius: 14px; background: #faf5f7;
+}
+.admin-selected-client span, .admin-selected-client strong, .admin-selected-client small { display: block; }
+.admin-selected-client span { color: #9a6c79; font-size: .68rem; font-weight: 900; text-transform: uppercase; }
+.admin-selected-client strong { margin-top: 4px; color: #4d363e; }
+.admin-selected-client small { margin-top: 3px; color: #80666e; }
+.admin-selected-client button {
+    border: 1px solid #d7c0c7; border-radius: 10px; padding: 8px 11px; background: #fff; color: #6d3445;
+    font: inherit; font-weight: 850; cursor: pointer;
+}
+
+.admin-manual-week-picker { display: grid; gap: 12px; }
+.admin-manual-week-picker__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-manual-week-picker__month, .admin-manual-week-picker__navs { display: flex; align-items: center; gap: 8px; }
+.admin-manual-week-picker__month strong { color: #4d363e; text-transform: capitalize; }
+.admin-manual-week-picker__month button, .admin-manual-week-picker__navs button {
+    width: 40px; height: 40px; border: 1px solid #dbc5cc; border-radius: 11px; background: #fff;
+    color: #6d3445; font: inherit; font-weight: 900; cursor: pointer;
+}
+
+.admin-manual-week-days { display: grid; gap: 6px; }
+.admin-manual-week-days__row { display: grid; gap: 6px; }
+.admin-manual-week-days__row--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-manual-week-days__row--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin-manual-week-day {
+    min-width: 0; border: 1px solid #e0d0d5; border-radius: 12px; padding: 9px 5px; background: #fff;
+    color: #5d464d; font: inherit; cursor: pointer;
+}
+.admin-manual-week-day span, .admin-manual-week-day strong { display: block; }
+.admin-manual-week-day span { color: #8a7078; font-size: .66rem; font-weight: 850; text-transform: capitalize; }
+.admin-manual-week-day strong { margin-top: 3px; font-size: .9rem; }
+.admin-manual-week-day.is-selected {
+    border-color: #9a5368; background: #f7e9ed; color: #6d3445; box-shadow: 0 0 0 2px rgba(154,83,104,.12);
+}
+.admin-manual-week-day.is-past { opacity: .38; cursor: not-allowed; }
+
+.admin-manual-month-calendar { border: 1px solid #eadde1; border-radius: 16px; padding: 13px; background: #fff; }
+.admin-manual-month-calendar__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.admin-manual-month-calendar__header strong { color: #4d363e; text-transform: capitalize; }
+.admin-manual-month-calendar__header button {
+    width: 36px; height: 36px; border: 1px solid #dbc5cc; border-radius: 9px; background: #fff; color: #6d3445; cursor: pointer;
+}
+.admin-manual-month-calendar__weekdays, .admin-manual-month-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.admin-manual-month-calendar__weekdays span { padding: 4px 0; color: #9a7a84; font-size: .65rem; font-weight: 900; text-align: center; }
+.admin-manual-month-calendar__grid button { aspect-ratio: 1; border: 0; border-radius: 9px; background: #faf5f7; color: #5d464d; cursor: pointer; }
+.admin-manual-month-calendar__grid button.is-selected { background: #8f3f58; color: #fff; font-weight: 900; }
+.admin-manual-month-calendar__grid button.is-past { opacity: .3; cursor: not-allowed; }
+.admin-manual-month-calendar__grid .is-empty { visibility: hidden; }
+
+.admin-manual-times { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); gap: 7px; }
+.admin-manual-times button {
+    min-height: 38px; border: 1px solid #e0d0d5; border-radius: 10px; background: #fff; color: #5d464d;
+    font: inherit; font-size: .82rem; font-weight: 850; cursor: pointer;
+}
+.admin-manual-times button.is-selected { border-color: #9a5368; background: #8f3f58; color: #fff; }
+.admin-manual-times__empty { padding: 14px; border-radius: 12px; background: #faf5f7; color: #80666e; text-align: center; }
+
+.admin-manual-booking__summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.admin-manual-booking__summary div { min-width: 0; padding: 12px; border-radius: 12px; background: #faf5f7; }
+.admin-manual-booking__summary span, .admin-manual-booking__summary strong { display: block; }
+.admin-manual-booking__summary span { margin-bottom: 4px; color: #9a707c; font-size: .68rem; font-weight: 850; text-transform: uppercase; }
+.admin-manual-booking__summary strong { overflow-wrap: anywhere; color: #4d363e; font-size: .82rem; }
+.admin-manual-booking__actions { display: flex; gap: 10px; }
+
+@media (max-width: 760px) {
+    .admin-manual-booking__section { grid-template-columns: 1fr; }
+    .admin-manual-booking__step { width: 32px; height: 32px; }
+    .admin-manual-booking__summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+    .admin-manual-week-picker__top { align-items: flex-start; flex-direction: column; }
+    .admin-manual-week-picker__navs { width: 100%; justify-content: flex-end; }
+    .admin-manual-booking__summary { grid-template-columns: 1fr; }
+    .admin-manual-booking__actions { flex-direction: column; }
+}
 `;
 
 
@@ -5336,11 +5483,18 @@ function AdminPanel() {
     const [financeMonth, setFinanceMonth] = useState(() => formatDateForInput(new Date()).slice(0, 7));
 
     const [showManualForm, setShowManualForm] = useState(false);
-    const [manualClientName, setManualClientName] = useState("");
-    const [manualClientPhone, setManualClientPhone] = useState("");
+    const [adminClientProfiles, setAdminClientProfiles] = useState<ClientProfile[]>([]);
+    const [manualClientSearch, setManualClientSearch] = useState("");
+    const [selectedManualClient, setSelectedManualClient] = useState<AdminBookingClient | null>(null);
     const [manualServiceName, setManualServiceName] = useState(fallbackServices[0].name);
     const [manualDate, setManualDate] = useState(formatDateForInput(new Date()));
-    const [manualTime, setManualTime] = useState("07:00");
+    const [manualWeekReferenceDate, setManualWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [manualTime, setManualTime] = useState("");
+    const [showManualMonthCalendar, setShowManualMonthCalendar] = useState(false);
+    const [manualCalendarMonth, setManualCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [manualError, setManualError] = useState("");
     const [manualSuccess, setManualSuccess] = useState("");
     const [isSavingManualAppointment, setIsSavingManualAppointment] = useState(false);
@@ -5454,6 +5608,7 @@ function AdminPanel() {
     useEffect(() => {
         if (!isAuthenticated) {
             setAppointments([]);
+            setAdminClientProfiles([]);
             return;
         }
 
@@ -5465,9 +5620,10 @@ function AdminPanel() {
                 {data: blockData, error: blockLoadError},
                 {data: serviceData, error: serviceLoadError},
                 {data: hoursData, error: hoursLoadError},
+                {data: clientProfileData, error: clientProfileLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
-                    .select("id, client_name, client_phone, client_email, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at")
+                    .select("id, client_id, client_name, client_phone, client_email, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at")
                     .order("appointment_date", {ascending: true})
                     .order("start_time", {ascending: true}),
                 supabase.from("schedule_blocks")
@@ -5480,10 +5636,13 @@ function AdminPanel() {
                 supabase.from("business_hours")
                     .select("id, day_of_week, start_time, end_time")
                     .order("day_of_week", {ascending: true}),
+                supabase.from("client_profiles")
+                    .select("id, full_name, phone, email, phone_digits, user_id, created_at, updated_at")
+                    .order("full_name", {ascending: true}),
             ]);
 
-            if (appointmentError || blockLoadError || serviceLoadError || hoursLoadError) {
-                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || hoursLoadError);
+            if (appointmentError || blockLoadError || serviceLoadError || hoursLoadError || clientProfileLoadError) {
+                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || hoursLoadError || clientProfileLoadError);
                 setPanelError("Não foi possível carregar os dados do painel. Atualize a página.");
                 setIsLoading(false);
                 return;
@@ -5492,6 +5651,7 @@ function AdminPanel() {
             setAppointments((appointmentData ?? []) as AdminAppointment[]);
             setAdminBlocks((blockData ?? []) as AdminScheduleBlock[]);
             setAdminServices((serviceData ?? []) as AdminServiceSetting[]);
+            setAdminClientProfiles((clientProfileData ?? []) as ClientProfile[]);
             setAdminBusinessHours(((hoursData ?? []) as AdminBusinessHour[]).map((hours) => ({
                 ...hours,
                 start_time: String(hours.start_time).slice(0, 5),
@@ -5575,6 +5735,13 @@ function AdminPanel() {
     async function createManualAppointment(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setManualError("");
+        setManualSuccess("");
+
+        if (!selectedManualClient) {
+            setManualError("Busque e selecione uma cliente cadastrada.");
+            return;
+        }
+
         if (!manualDate || !manualTime) {
             setManualError("Escolha a data e o horário.");
             return;
@@ -5583,58 +5750,79 @@ function AdminPanel() {
         const now = new Date();
         const selectedDateTime = new Date(`${manualDate}T${manualTime}:00`);
 
-        if (Number.isNaN(selectedDateTime.getTime())) {
-            setManualError("Data ou horário inválido.");
-            return;
-        }
-
-        if (selectedDateTime.getTime() <= now.getTime()) {
+        if (Number.isNaN(selectedDateTime.getTime()) || selectedDateTime.getTime() <= now.getTime()) {
             setManualError("Não é possível criar um agendamento em uma data ou horário que já passou.");
             return;
         }
-
-        setManualSuccess("");
 
         const service = adminServices.find((item) => item.name === manualServiceName);
         if (!service) {
             setManualError("Escolha um serviço válido.");
             return;
         }
-        if (manualClientName.trim().length < 3 || manualClientPhone.replace(/\D/g, "").length < 10) {
-            setManualError("Informe nome completo e telefone válido.");
-            return;
-        }
+
         if (appointmentConflicts("", manualDate, manualTime, service.duration_minutes)) {
             setManualError("Este período entra em conflito com outro agendamento ou bloqueio.");
             return;
         }
 
         setIsSavingManualAppointment(true);
-        const {data, error} = await supabase.from("appointments").insert({
-            client_name: manualClientName.trim(),
-            client_phone: formatBrazilianPhone(manualClientPhone),
-            client_email: null,
-            service_name: service.name,
-            appointment_date: manualDate,
-            start_time: manualTime,
-            duration_minutes: service.duration_minutes,
-            price_cents: service.price_cents,
-            status: "confirmed",
-        }).select("id, client_name, client_phone, client_email, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at").single();
 
-        if (error || !data) {
+        try {
+            let profileId = selectedManualClient.profileId;
+            let profileName = selectedManualClient.name;
+            let profilePhone = selectedManualClient.phone;
+            let profileEmail = selectedManualClient.email;
+
+            if (!profileId) {
+                const profile = await ensureClientProfile({
+                    key: selectedManualClient.key,
+                    name: selectedManualClient.name,
+                    phone: selectedManualClient.phone,
+                    email: selectedManualClient.email,
+                    appointments: [],
+                    lastAppointment: null,
+                    nextAppointment: null,
+                });
+
+                profileId = profile.id;
+                profileName = profile.full_name;
+                profilePhone = profile.phone;
+                profileEmail = profile.email ?? "";
+
+                setAdminClientProfiles((current) => {
+                    if (current.some((item) => item.id === profile.id)) return current;
+                    return [...current, profile].sort((a, b) => a.full_name.localeCompare(b.full_name, "pt-BR"));
+                });
+            }
+
+            const {data, error} = await supabase.from("appointments").insert({
+                client_id: profileId,
+                client_name: profileName.trim(),
+                client_phone: formatBrazilianPhone(profilePhone),
+                client_email: profileEmail.trim() || null,
+                service_name: service.name,
+                appointment_date: manualDate,
+                start_time: manualTime,
+                duration_minutes: service.duration_minutes,
+                price_cents: service.price_cents,
+                status: "confirmed",
+            }).select("id, client_id, client_name, client_phone, client_email, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at").single();
+
+            if (error || !data) {
+                throw error ?? new Error("Agendamento não retornado após salvar.");
+            }
+
+            setAppointments((current) => [...current, data as AdminAppointment]);
+            setManualSuccess(`Agendamento de ${profileName} criado com sucesso e vinculado ao perfil da cliente.`);
+            setAgendaDate(manualDate);
+            setManualTime("");
+        } catch (error) {
             console.error("Erro ao criar agendamento:", error);
             setManualError("Não foi possível criar o agendamento.");
+        } finally {
             setIsSavingManualAppointment(false);
-            return;
         }
-
-        setAppointments((current) => [...current, data as AdminAppointment]);
-        setManualSuccess("Agendamento criado com sucesso.");
-        setAgendaDate(manualDate);
-        setManualClientName("");
-        setManualClientPhone("");
-        setIsSavingManualAppointment(false);
     }
 
     function openAppointmentDetails(appointment: AdminAppointment) {
@@ -6130,6 +6318,178 @@ function AdminPanel() {
             Boolean(digits && client.phone.replace(/\D/g, "").includes(digits)),
         );
     }, [clients, clientSearch]);
+
+    const manualBookingClients = useMemo<AdminBookingClient[]>(() => {
+        const byPhone = new Map<string, AdminBookingClient>();
+
+        adminClientProfiles.forEach((profile) => {
+            const digits = normalizeClientPhone(profile.phone ?? "");
+            const key = digits || `profile:${profile.id}`;
+            byPhone.set(key, {
+                key,
+                profileId: profile.id,
+                name: profile.full_name,
+                phone: profile.phone,
+                email: profile.email ?? "",
+                userId: profile.user_id ?? null,
+            });
+        });
+
+        clients.forEach((client) => {
+            const digits = normalizeClientPhone(client.phone);
+            const key = digits || `client:${client.key}`;
+            if (!byPhone.has(key)) {
+                byPhone.set(key, {
+                    key,
+                    profileId: null,
+                    name: client.name,
+                    phone: client.phone,
+                    email: client.email,
+                });
+            }
+        });
+
+        return Array.from(byPhone.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    }, [adminClientProfiles, clients]);
+
+    const filteredManualBookingClients = useMemo(() => {
+        const query = manualClientSearch.trim().toLowerCase();
+        const digits = manualClientSearch.replace(/\D/g, "");
+
+        if (!query) return [] as AdminBookingClient[];
+
+        return manualBookingClients
+            .filter((client) =>
+                client.name.toLowerCase().includes(query) ||
+                client.phone.toLowerCase().includes(query) ||
+                Boolean(digits && client.phone.replace(/\D/g, "").includes(digits)),
+            )
+            .slice(0, 8);
+    }, [manualBookingClients, manualClientSearch]);
+
+    function getManualWeekDates(referenceDate: string) {
+        const reference = new Date(`${referenceDate}T12:00:00`);
+        const day = reference.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        reference.setDate(reference.getDate() + diffToMonday);
+
+        return Array.from({length: 7}, (_, index) => {
+            const date = new Date(reference);
+            date.setDate(reference.getDate() + index);
+            return formatDateForInput(date);
+        });
+    }
+
+    const manualVisibleWeekDates = useMemo(
+        () => getManualWeekDates(manualWeekReferenceDate),
+        [manualWeekReferenceDate],
+    );
+
+    function selectManualBookingDate(date: string) {
+        const today = formatDateForInput(new Date());
+        if (date < today) return;
+
+        setManualDate(date);
+        setManualWeekReferenceDate(date);
+        setManualTime("");
+        setManualError("");
+        setShowManualMonthCalendar(false);
+    }
+
+    function moveManualBookingWeek(amount: number) {
+        const currentWeek = getManualWeekDates(manualWeekReferenceDate);
+        const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
+        const nextWeek = getManualWeekDates(nextReference);
+        const today = formatDateForInput(new Date());
+        const firstSelectable = nextWeek.find((date) => date >= today);
+
+        setManualWeekReferenceDate(nextReference);
+        setManualTime("");
+        setManualError("");
+
+        if (firstSelectable) {
+            setManualDate(firstSelectable);
+        }
+    }
+
+    function openManualMonthCalendar() {
+        const reference = new Date(`${manualDate || manualWeekReferenceDate}T12:00:00`);
+        setManualCalendarMonth(new Date(reference.getFullYear(), reference.getMonth(), 1));
+        setShowManualMonthCalendar((current) => !current);
+    }
+
+    function getManualMonthCalendarCells() {
+        const year = manualCalendarMonth.getFullYear();
+        const month = manualCalendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({length: leadingEmpty}, () => null),
+            ...Array.from({length: daysInMonth}, (_, index) =>
+                formatDateForInput(new Date(year, month, index + 1)),
+            ),
+        ];
+    }
+
+    const manualSelectedService = adminServices.find((service) => service.name === manualServiceName);
+
+    const manualAvailableTimes = useMemo(() => {
+        if (!manualDate || !manualSelectedService) return [] as string[];
+
+        const date = new Date(`${manualDate}T12:00:00`);
+        const configuredHours = adminBusinessHours.find((hours) => hours.day_of_week === date.getDay());
+        if (!configuredHours) return [] as string[];
+
+        const openingTime = getMinutesFromTime(configuredHours.start_time);
+        const lastStartingTime = getMinutesFromTime(configuredHours.end_time);
+        const occupied: TimeInterval[] = [
+            ...appointments
+                .filter((appointment) =>
+                    appointment.appointment_date === manualDate &&
+                    appointment.status !== "cancelled" &&
+                    appointment.status !== "no-show",
+                )
+                .map((appointment) => {
+                    const start = getMinutesFromTime(appointment.start_time);
+                    return {start, end: start + appointment.duration_minutes};
+                }),
+            ...adminBlocks
+                .filter((block) => block.block_date === manualDate)
+                .map((block) => ({
+                    start: getMinutesFromTime(block.start_time),
+                    end: getMinutesFromTime(block.end_time),
+                })),
+        ];
+
+        const merged = mergeIntervals(occupied);
+        const now = new Date();
+        const today = formatDateForInput(now);
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const result: string[] = [];
+
+        for (let start = openingTime; start <= lastStartingTime; start += 30) {
+            const end = start + manualSelectedService.duration_minutes;
+            const isPastToday = manualDate === today && start <= currentMinutes;
+            const hasConflict = merged.some((interval) =>
+                intervalsOverlap(start, end, interval.start, interval.end),
+            );
+
+            if (!isPastToday && !hasConflict) {
+                result.push(minutesToTime(start));
+            }
+        }
+
+        return result;
+    }, [
+        manualDate,
+        manualSelectedService,
+        appointments,
+        adminBlocks,
+        adminBusinessHours,
+    ]);
 
     function openClientEditor(client: AdminClient) {
         setEditingClient(client);
@@ -6820,54 +7180,263 @@ function AdminPanel() {
                 ) : (
                     <section className="admin-content-section">
                         <section className="admin-new-appointment">
-                            <div className="admin-new-appointment__header"><div><h2>Novo agendamento</h2><p>A Mirian pode cadastrar qualquer horário, inclusive fora do expediente das clientes.</p></div><button className="admin-new-appointment__toggle" type="button" onClick={() => setShowManualForm((current) => !current)}>{showManualForm ? "Fechar" : "+ Adicionar"}</button></div>
+                            <div className="admin-new-appointment__header">
+                                <div>
+                                    <h2>Novo agendamento</h2>
+                                    <p>Busque a cliente cadastrada e escolha serviço, dia e horário no mesmo padrão do agendamento da cliente.</p>
+                                </div>
+                                <button
+                                    className="admin-new-appointment__toggle"
+                                    type="button"
+                                    onClick={() => {
+                                        setShowManualForm((current) => !current);
+                                        setManualError("");
+                                        setManualSuccess("");
+                                    }}
+                                >
+                                    {showManualForm ? "Fechar" : "+ Adicionar"}
+                                </button>
+                            </div>
+
                             {showManualForm && (
-                                <form className="admin-manual-form" onSubmit={createManualAppointment}>
-                                    <label>Nome da cliente<input value={manualClientName} onChange={(event) => setManualClientName(event.target.value)} required/></label>
-                                    <label>Telefone<input value={manualClientPhone} onChange={(event) => setManualClientPhone(formatBrazilianPhone(event.target.value))} maxLength={15} inputMode="numeric" required/></label>
-                                    <label>Serviço<select value={manualServiceName} onChange={(event) => setManualServiceName(event.target.value)}>{adminServices.map((service) => <option key={service.id} value={service.name}>{service.name} — {service.duration_minutes} min</option>)}</select></label>
-                                    <label>Data<input
-                                        type="date"
-                                        min={formatDateForInput(new Date())}
-                                        value={manualDate}
-                                        onChange={(event) => {
-                                            const nextDate = event.target.value;
-                                            const now = new Date();
-                                            const today = formatDateForInput(now);
-                                            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                                <form className="admin-manual-booking" onSubmit={createManualAppointment}>
+                                    <section className="admin-manual-booking__section">
+                                        <span className="admin-manual-booking__step">1</span>
+                                        <div className="admin-manual-booking__content">
+                                            <h3>Buscar cliente</h3>
+                                            <p>Digite o nome ou telefone e selecione uma cliente cadastrada.</p>
 
-                                            if (nextDate < today) {
-                                                setManualDate(today);
-                                                setManualTime("");
-                                                setManualError("Não é possível selecionar uma data que já passou.");
-                                                return;
-                                            }
+                                            <div className="admin-client-picker">
+                                                <input
+                                                    value={manualClientSearch}
+                                                    onChange={(event) => {
+                                                        setManualClientSearch(event.target.value);
+                                                        setSelectedManualClient(null);
+                                                        setManualError("");
+                                                    }}
+                                                    placeholder="Buscar por nome ou telefone"
+                                                    autoComplete="off"
+                                                />
 
-                                            setManualDate(nextDate);
+                                                {manualClientSearch.trim() && !selectedManualClient && (
+                                                    <div className="admin-client-picker__results">
+                                                        {filteredManualBookingClients.length ? (
+                                                            filteredManualBookingClients.map((client) => (
+                                                                <button
+                                                                    type="button"
+                                                                    key={client.key}
+                                                                    onClick={() => {
+                                                                        setSelectedManualClient(client);
+                                                                        setManualClientSearch(client.name);
+                                                                        setManualError("");
+                                                                    }}
+                                                                >
+                                                                    <span className="admin-client-picker__avatar">
+                                                                        {client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+                                                                    </span>
+                                                                    <span>
+                                                                        <strong>{client.name}</strong>
+                                                                        <small>{client.phone}{client.email ? ` • ${client.email}` : ""}</small>
+                                                                    </span>
+                                                                </button>
+                                                            ))
+                                                        ) : (
+                                                            <div className="admin-client-picker__empty">Nenhuma cliente encontrada.</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                            if (nextDate === today && manualTime && timeToMinutes(manualTime) <= currentMinutes) {
-                                                setManualTime("");
-                                            }
+                                            {selectedManualClient && (
+                                                <div className="admin-selected-client">
+                                                    <div>
+                                                        <span>Cliente selecionada</span>
+                                                        <strong>{selectedManualClient.name}</strong>
+                                                        <small>{selectedManualClient.phone}{selectedManualClient.email ? ` • ${selectedManualClient.email}` : ""}</small>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedManualClient(null);
+                                                            setManualClientSearch("");
+                                                        }}
+                                                    >
+                                                        Trocar
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </section>
 
-                                            setManualError("");
-                                        }}
-                                        required
-                                    /></label>
-                                    <label>Horário<select value={manualTime} onChange={(event) => setManualTime(event.target.value)} required>
-                                        <option value="" disabled>Selecione um horário</option>
-                                        {allDayTimes.map((time) => {
-                                            const now = new Date();
-                                            const today = formatDateForInput(now);
-                                            const currentMinutes = now.getHours() * 60 + now.getMinutes();
-                                            const isPastToday = manualDate === today && timeToMinutes(time) <= currentMinutes;
-                                            return (
-                                                <option key={time} value={time} disabled={isPastToday}>
-                                                    {time}{isPastToday ? " — horário passado" : ""}
-                                                </option>
-                                            );
-                                        })}
-                                    </select></label>
-                                    <div className="admin-manual-form__actions"><button className="admin-manual-form__save" type="submit" disabled={isSavingManualAppointment}>{isSavingManualAppointment ? "Criando..." : "Criar agendamento"}</button><button className="admin-manual-form__cancel" type="button" onClick={() => setShowManualForm(false)}>Cancelar</button></div>
+                                    <section className="admin-manual-booking__section">
+                                        <span className="admin-manual-booking__step">2</span>
+                                        <div className="admin-manual-booking__content">
+                                            <h3>Serviço</h3>
+                                            <select
+                                                className="admin-manual-booking__service"
+                                                value={manualServiceName}
+                                                onChange={(event) => {
+                                                    setManualServiceName(event.target.value);
+                                                    setManualTime("");
+                                                    setManualError("");
+                                                }}
+                                            >
+                                                {adminServices.map((service) => (
+                                                    <option key={service.id} value={service.name}>
+                                                        {service.name} — {service.duration_minutes} min — {formatCurrency(service.price_cents)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </section>
+
+                                    <section className="admin-manual-booking__section">
+                                        <span className="admin-manual-booking__step">3</span>
+                                        <div className="admin-manual-booking__content">
+                                            <h3>Dia</h3>
+
+                                            <div className="admin-manual-week-picker">
+                                                <div className="admin-manual-week-picker__top">
+                                                    <div className="admin-manual-week-picker__month">
+                                                        <button type="button" onClick={openManualMonthCalendar}>📅</button>
+                                                        <strong>
+                                                            {new Date(`${manualWeekReferenceDate}T12:00:00`).toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div className="admin-manual-week-picker__navs">
+                                                        <button type="button" onClick={() => moveManualBookingWeek(-1)}>‹</button>
+                                                        <button type="button" onClick={() => moveManualBookingWeek(1)}>›</button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="admin-manual-week-days">
+                                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--four">
+                                                        {manualVisibleWeekDates.slice(0, 4).map((date) => {
+                                                            const parsed = new Date(`${date}T12:00:00`);
+                                                            const isPast = date < formatDateForInput(new Date());
+                                                            return (
+                                                                <button
+                                                                    key={date}
+                                                                    type="button"
+                                                                    disabled={isPast}
+                                                                    className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                                    onClick={() => selectManualBookingDate(date)}
+                                                                >
+                                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                                    <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--three">
+                                                        {manualVisibleWeekDates.slice(4).map((date) => {
+                                                            const parsed = new Date(`${date}T12:00:00`);
+                                                            const isPast = date < formatDateForInput(new Date());
+                                                            return (
+                                                                <button
+                                                                    key={date}
+                                                                    type="button"
+                                                                    disabled={isPast}
+                                                                    className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                                    onClick={() => selectManualBookingDate(date)}
+                                                                >
+                                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                                    <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                {showManualMonthCalendar && (
+                                                    <div className="admin-manual-month-calendar">
+                                                        <div className="admin-manual-month-calendar__header">
+                                                            <button type="button" onClick={() => setManualCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button>
+                                                            <strong>{manualCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                                            <button type="button" onClick={() => setManualCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
+                                                        </div>
+
+                                                        <div className="admin-manual-month-calendar__weekdays">
+                                                            {['SEG','TER','QUA','QUI','SEX','SÁB','DOM'].map((day) => <span key={day}>{day}</span>)}
+                                                        </div>
+
+                                                        <div className="admin-manual-month-calendar__grid">
+                                                            {getManualMonthCalendarCells().map((date, index) => {
+                                                                if (!date) return <span className="is-empty" key={`empty-${index}`}/>;
+                                                                const isPast = date < formatDateForInput(new Date());
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={date}
+                                                                        disabled={isPast}
+                                                                        className={`${manualDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                                        onClick={() => selectManualBookingDate(date)}
+                                                                    >
+                                                                        {new Date(`${date}T12:00:00`).getDate()}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section className="admin-manual-booking__section">
+                                        <span className="admin-manual-booking__step">4</span>
+                                        <div className="admin-manual-booking__content">
+                                            <h3>Horário disponível</h3>
+                                            <p>{manualSelectedService ? `Duração do serviço: ${manualSelectedService.duration_minutes} min.` : ""}</p>
+
+                                            <div className="admin-manual-times">
+                                                {manualAvailableTimes.map((time) => (
+                                                    <button
+                                                        key={time}
+                                                        type="button"
+                                                        className={manualTime === time ? "is-selected" : ""}
+                                                        onClick={() => {
+                                                            setManualTime(time);
+                                                            setManualError("");
+                                                        }}
+                                                    >
+                                                        {time}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {!manualAvailableTimes.length && (
+                                                <div className="admin-manual-times__empty">Nenhum horário disponível para este serviço neste dia.</div>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    <div className="admin-manual-booking__summary">
+                                        <div><span>Cliente</span><strong>{selectedManualClient?.name || "Selecione a cliente"}</strong></div>
+                                        <div><span>Serviço</span><strong>{manualServiceName || "Selecione o serviço"}</strong></div>
+                                        <div><span>Data</span><strong>{manualDate ? formatAdminDate(manualDate) : "Selecione o dia"}</strong></div>
+                                        <div><span>Horário</span><strong>{manualTime || "Selecione o horário"}</strong></div>
+                                    </div>
+
+                                    <div className="admin-manual-booking__actions">
+                                        <button
+                                            className="admin-manual-form__save"
+                                            type="submit"
+                                            disabled={isSavingManualAppointment || !selectedManualClient || !manualTime}
+                                        >
+                                            {isSavingManualAppointment ? "Criando..." : "Salvar agendamento"}
+                                        </button>
+                                        <button
+                                            className="admin-manual-form__cancel"
+                                            type="button"
+                                            onClick={() => setShowManualForm(false)}
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+
                                     {manualError && <p className="admin-manual-form__error">{manualError}</p>}
                                     {manualSuccess && <p className="admin-manual-form__success">{manualSuccess}</p>}
                                 </form>
@@ -7141,4 +7710,3 @@ function App() {
 }
 
 export default App;
-
