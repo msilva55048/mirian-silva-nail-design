@@ -2629,7 +2629,6 @@ type NailRecord = {
     photos: NailRecordPhoto[];
 };
 
-const dayNames = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 const adminStyles = `
 .admin-page {
@@ -5461,6 +5460,242 @@ const adminEnhancementStyles = `
 
 const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
 
+
+const adminServiceManagerStyles = `
+.admin-service-manager {
+    display: grid;
+    gap: 22px;
+}
+.admin-service-form-card,
+.admin-service-list-section {
+    border: 1px solid rgba(154, 97, 115, .16);
+    border-radius: 24px;
+    background: rgba(255,255,255,.94);
+    padding: 22px;
+    box-shadow: 0 16px 40px rgba(92, 56, 67, .07);
+}
+.admin-service-form-card__heading,
+.admin-service-list-section__heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.admin-service-form-card__heading span,
+.admin-service-list-section__heading span {
+    display: block;
+    margin-bottom: 5px;
+    color: #a16074;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .14em;
+}
+.admin-service-form-card__heading h3,
+.admin-service-list-section__heading h3 {
+    margin: 0;
+    color: #3e2d33;
+    font-size: 1.35rem;
+}
+.admin-service-form-card__cancel {
+    border: 1px solid #dcc4cb;
+    border-radius: 12px;
+    padding: 9px 12px;
+    background: #fff;
+    color: #7d4457;
+    font: inherit;
+    font-size: .78rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+.admin-service-form-fields {
+    display: grid;
+    gap: 16px;
+}
+.admin-service-form-fields label {
+    display: grid;
+    gap: 8px;
+}
+.admin-service-form-fields label > span {
+    color: #5d444c;
+    font-size: .78rem;
+    font-weight: 900;
+    letter-spacing: .045em;
+}
+.admin-service-form-fields input {
+    width: 100%;
+    min-height: 52px;
+    box-sizing: border-box;
+    border: 1px solid #decbd1;
+    border-radius: 14px;
+    padding: 0 15px;
+    background: #fffdfd;
+    color: #33272b;
+    font: inherit;
+    outline: none;
+}
+.admin-service-form-fields input:focus {
+    border-color: #a86175;
+    box-shadow: 0 0 0 3px rgba(168,97,117,.1);
+}
+.admin-service-price-field,
+.admin-service-duration-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    border: 1px solid #decbd1;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fffdfd;
+}
+.admin-service-price-field > span,
+.admin-service-duration-field > span {
+    padding: 0 14px;
+    color: #8c6c76;
+    font-size: .86rem;
+    font-weight: 800;
+}
+.admin-service-price-field input,
+.admin-service-duration-field input {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none !important;
+}
+.admin-service-duration-field {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+.admin-service-form-card__save {
+    width: 100%;
+    margin-top: 20px;
+    border: 0;
+    border-radius: 14px;
+    padding: 15px 18px;
+    background: linear-gradient(135deg, #a86175, #713c4c);
+    color: #fff;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.admin-service-form-card__save:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+.admin-service-list-section__heading > strong {
+    display: grid;
+    place-items: center;
+    min-width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #f6e9ed;
+    color: #8f5063;
+}
+.admin-service-cards {
+    display: grid;
+    gap: 12px;
+}
+.admin-service-summary-card {
+    border: 1px solid #ead9de;
+    border-radius: 18px;
+    background: #fff;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.admin-service-summary-card:hover,
+.admin-service-summary-card.is-expanded {
+    border-color: #c99daa;
+    box-shadow: 0 10px 26px rgba(100, 57, 70, .08);
+}
+.admin-service-summary-card__main {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 13px;
+    padding: 16px;
+}
+.admin-service-summary-card__icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: #f8edf0;
+    color: #9c5d70;
+    font-size: 1.1rem;
+}
+.admin-service-summary-card__content > strong {
+    display: block;
+    margin-bottom: 9px;
+    color: #382b30;
+    font-size: 1rem;
+}
+.admin-service-summary-card__details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+.admin-service-summary-card__details span {
+    display: grid;
+    gap: 1px;
+}
+.admin-service-summary-card__details small {
+    color: #9b858c;
+    font-size: .68rem;
+}
+.admin-service-summary-card__details b {
+    color: #6f4854;
+    font-size: .84rem;
+}
+.admin-service-summary-card__chevron {
+    color: #9a6575;
+    font-size: 1.25rem;
+}
+.admin-service-summary-card__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 16px 16px;
+}
+.admin-service-summary-card__actions button {
+    border-radius: 12px;
+    padding: 11px 12px;
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+.admin-service-summary-card__actions .edit {
+    border: 1px solid #cfaab5;
+    background: #fff8fa;
+    color: #824e5e;
+}
+.admin-service-summary-card__actions .delete {
+    border: 1px solid #e4b7ba;
+    background: #fff5f5;
+    color: #9d444a;
+}
+.admin-service-summary-card__actions button:disabled {
+    opacity: .5;
+    cursor: wait;
+}
+@media (max-width: 620px) {
+    .admin-service-form-card,
+    .admin-service-list-section {
+        padding: 17px;
+        border-radius: 20px;
+    }
+    .admin-service-form-card__heading {
+        flex-direction: column;
+    }
+    .admin-service-summary-card__details {
+        gap: 10px;
+    }
+    .admin-service-summary-card__actions {
+        grid-template-columns: 1fr;
+    }
+}
+`;
+
 function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [adminNow, setAdminNow] = useState(() => new Date());
@@ -5561,7 +5796,12 @@ function AdminPanel() {
     const [settingsError, setSettingsError] = useState("");
     const [settingsSuccess, setSettingsSuccess] = useState("");
     const [savingServiceId, setSavingServiceId] = useState<number | null>(null);
-    const [savingHoursId, setSavingHoursId] = useState<number | null>(null);
+    const [serviceFormName, setServiceFormName] = useState("");
+    const [serviceFormPrice, setServiceFormPrice] = useState("");
+    const [serviceFormDuration, setServiceFormDuration] = useState("");
+    const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
+    const [expandedServiceId, setExpandedServiceId] = useState<number | null>(null);
+    const [deletingServiceId, setDeletingServiceId] = useState<number | null>(null);
 
     const allDayTimes = useMemo(
         () => Array.from({length: 48}, (_, index) => minutesToTime(index * 30)),
@@ -6895,46 +7135,169 @@ function AdminPanel() {
         setAdminBlocks((current) => current.filter((item) => item.id !== blockId));
     }
 
-    function updateAdminServiceField(serviceId: number, field: "name" | "price_cents" | "duration_minutes", value: string) {
-        setAdminServices((current) => current.map((service) => service.id === serviceId ? {
-            ...service,
-            [field]: field === "name" ? value : Math.max(0, Number(value)),
-        } : service));
+    function resetServiceForm() {
+        setServiceFormName("");
+        setServiceFormPrice("");
+        setServiceFormDuration("");
+        setEditingServiceId(null);
     }
 
-    async function saveAdminService(service: AdminServiceSetting) {
+    function openServiceEditor(service: AdminServiceSetting) {
+        setServiceFormName(service.name);
+        setServiceFormPrice((service.price_cents / 100).toFixed(2).replace(".", ","));
+        setServiceFormDuration(String(service.duration_minutes));
+        setEditingServiceId(service.id);
+        setExpandedServiceId(service.id);
         setSettingsError("");
         setSettingsSuccess("");
-        if (service.name.trim().length < 2 || service.duration_minutes <= 0 || service.price_cents < 0) {
-            setSettingsError("Confira o nome, o preço e a duração do serviço.");
+
+        window.setTimeout(() => {
+            document.getElementById("admin-service-form")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        }, 50);
+    }
+
+    async function saveServiceFromForm() {
+        setSettingsError("");
+        setSettingsSuccess("");
+
+        const name = serviceFormName.trim();
+        const normalizedPrice = serviceFormPrice.replace(",", ".").trim();
+        const priceValue = Number(normalizedPrice);
+        const durationValue = Number(serviceFormDuration);
+
+        if (
+            name.length < 2 ||
+            !Number.isFinite(priceValue) ||
+            priceValue < 0 ||
+            !Number.isFinite(durationValue) ||
+            durationValue <= 0
+        ) {
+            setSettingsError("Confira o nome, o valor e a duração do serviço.");
             return;
         }
-        setSavingServiceId(service.id);
-        const {error} = await supabase.from("services").update({
-            name: service.name.trim(),
-            price_cents: Math.round(service.price_cents),
-            duration_minutes: Math.round(service.duration_minutes),
-        }).eq("id", service.id);
-        if (error) setSettingsError("Não foi possível salvar o serviço.");
-        else setSettingsSuccess(`Serviço “${service.name.trim()}” atualizado.`);
+
+        const priceCents = Math.round(priceValue * 100);
+        const durationMinutes = Math.round(durationValue);
+
+        if (editingServiceId !== null) {
+            setSavingServiceId(editingServiceId);
+
+            const {data, error} = await supabase
+                .from("services")
+                .update({
+                    name,
+                    price_cents: priceCents,
+                    duration_minutes: durationMinutes,
+                })
+                .eq("id", editingServiceId)
+                .select("id, name, description, duration_minutes, price_cents, display_order")
+                .single();
+
+            if (error || !data) {
+                console.error("Erro ao editar serviço:", error);
+                setSettingsError(
+                    error?.message?.includes("services_name_unique")
+                        ? "Já existe um serviço com esse nome."
+                        : "Não foi possível atualizar o serviço.",
+                );
+                setSavingServiceId(null);
+                return;
+            }
+
+            setAdminServices((current) =>
+                current.map((service) =>
+                    service.id === editingServiceId
+                        ? data as AdminServiceSetting
+                        : service,
+                ),
+            );
+
+            setSettingsSuccess(`Serviço “${name}” atualizado com sucesso.`);
+            setSavingServiceId(null);
+            resetServiceForm();
+            return;
+        }
+
+        setSavingServiceId(-1);
+
+        const currentMinimumOrder = adminServices.length
+            ? Math.min(...adminServices.map((service) => service.display_order))
+            : 1;
+
+        const {data, error} = await supabase
+            .from("services")
+            .insert({
+                name,
+                description: "",
+                price_cents: priceCents,
+                duration_minutes: durationMinutes,
+                is_active: true,
+                display_order: currentMinimumOrder - 1,
+            })
+            .select("id, name, description, duration_minutes, price_cents, display_order")
+            .single();
+
+        if (error || !data) {
+            console.error("Erro ao adicionar serviço:", error);
+            setSettingsError(
+                error?.message?.includes("services_name_unique")
+                    ? "Já existe um serviço com esse nome."
+                    : "Não foi possível adicionar o serviço.",
+            );
+            setSavingServiceId(null);
+            return;
+        }
+
+        setAdminServices((current) => [
+            data as AdminServiceSetting,
+            ...current,
+        ]);
+
+        setSettingsSuccess(`Serviço “${name}” adicionado com sucesso.`);
         setSavingServiceId(null);
+        resetServiceForm();
     }
 
-    function updateAdminHoursField(hoursId: number, field: "start_time" | "end_time", value: string) {
-        setAdminBusinessHours((current) => current.map((hours) => hours.id === hoursId ? {...hours, [field]: value} : hours));
-    }
+    async function deleteAdminService(service: AdminServiceSetting) {
+        const confirmed = window.confirm(
+            `Excluir o serviço “${service.name}”? Ele deixará de aparecer para as clientes.`,
+        );
 
-    async function saveAdminHours(hours: AdminBusinessHour) {
+        if (!confirmed) return;
+
         setSettingsError("");
         setSettingsSuccess("");
-        setSavingHoursId(hours.id);
-        const {error} = await supabase.from("business_hours").update({
-            start_time: hours.start_time,
-            end_time: hours.end_time,
-        }).eq("id", hours.id);
-        if (error) setSettingsError("Não foi possível salvar os horários.");
-        else setSettingsSuccess(`${dayNames[hours.day_of_week]} atualizado.`);
-        setSavingHoursId(null);
+        setDeletingServiceId(service.id);
+
+        const {error} = await supabase
+            .from("services")
+            .delete()
+            .eq("id", service.id);
+
+        if (error) {
+            console.error("Erro ao excluir serviço:", error);
+            setSettingsError("Não foi possível excluir o serviço.");
+            setDeletingServiceId(null);
+            return;
+        }
+
+        setAdminServices((current) =>
+            current.filter((item) => item.id !== service.id),
+        );
+
+        if (editingServiceId === service.id) {
+            resetServiceForm();
+        }
+
+        if (expandedServiceId === service.id) {
+            setExpandedServiceId(null);
+        }
+
+        setSettingsSuccess(`Serviço “${service.name}” excluído.`);
+        setDeletingServiceId(null);
     }
 
     function getAppointmentStatusLabel(status: AdminAppointment["status"]) {
@@ -6998,13 +7361,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -7022,7 +7385,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -7034,7 +7397,7 @@ function AdminPanel() {
                     <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configurações</strong><span>Serviços e horários do site.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configurações</strong><span>Gerencie os serviços do site.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -7205,36 +7568,237 @@ function AdminPanel() {
                         </p>
                     </section>
                 ) : adminView === "settings" ? (
-                    <section className="admin-settings">
-                        <div className="admin-settings__intro"><div><span className="admin-settings__eyebrow">Configurações do site</span><h2>Serviços e horários</h2><p>As alterações salvas aqui aparecem no agendamento das clientes.</p></div></div>
-                        {settingsError && <p className="admin-settings__message admin-settings__message--error">{settingsError}</p>}
-                        {settingsSuccess && <p className="admin-settings__message admin-settings__message--success">{settingsSuccess}</p>}
-                        <div className="admin-settings__section">
-                            <div className="admin-settings__section-header"><h3>Serviços</h3><p>Edite nome, preço e duração.</p></div>
-                            <div className="admin-settings__list">
-                                {adminServices.map((service) => (
-                                    <article className="admin-settings__service" key={service.id}>
-                                        <label>Nome do serviço<input value={service.name} onChange={(event) => updateAdminServiceField(service.id, "name", event.target.value)}/></label>
-                                        <label>Preço (R$)<input type="number" min="0" step="0.01" value={(service.price_cents / 100).toFixed(2)} onChange={(event) => updateAdminServiceField(service.id, "price_cents", String(Math.round(Number(event.target.value) * 100)))}/></label>
-                                        <label>Duração (minutos)<input type="number" min="1" step="5" value={service.duration_minutes} onChange={(event) => updateAdminServiceField(service.id, "duration_minutes", event.target.value)}/></label>
-                                        <button type="button" disabled={savingServiceId === service.id} onClick={() => void saveAdminService(service)}>{savingServiceId === service.id ? "Salvando..." : "Salvar"}</button>
-                                    </article>
-                                ))}
+                    <section className="admin-settings admin-service-manager">
+                        <div className="admin-settings__intro">
+                            <div>
+                                <span className="admin-settings__eyebrow">Configurações do site</span>
+                                <h2>Serviços</h2>
+                                <p>Cadastre, edite ou exclua os serviços que aparecem para as clientes.</p>
                             </div>
                         </div>
-                        <div className="admin-settings__section">
-                            <div className="admin-settings__section-header"><h3>Horários das clientes</h3><p>Defina o primeiro e o último horário de início.</p></div>
-                            <div className="admin-settings__list">
-                                {adminBusinessHours.map((hours) => (
-                                    <article className="admin-settings__hours" key={hours.id}>
-                                        <strong>{dayNames[hours.day_of_week]}</strong>
-                                        <label>Primeiro horário<input type="time" step="1800" value={hours.start_time} onChange={(event) => updateAdminHoursField(hours.id, "start_time", event.target.value)}/></label>
-                                        <label>Último início<input type="time" step="1800" value={hours.end_time} onChange={(event) => updateAdminHoursField(hours.id, "end_time", event.target.value)}/></label>
-                                        <button type="button" disabled={savingHoursId === hours.id} onClick={() => void saveAdminHours(hours)}>{savingHoursId === hours.id ? "Salvando..." : "Salvar"}</button>
-                                    </article>
-                                ))}
+
+                        {settingsError && (
+                            <p className="admin-settings__message admin-settings__message--error">
+                                {settingsError}
+                            </p>
+                        )}
+
+                        {settingsSuccess && (
+                            <p className="admin-settings__message admin-settings__message--success">
+                                {settingsSuccess}
+                            </p>
+                        )}
+
+                        <section
+                            id="admin-service-form"
+                            className="admin-service-form-card"
+                        >
+                            <div className="admin-service-form-card__heading">
+                                <div>
+                                    <span>
+                                        {editingServiceId !== null
+                                            ? "EDITAR SERVIÇO"
+                                            : "NOVO SERVIÇO"}
+                                    </span>
+                                    <h3>
+                                        {editingServiceId !== null
+                                            ? "Atualize as informações"
+                                            : "Adicionar serviço"}
+                                    </h3>
+                                </div>
+
+                                {editingServiceId !== null && (
+                                    <button
+                                        type="button"
+                                        className="admin-service-form-card__cancel"
+                                        onClick={resetServiceForm}
+                                    >
+                                        Cancelar edição
+                                    </button>
+                                )}
                             </div>
-                        </div>
+
+                            <div className="admin-service-form-fields">
+                                <label>
+                                    <span>NOME DO SERVIÇO</span>
+                                    <input
+                                        type="text"
+                                        value={serviceFormName}
+                                        onChange={(event) =>
+                                            setServiceFormName(event.target.value)
+                                        }
+                                        placeholder="Ex.: Esmaltação em Gel"
+                                    />
+                                </label>
+
+                                <label>
+                                    <span>VALOR DO SERVIÇO</span>
+                                    <div className="admin-service-price-field">
+                                        <span>R$</span>
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={serviceFormPrice}
+                                            onChange={(event) =>
+                                                setServiceFormPrice(
+                                                    event.target.value.replace(
+                                                        /[^0-9,.]/g,
+                                                        "",
+                                                    ),
+                                                )
+                                            }
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                </label>
+
+                                <label>
+                                    <span>DURAÇÃO DO SERVIÇO</span>
+                                    <div className="admin-service-duration-field">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={serviceFormDuration}
+                                            onChange={(event) =>
+                                                setServiceFormDuration(event.target.value)
+                                            }
+                                            placeholder="90"
+                                        />
+                                        <span>minutos</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="admin-service-form-card__save"
+                                disabled={savingServiceId !== null}
+                                onClick={() => void saveServiceFromForm()}
+                            >
+                                {savingServiceId !== null
+                                    ? "Salvando..."
+                                    : editingServiceId !== null
+                                        ? "Salvar alterações"
+                                        : "Salvar serviço"}
+                            </button>
+                        </section>
+
+                        <section className="admin-service-list-section">
+                            <div className="admin-service-list-section__heading">
+                                <div>
+                                    <span>SERVIÇOS CADASTRADOS</span>
+                                    <h3>Serviços disponíveis</h3>
+                                </div>
+                                <strong>{adminServices.length}</strong>
+                            </div>
+
+                            <div className="admin-service-cards">
+                                {adminServices.map((service) => {
+                                    const isExpanded =
+                                        expandedServiceId === service.id;
+
+                                    return (
+                                        <article
+                                            className={`admin-service-summary-card${
+                                                isExpanded ? " is-expanded" : ""
+                                            }`}
+                                            key={service.id}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() =>
+                                                setExpandedServiceId((current) =>
+                                                    current === service.id
+                                                        ? null
+                                                        : service.id,
+                                                )
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" ||
+                                                    event.key === " "
+                                                ) {
+                                                    event.preventDefault();
+                                                    setExpandedServiceId((current) =>
+                                                        current === service.id
+                                                            ? null
+                                                            : service.id,
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <div className="admin-service-summary-card__main">
+                                                <div className="admin-service-summary-card__icon">
+                                                    ✦
+                                                </div>
+
+                                                <div className="admin-service-summary-card__content">
+                                                    <strong>{service.name}</strong>
+
+                                                    <div className="admin-service-summary-card__details">
+                                                        <span>
+                                                            <small>Valor</small>
+                                                            <b>
+                                                                {formatCurrency(
+                                                                    service.price_cents,
+                                                                )}
+                                                            </b>
+                                                        </span>
+
+                                                        <span>
+                                                            <small>Duração</small>
+                                                            <b>
+                                                                {formatDuration(
+                                                                    service.duration_minutes,
+                                                                )}
+                                                            </b>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <span className="admin-service-summary-card__chevron">
+                                                    {isExpanded ? "⌃" : "⌄"}
+                                                </span>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div
+                                                    className="admin-service-summary-card__actions"
+                                                    onClick={(event) =>
+                                                        event.stopPropagation()
+                                                    }
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        className="edit"
+                                                        onClick={() =>
+                                                            openServiceEditor(service)
+                                                        }
+                                                    >
+                                                        Editar serviço
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className="delete"
+                                                        disabled={
+                                                            deletingServiceId === service.id
+                                                        }
+                                                        onClick={() =>
+                                                            void deleteAdminService(service)
+                                                        }
+                                                    >
+                                                        {deletingServiceId === service.id
+                                                            ? "Excluindo..."
+                                                            : "Excluir serviço"}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </section>
                     </section>
                 ) : adminView === "clients" ? (
                     <section className="admin-clients">
