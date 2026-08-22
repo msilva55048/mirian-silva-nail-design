@@ -38,15 +38,6 @@ type TimeInterval = {
 
 const fallbackServices: Service[] = [
     {
-        name: "Esmaltação em Gel Básica",
-        description:
-            "Acabamento elegante, duradouro e com brilho intenso para suas unhas.",
-        duration: "1h30",
-        durationMinutes: 90,
-        price: "R$ 60,00",
-        priceCents: 6000,
-    },
-    {
         name: "Esmaltação em Gel Decorada",
         description:
             "Esmaltação em gel com decoração personalizada e acabamento exclusivo.",
@@ -54,6 +45,15 @@ const fallbackServices: Service[] = [
         durationMinutes: 120,
         price: "R$ 70,00",
         priceCents: 7000,
+    },
+    {
+        name: "Esmaltação em Gel Básica",
+        description:
+            "Acabamento elegante, duradouro e com brilho intenso para suas unhas.",
+        duration: "1h30",
+        durationMinutes: 90,
+        price: "R$ 60,00",
+        priceCents: 6000,
     },
     {
         name: "Reparo de Unha (Unitário)",
@@ -1276,7 +1276,8 @@ function PublicSite() {
                         .from("services")
                         .select("id, name, description, duration_minutes, price_cents, display_order")
                         .eq("is_active", true)
-                        .order("display_order", {ascending: true}),
+                        .order("price_cents", {ascending: false})
+                        .order("name", {ascending: true}),
                     supabase
                         .from("business_hours")
                         .select("day_of_week, start_time, end_time")
@@ -5881,7 +5882,8 @@ function AdminPanel() {
                     .order("start_time", {ascending: true}),
                 supabase.from("services")
                     .select("id, name, description, duration_minutes, price_cents, display_order")
-                    .order("display_order", {ascending: true}),
+                    .order("price_cents", {ascending: false})
+                    .order("name", {ascending: true}),
                 supabase.from("business_hours")
                     .select("id, day_of_week, start_time, end_time")
                     .order("day_of_week", {ascending: true}),
@@ -7208,11 +7210,17 @@ function AdminPanel() {
             }
 
             setAdminServices((current) =>
-                current.map((service) =>
-                    service.id === editingServiceId
-                        ? data as AdminServiceSetting
-                        : service,
-                ),
+                current
+                    .map((service) =>
+                        service.id === editingServiceId
+                            ? data as AdminServiceSetting
+                            : service,
+                    )
+                    .sort(
+                        (first, second) =>
+                            second.price_cents - first.price_cents ||
+                            first.name.localeCompare(second.name, "pt-BR"),
+                    ),
             );
 
             setSettingsSuccess(`Serviço “${name}” atualizado com sucesso.`);
@@ -7223,10 +7231,6 @@ function AdminPanel() {
 
         setSavingServiceId(-1);
 
-        const currentMinimumOrder = adminServices.length
-            ? Math.min(...adminServices.map((service) => service.display_order))
-            : 1;
-
         const {data, error} = await supabase
             .from("services")
             .insert({
@@ -7235,7 +7239,7 @@ function AdminPanel() {
                 price_cents: priceCents,
                 duration_minutes: durationMinutes,
                 is_active: true,
-                display_order: currentMinimumOrder - 1,
+                display_order: 0,
             })
             .select("id, name, description, duration_minutes, price_cents, display_order")
             .single();
@@ -7251,10 +7255,16 @@ function AdminPanel() {
             return;
         }
 
-        setAdminServices((current) => [
-            data as AdminServiceSetting,
-            ...current,
-        ]);
+        setAdminServices((current) =>
+            [
+                data as AdminServiceSetting,
+                ...current,
+            ].sort(
+                (first, second) =>
+                    second.price_cents - first.price_cents ||
+                    first.name.localeCompare(second.name, "pt-BR"),
+            ),
+        );
 
         setSettingsSuccess(`Serviço “${name}” adicionado com sucesso.`);
         setSavingServiceId(null);
@@ -7573,7 +7583,7 @@ function AdminPanel() {
                             <div>
                                 <span className="admin-settings__eyebrow">Configurações do site</span>
                                 <h2>Serviços</h2>
-                                <p>Cadastre, edite ou exclua os serviços que aparecem para as clientes.</p>
+                                <p>Cadastre, edite ou exclua os serviços. A lista é organizada do maior para o menor valor.</p>
                             </div>
                         </div>
 
