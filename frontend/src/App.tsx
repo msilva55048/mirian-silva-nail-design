@@ -2665,7 +2665,19 @@ function PublicSite() {
                                     lineHeight: 1.3,
                                 }}
                             >
-                                @msilva55048
+                                Desenvolvido por{" "}
+                                <a
+                                    href="https://www.instagram.com/msilva55048/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        color: "inherit",
+                                        textDecoration: "none",
+                                        fontWeight: "inherit",
+                                    }}
+                                >
+                                    @msilva55048
+                                </a>
                             </div>
                         </div>
 
