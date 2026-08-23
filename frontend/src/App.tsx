@@ -109,6 +109,23 @@ function intervalsOverlap(
     return firstStart < secondEnd && firstEnd > secondStart;
 }
 
+function getFixedClientStartMinutes(date: string) {
+    const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    // Segunda a sexta: horários públicos já definidos.
+    // Sábado e domingo: horários públicos fixos solicitados.
+    return isWeekend
+        ? [7 * 60, 9 * 60, 11 * 60, 13 * 60]
+        : [7 * 60, 19 * 60 + 30, 21 * 60];
+}
+
+function getFixedAdminManualStartMinutes(date: string) {
+    return [...getFixedClientStartMinutes(date), 15 * 60]
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .sort((a, b) => a - b);
+}
+
 function normalizeBrazilianPhoneDigits(value: string) {
     let digits = value.replace(/\D/g, "");
 
@@ -916,26 +933,6 @@ function PublicSite() {
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
     const [services, setServices] = useState<Service[]>(fallbackServices);
-    const [businessHours, setBusinessHours] = useState<Record<number, {
-        isOpen: boolean;
-        morningEnabled: boolean;
-        morningStart: string;
-        morningEnd: string;
-        morningSlotIntervalMinutes: number;
-        afternoonEnabled: boolean;
-        afternoonStart: string;
-        afternoonEnd: string;
-        afternoonSlotIntervalMinutes: number;
-    }>>({
-        0: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "13:00", morningSlotIntervalMinutes: 30, afternoonEnabled: false, afternoonStart: "14:00", afternoonEnd: "14:00", afternoonSlotIntervalMinutes: 30},
-        1: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
-        2: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
-        3: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
-        4: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
-        5: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "07:00", morningSlotIntervalMinutes: 120, afternoonEnabled: true, afternoonStart: "19:30", afternoonEnd: "21:00", afternoonSlotIntervalMinutes: 90},
-        6: {isOpen: true, morningEnabled: true, morningStart: "07:00", morningEnd: "13:00", morningSlotIntervalMinutes: 30, afternoonEnabled: false, afternoonStart: "14:00", afternoonEnd: "14:00", afternoonSlotIntervalMinutes: 30},
-    });
-
     const [clientUserId, setClientUserId] = useState<string | null>(null);
     const [clientUserEmail, setClientUserEmail] = useState("");
     const [clientProfile, setClientProfile] = useState<PublicClientProfile | null>(null);
@@ -1280,19 +1277,12 @@ function PublicSite() {
 
     useEffect(() => {
         async function loadPublicSettings() {
-            const [{data: serviceData, error: serviceError}, {data: hoursData, error: hoursError}] =
-                await Promise.all([
-                    supabase
-                        .from("services")
-                        .select("id, name, description, duration_minutes, price_cents, display_order")
-                        .eq("is_active", true)
-                        .order("price_cents", {ascending: false})
-                        .order("name", {ascending: true}),
-                    supabase
-                        .from("business_hours")
-                        .select("day_of_week, is_open, morning_enabled, morning_start_time, morning_end_time, morning_slot_interval_minutes, afternoon_enabled, afternoon_start_time, afternoon_end_time, afternoon_slot_interval_minutes")
-                        .order("day_of_week", {ascending: true}),
-                ]);
+            const {data: serviceData, error: serviceError} = await supabase
+                .from("services")
+                .select("id, name, description, duration_minutes, price_cents, display_order")
+                .eq("is_active", true)
+                .order("price_cents", {ascending: false})
+                .order("name", {ascending: true});
 
             if (!serviceError && serviceData?.length) {
                 setServices(
@@ -1306,31 +1296,11 @@ function PublicSite() {
                     })),
                 );
             }
-
-            if (!hoursError && hoursData?.length) {
-                setBusinessHours(
-                    Object.fromEntries(
-                        hoursData.map((hours) => [
-                            hours.day_of_week,
-                            {
-                                isOpen: Boolean(hours.is_open),
-                                morningEnabled: Boolean(hours.morning_enabled),
-                                morningStart: String(hours.morning_start_time ?? "07:00").slice(0, 5),
-                                morningEnd: String(hours.morning_end_time ?? "07:00").slice(0, 5),
-                                morningSlotIntervalMinutes: Number(hours.morning_slot_interval_minutes ?? 30),
-                                afternoonEnabled: Boolean(hours.afternoon_enabled),
-                                afternoonStart: String(hours.afternoon_start_time ?? "19:30").slice(0, 5),
-                                afternoonEnd: String(hours.afternoon_end_time ?? "21:00").slice(0, 5),
-                                afternoonSlotIntervalMinutes: Number(hours.afternoon_slot_interval_minutes ?? 30),
-                            },
-                        ]),
-                    ),
-                );
-            }
         }
 
         void loadPublicSettings();
     }, []);
+
 
     useEffect(() => {
         async function loadAppointments() {
@@ -1554,48 +1524,7 @@ function PublicSite() {
 
     function getConfiguredPublicStartMinutes(date: string) {
         if (!date) return [] as number[];
-
-        const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
-        const hours = businessHours[dayOfWeek];
-
-        if (!hours || !hours.isOpen) return [] as number[];
-
-        const result: number[] = [];
-
-        const appendShift = (
-            enabled: boolean,
-            startTime: string,
-            endTime: string,
-            intervalMinutes: number,
-        ) => {
-            if (!enabled) return;
-
-            const start = timeToMinutes(startTime);
-            const end = timeToMinutes(endTime);
-            const safeInterval = Math.max(1, intervalMinutes || 30);
-
-            if (end < start) return;
-
-            for (let cursor = start; cursor <= end; cursor += safeInterval) {
-                result.push(cursor);
-            }
-        };
-
-        appendShift(
-            hours.morningEnabled,
-            hours.morningStart,
-            hours.morningEnd,
-            hours.morningSlotIntervalMinutes,
-        );
-
-        appendShift(
-            hours.afternoonEnabled,
-            hours.afternoonStart,
-            hours.afternoonEnd,
-            hours.afternoonSlotIntervalMinutes,
-        );
-
-        return [...new Set(result)].sort((a, b) => a - b);
+        return getFixedClientStartMinutes(date);
     }
 
     function getAvailableTimes(date: string, serviceDurationMinutes: number) {
@@ -1629,7 +1558,6 @@ function PublicSite() {
         scheduleBlocks,
         selectedDate,
         selectedServiceInformation,
-        businessHours,
         editingClientAppointment,
     ]);
 
@@ -2610,21 +2538,6 @@ type AdminServiceSetting = {
     display_order: number;
 };
 
-type AdminBusinessHour = {
-    id: number;
-    day_of_week: number;
-    is_open: boolean;
-    start_time: string;
-    end_time: string;
-    morning_enabled: boolean;
-    morning_start_time: string;
-    morning_end_time: string;
-    morning_slot_interval_minutes: number;
-    afternoon_enabled: boolean;
-    afternoon_start_time: string;
-    afternoon_end_time: string;
-    afternoon_slot_interval_minutes: number;
-};
 
 type AdminClient = {
     key: string;
@@ -4620,8 +4533,7 @@ const adminEnhancementStyles = `
     font-weight: 800;
 }
 .admin-edit-form input,
-.admin-edit-form select,
-.admin-edit-form textarea {
+.admin-edit-form select {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #d8c7cc;
@@ -5743,170 +5655,68 @@ const adminServiceManagerStyles = `
 `;
 
 
-const adminHoursSettingsStyles = `
-.admin-hours-settings-page {
+
+const adminEditDateTimeStyles = `
+.admin-edit-date-time {
     display: grid;
-    gap: 20px;
+    gap: 9px;
 }
-.admin-hours-settings-list {
-    display: grid;
-    gap: 14px;
+.admin-edit-date-time__label {
+    color: #513a42;
+    font-size: .82rem;
+    font-weight: 800;
 }
-.admin-hours-day-card {
-    border: 1px solid rgba(157, 95, 115, .18);
-    border-radius: 22px;
-    padding: 18px;
-    background: #fff;
-    box-shadow: 0 12px 34px rgba(91, 55, 67, .06);
-}
-.admin-hours-day-card.is-closed {
-    background: #faf7f8;
-}
-.admin-hours-day-card__header {
+.admin-edit-date-time__toggle {
+    width: 100%;
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-.admin-hours-day-toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #3f3035;
-    font-weight: 900;
-    font-size: 1.08rem;
-}
-.admin-hours-day-toggle input,
-.admin-hours-shift__title input {
-    width: 20px;
-    height: 20px;
-    accent-color: #9b4763;
-}
-.admin-hours-close-day {
-    border: 1px solid #dfc7cf;
-    border-radius: 11px;
-    padding: 8px 10px;
-    background: #fff8fa;
-    color: #8d5265;
+    gap: 14px;
+    border: 1px solid #dbc8ce;
+    border-radius: 14px;
+    padding: 13px 15px;
+    background: #fff;
+    color: #513a42;
+    text-align: left;
     font: inherit;
-    font-size: .75rem;
-    font-weight: 900;
+    cursor: pointer;
 }
-.admin-hours-shifts {
+.admin-edit-date-time__toggle div {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: 3px;
 }
-.admin-hours-shift {
-    border: 1px solid #eadce0;
-    border-radius: 16px;
+.admin-edit-date-time__toggle small {
+    color: #a0878f;
+    font-size: .69rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+.admin-edit-date-time__toggle strong {
+    font-size: .94rem;
+}
+.admin-edit-date-time__picker {
+    display: grid;
+    gap: 18px;
+    border: 1px solid #eadde1;
+    border-radius: 18px;
     padding: 14px;
     background: #fffafb;
 }
-.admin-hours-shift.is-disabled {
-    opacity: .58;
+.admin-edit-date-time__times {
+    display: grid;
+    gap: 10px;
 }
-.admin-hours-shift__title {
+.admin-edit-date-time__times-heading {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 12px;
+    color: #563e47;
 }
-.admin-hours-shift__title > strong {
-    color: #60434d;
-    font-size: .9rem;
-}
-.admin-hours-shift__title label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #936174;
-    font-size: .72rem;
-    font-weight: 900;
-}
-.admin-hours-time-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-.admin-hours-time-grid label {
-    display: grid;
-    gap: 6px;
-}
-.admin-hours-time-grid label span {
-    color: #8a737b;
-    font-size: .72rem;
-    font-weight: 800;
-}
-.admin-hours-time-grid input {
-    width: 100%;
-    min-height: 44px;
-    box-sizing: border-box;
-    border: 1px solid #dfd0d5;
-    border-radius: 11px;
-    padding: 0 10px;
-    background: #fff;
-    color: #46343a;
-    font: inherit;
-}
-.admin-hours-day-card__save {
-    width: 100%;
-    margin-top: 14px;
-    border: 0;
-    border-radius: 12px;
-    padding: 12px 14px;
-    background: linear-gradient(135deg, #a45d73, #723d4d);
-    color: #fff;
-    font: inherit;
-    font-weight: 900;
-}
-.admin-hours-settings-note {
-    border: 1px solid #ead9df;
-    border-radius: 18px;
-    padding: 16px;
-    background: #fff9fb;
-    color: #6d5059;
-}
-.admin-hours-settings-note strong {
-    display: block;
-    margin-bottom: 5px;
-}
-.admin-hours-settings-note p {
-    margin: 0;
-    line-height: 1.55;
-}
-@media (max-width: 720px) {
-    .admin-hours-shifts {
-        grid-template-columns: 1fr;
-    }
-    .admin-hours-day-card__header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-}
-`;
-
-
-const adminMusicTasteStyles = `
-.admin-edit-form textarea {
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 92px;
-    resize: vertical;
-    border: 1px solid #dbc5cc;
-    border-radius: 12px;
-    padding: 12px 13px;
-    background: #fff;
-    color: #35272c;
-    font: inherit;
-    line-height: 1.45;
-}
-.admin-edit-form textarea:focus {
-    outline: none;
-    border-color: #a86175;
-    box-shadow: 0 0 0 3px rgba(168,97,117,.1);
+.admin-edit-date-time__times-heading span {
+    color: #9b7a85;
+    font-size: .75rem;
 }
 .admin-booking-card__music {
     grid-column: 1 / -1;
@@ -5915,7 +5725,7 @@ const adminMusicTasteStyles = `
     white-space: normal;
     overflow-wrap: anywhere;
 }
-
+.admin-edit-form textarea,
 .admin-client-editor textarea {
     width: 100%;
     box-sizing: border-box;
@@ -5929,10 +5739,16 @@ const adminMusicTasteStyles = `
     font: inherit;
     line-height: 1.45;
 }
+.admin-edit-form textarea:focus,
 .admin-client-editor textarea:focus {
     outline: none;
     border-color: #a86175;
     box-shadow: 0 0 0 3px rgba(168,97,117,.1);
+}
+@media (max-width: 620px) {
+    .admin-edit-date-time__picker {
+        padding: 11px;
+    }
 }
 `;
 
@@ -5948,7 +5764,6 @@ function AdminPanel() {
     const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
     const [adminBlocks, setAdminBlocks] = useState<AdminScheduleBlock[]>([]);
     const [adminServices, setAdminServices] = useState<AdminServiceSetting[]>([]);
-    const [adminBusinessHours, setAdminBusinessHours] = useState<AdminBusinessHour[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [panelError, setPanelError] = useState("");
     const [notificationClock, setNotificationClock] = useState(() => Date.now());
@@ -5961,7 +5776,7 @@ function AdminPanel() {
         }
     });
 
-    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings" | "hours-settings">("agenda");
+    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings">("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
     const [financeMonth, setFinanceMonth] = useState(() => formatDateForInput(new Date()).slice(0, 7));
 
@@ -5990,6 +5805,13 @@ function AdminPanel() {
     const [editAppointmentService, setEditAppointmentService] = useState("");
     const [editAppointmentDate, setEditAppointmentDate] = useState("");
     const [editAppointmentTime, setEditAppointmentTime] = useState("");
+    const [showEditDateTimePicker, setShowEditDateTimePicker] = useState(false);
+    const [editWeekReferenceDate, setEditWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [showEditMonthCalendar, setShowEditMonthCalendar] = useState(false);
+    const [editCalendarMonth, setEditCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [appointmentEditError, setAppointmentEditError] = useState("");
     const [isSavingAppointment, setIsSavingAppointment] = useState(false);
 
@@ -6044,14 +5866,6 @@ function AdminPanel() {
     const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
     const [expandedServiceId, setExpandedServiceId] = useState<number | null>(null);
     const [deletingServiceId, setDeletingServiceId] = useState<number | null>(null);
-    const [savingBusinessHourId, setSavingBusinessHourId] = useState<number | null>(null);
-    const [hoursSettingsError, setHoursSettingsError] = useState("");
-    const [hoursSettingsSuccess, setHoursSettingsSuccess] = useState("");
-
-    const allDayTimes = useMemo(
-        () => Array.from({length: 48}, (_, index) => minutesToTime(index * 30)),
-        [],
-    );
 
     useEffect(() => {
         const timer = window.setInterval(() => setNotificationClock(Date.now()), 60_000);
@@ -6113,7 +5927,6 @@ function AdminPanel() {
                 {data: appointmentData, error: appointmentError},
                 {data: blockData, error: blockLoadError},
                 {data: serviceData, error: serviceLoadError},
-                {data: hoursData, error: hoursLoadError},
                 {data: clientProfileData, error: clientProfileLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
@@ -6128,16 +5941,13 @@ function AdminPanel() {
                     .select("id, name, description, duration_minutes, price_cents, display_order")
                     .order("price_cents", {ascending: false})
                     .order("name", {ascending: true}),
-                supabase.from("business_hours")
-                    .select("id, day_of_week, is_open, start_time, end_time, morning_enabled, morning_start_time, morning_end_time, morning_slot_interval_minutes, afternoon_enabled, afternoon_start_time, afternoon_end_time, afternoon_slot_interval_minutes")
-                    .order("day_of_week", {ascending: true}),
                 supabase.from("client_profiles")
                     .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
                     .order("full_name", {ascending: true}),
             ]);
 
-            if (appointmentError || blockLoadError || serviceLoadError || hoursLoadError || clientProfileLoadError) {
-                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || hoursLoadError || clientProfileLoadError);
+            if (appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError) {
+                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError);
                 setPanelError("Não foi possível carregar os dados do painel. Atualize a página.");
                 setIsLoading(false);
                 return;
@@ -6147,20 +5957,6 @@ function AdminPanel() {
             setAdminBlocks((blockData ?? []) as AdminScheduleBlock[]);
             setAdminServices((serviceData ?? []) as AdminServiceSetting[]);
             setAdminClientProfiles((clientProfileData ?? []) as ClientProfile[]);
-            setAdminBusinessHours(((hoursData ?? []) as AdminBusinessHour[]).map((hours) => ({
-                ...hours,
-                is_open: Boolean(hours.is_open),
-                start_time: String(hours.start_time ?? "07:00").slice(0, 5),
-                end_time: String(hours.end_time ?? "21:00").slice(0, 5),
-                morning_enabled: Boolean(hours.morning_enabled),
-                morning_start_time: String(hours.morning_start_time ?? "07:00").slice(0, 5),
-                morning_end_time: String(hours.morning_end_time ?? "07:00").slice(0, 5),
-                morning_slot_interval_minutes: Number(hours.morning_slot_interval_minutes ?? 30),
-                afternoon_enabled: Boolean(hours.afternoon_enabled),
-                afternoon_start_time: String(hours.afternoon_start_time ?? "19:30").slice(0, 5),
-                afternoon_end_time: String(hours.afternoon_end_time ?? "21:00").slice(0, 5),
-                afternoon_slot_interval_minutes: Number(hours.afternoon_slot_interval_minutes ?? 30),
-            })));
             if (serviceData?.length) setManualServiceName(serviceData[0].name);
             setIsLoading(false);
         }
@@ -6364,14 +6160,161 @@ function AdminPanel() {
         setEditAppointmentService(appointment.service_name);
         setEditAppointmentDate(appointment.appointment_date);
         setEditAppointmentTime(String(appointment.start_time).slice(0, 5));
+        setEditWeekReferenceDate(appointment.appointment_date);
+
+        const appointmentDate = new Date(`${appointment.appointment_date}T12:00:00`);
+        setEditCalendarMonth(
+            new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), 1),
+        );
+
+        setShowEditDateTimePicker(false);
+        setShowEditMonthCalendar(false);
         setAppointmentEditError("");
     }
+
+    const editVisibleWeekDates = useMemo(
+        () => getManualWeekDates(editWeekReferenceDate),
+        [editWeekReferenceDate],
+    );
+
+    function selectEditAppointmentDate(date: string) {
+        const today = formatDateForInput(new Date());
+
+        if (date < today) return;
+
+        setEditAppointmentDate(date);
+        setEditWeekReferenceDate(date);
+        setEditAppointmentTime("");
+        setAppointmentEditError("");
+        setShowEditMonthCalendar(false);
+    }
+
+    function moveEditAppointmentWeek(amount: number) {
+        const currentWeek = getManualWeekDates(editWeekReferenceDate);
+        const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
+        const nextWeek = getManualWeekDates(nextReference);
+        const today = formatDateForInput(new Date());
+        const firstSelectable = nextWeek.find((date) => date >= today);
+
+        setEditWeekReferenceDate(nextReference);
+        setEditAppointmentTime("");
+        setAppointmentEditError("");
+
+        if (firstSelectable) {
+            setEditAppointmentDate(firstSelectable);
+        }
+    }
+
+    function openEditAppointmentMonthCalendar() {
+        const reference = new Date(
+            `${editAppointmentDate || editWeekReferenceDate}T12:00:00`,
+        );
+
+        setEditCalendarMonth(
+            new Date(reference.getFullYear(), reference.getMonth(), 1),
+        );
+        setShowEditMonthCalendar((current) => !current);
+    }
+
+    function getEditAppointmentMonthCells() {
+        const year = editCalendarMonth.getFullYear();
+        const month = editCalendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({length: leadingEmpty}, () => null),
+            ...Array.from({length: daysInMonth}, (_, index) =>
+                formatDateForInput(new Date(year, month, index + 1)),
+            ),
+        ];
+    }
+
+    const editSelectedService = adminServices.find(
+        (service) => service.name === editAppointmentService,
+    );
+
+    const editAppointmentAvailableTimes = useMemo(() => {
+        if (
+            !selectedAdminAppointment ||
+            !editAppointmentDate ||
+            !editSelectedService
+        ) {
+            return [] as string[];
+        }
+
+        const candidateStarts =
+            getFixedAdminManualStartMinutes(editAppointmentDate);
+
+        const occupied: TimeInterval[] = [
+            ...appointments
+                .filter(
+                    (appointment) =>
+                        appointment.id !== selectedAdminAppointment.id &&
+                        appointment.appointment_date === editAppointmentDate &&
+                        appointment.status !== "cancelled" &&
+                        appointment.status !== "no-show",
+                )
+                .map((appointment) => {
+                    const start = getMinutesFromTime(appointment.start_time);
+
+                    return {
+                        start,
+                        end: start + appointment.duration_minutes,
+                    };
+                }),
+            ...adminBlocks
+                .filter((block) => block.block_date === editAppointmentDate)
+                .map((block) => ({
+                    start: getMinutesFromTime(block.start_time),
+                    end: getMinutesFromTime(block.end_time),
+                })),
+        ];
+
+        const merged = mergeIntervals(occupied);
+        const now = new Date();
+        const today = formatDateForInput(now);
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        return candidateStarts
+            .filter((start) => {
+                const end = start + editSelectedService.duration_minutes;
+                const isPastToday =
+                    editAppointmentDate === today &&
+                    start <= currentMinutes;
+
+                const hasConflict = merged.some((interval) =>
+                    intervalsOverlap(
+                        start,
+                        end,
+                        interval.start,
+                        interval.end,
+                    ),
+                );
+
+                return !isPastToday && !hasConflict;
+            })
+            .map(minutesToTime);
+    }, [
+        selectedAdminAppointment,
+        editAppointmentDate,
+        editSelectedService,
+        appointments,
+        adminBlocks,
+    ]);
 
     async function saveAppointmentChanges() {
         if (!selectedAdminAppointment) return;
         const service = adminServices.find((item) => item.name === editAppointmentService);
         if (!service) {
             setAppointmentEditError("Escolha um serviço válido.");
+            return;
+        }
+
+        if (!editAppointmentDate || !editAppointmentTime) {
+            setAppointmentEditError("Escolha a nova data e o horário.");
             return;
         }
         if (editAppointmentName.trim().length < 3 || editAppointmentPhone.replace(/\D/g, "").length < 10) {
@@ -6974,10 +6917,7 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        const date = new Date(`${manualDate}T12:00:00`);
-        const configuredIntervals = getAdminConfiguredIntervals(date.getDay());
-
-        if (!configuredIntervals.length) return [] as string[];
+        const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
 
         const occupied: TimeInterval[] = [
             ...appointments
@@ -7002,10 +6942,9 @@ function AdminPanel() {
         const now = new Date();
         const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const result: number[] = [];
 
-        configuredIntervals.forEach((interval) => {
-            for (let start = interval.start; start < interval.end; start += 30) {
+        return candidateStarts
+            .filter((start) => {
                 const end = start + manualSelectedService.duration_minutes;
                 const isPastToday = manualDate === today && start <= currentMinutes;
                 const hasConflict = merged.some((occupiedInterval) =>
@@ -7017,21 +6956,14 @@ function AdminPanel() {
                     ),
                 );
 
-                if (!isPastToday && !hasConflict) {
-                    result.push(start);
-                }
-            }
-        });
-
-        return [...new Set(result)]
-            .sort((a, b) => a - b)
+                return !isPastToday && !hasConflict;
+            })
             .map(minutesToTime);
     }, [
         manualDate,
         manualSelectedService,
         appointments,
         adminBlocks,
-        adminBusinessHours,
     ]);
 
     function openClientEditor(client: AdminClient) {
@@ -7097,7 +7029,9 @@ function AdminPanel() {
                         updated_at: new Date().toISOString(),
                     })
                     .eq("id", existingProfile.id)
-                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
+                    .select(
+                        "id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at",
+                    )
                     .single();
 
                 if (profileError) throw profileError;
@@ -7403,10 +7337,7 @@ function AdminPanel() {
     }, [blockDate]);
 
     const blockAvailableTimes = useMemo(() => {
-        const day = new Date(`${blockDate}T12:00:00`).getDay();
-        const configuredIntervals = getAdminConfiguredIntervals(day);
-
-        if (!configuredIntervals.length) return [] as string[];
+        const candidateStarts = getFixedClientStartMinutes(blockDate);
 
         const occupied = appointments
             .filter(
@@ -7426,24 +7357,16 @@ function AdminPanel() {
                 end: getMinutesFromTime(item.end_time),
             }));
 
-        const result: number[] = [];
-
-        configuredIntervals.forEach((interval) => {
-            for (let start = interval.start; start < interval.end; start += 30) {
+        return candidateStarts
+            .filter((start) => {
                 const isOccupied = [...occupied, ...blocked].some((item) =>
                     intervalsOverlap(start, start + 30, item.start, item.end),
                 );
 
-                if (!isOccupied) {
-                    result.push(start);
-                }
-            }
-        });
-
-        return [...new Set(result)]
-            .sort((a, b) => a - b)
+                return !isOccupied;
+            })
             .map(minutesToTime);
-    }, [appointments, adminBlocks, blockDate, adminBusinessHours]);
+    }, [appointments, adminBlocks, blockDate]);
 
     useEffect(() => {
         setSelectedBlockTimes((current) => current.filter((time) => blockAvailableTimes.includes(time)));
@@ -7658,120 +7581,6 @@ function AdminPanel() {
         setDeletingServiceId(null);
     }
 
-    const adminDayNames = [
-        "Domingo",
-        "Segunda-feira",
-        "Terça-feira",
-        "Quarta-feira",
-        "Quinta-feira",
-        "Sexta-feira",
-        "Sábado",
-    ];
-
-    function updateAdminBusinessHour(
-        hoursId: number,
-        field: keyof AdminBusinessHour,
-        value: string | boolean | number,
-    ) {
-        setAdminBusinessHours((current) =>
-            current.map((hours) =>
-                hours.id === hoursId
-                    ? {...hours, [field]: value}
-                    : hours,
-            ),
-        );
-    }
-
-    async function saveAdminBusinessHour(hours: AdminBusinessHour) {
-        setHoursSettingsError("");
-        setHoursSettingsSuccess("");
-
-        if (
-            hours.is_open &&
-            !hours.morning_enabled &&
-            !hours.afternoon_enabled
-        ) {
-            setHoursSettingsError(
-                `${adminDayNames[hours.day_of_week]} está ativo, mas nenhuma jornada foi habilitada.`,
-            );
-            return;
-        }
-
-        const invalidMorning =
-            hours.is_open &&
-            hours.morning_enabled &&
-            getMinutesFromTime(hours.morning_end_time) <
-            getMinutesFromTime(hours.morning_start_time);
-
-        const invalidAfternoon =
-            hours.is_open &&
-            hours.afternoon_enabled &&
-            getMinutesFromTime(hours.afternoon_end_time) <
-            getMinutesFromTime(hours.afternoon_start_time);
-
-        if (invalidMorning || invalidAfternoon) {
-            setHoursSettingsError(
-                "O horário final da jornada não pode ser anterior ao horário inicial.",
-            );
-            return;
-        }
-
-        setSavingBusinessHourId(hours.id);
-
-        const {error} = await supabase
-            .from("business_hours")
-            .update({
-                is_open: hours.is_open,
-                morning_enabled: hours.morning_enabled,
-                morning_start_time: hours.morning_start_time,
-                morning_end_time: hours.morning_end_time,
-                morning_slot_interval_minutes: hours.morning_slot_interval_minutes,
-                afternoon_enabled: hours.afternoon_enabled,
-                afternoon_start_time: hours.afternoon_start_time,
-                afternoon_end_time: hours.afternoon_end_time,
-                afternoon_slot_interval_minutes: hours.afternoon_slot_interval_minutes,
-            })
-            .eq("id", hours.id);
-
-        if (error) {
-            console.error("Erro ao salvar configuração de horários:", error);
-            setHoursSettingsError("Não foi possível salvar os horários.");
-            setSavingBusinessHourId(null);
-            return;
-        }
-
-        setHoursSettingsSuccess(
-            `${adminDayNames[hours.day_of_week]} atualizado com sucesso.`,
-        );
-        setSavingBusinessHourId(null);
-    }
-
-    function getAdminConfiguredIntervals(dayOfWeek: number) {
-        const hours = adminBusinessHours.find(
-            (item) => item.day_of_week === dayOfWeek,
-        );
-
-        if (!hours || !hours.is_open) return [] as TimeInterval[];
-
-        const intervals: TimeInterval[] = [];
-
-        if (hours.morning_enabled) {
-            intervals.push({
-                start: getMinutesFromTime(hours.morning_start_time),
-                end: getMinutesFromTime(hours.morning_end_time) + 30,
-            });
-        }
-
-        if (hours.afternoon_enabled) {
-            intervals.push({
-                start: getMinutesFromTime(hours.afternoon_start_time),
-                end: getMinutesFromTime(hours.afternoon_end_time) + 30,
-            });
-        }
-
-        return intervals;
-    }
-
     function getAppointmentStatusLabel(status: AdminAppointment["status"]) {
         if (status === "completed") return "Concluído";
         if (status === "cancelled") return "Cancelado";
@@ -7806,7 +7615,10 @@ function AdminPanel() {
                     <div><span>Serviço</span><strong>{appointment.service_name}</strong></div>
                     <div><span>Duração</span><strong>{appointment.duration_minutes} min</strong></div>
                     <div><span>Telefone</span><strong>{appointment.client_phone}</strong></div>
-                    <div className="admin-booking-card__music"><span>Gosto musical</span><strong>{appointment.musical_taste?.trim() || "Não informado"}</strong></div>
+                    <div className="admin-booking-card__music">
+                        <span>Gosto musical</span>
+                        <strong>{appointment.musical_taste?.trim() || "Não informado"}</strong>
+                    </div>
                 </div>
                 <div className="admin-booking-card__footer" onClick={(event) => event.stopPropagation()}>
                     <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar detalhes</button>
@@ -7834,13 +7646,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminHoursSettingsStyles + adminMusicTasteStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminHoursSettingsStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -7858,7 +7670,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminHoursSettingsStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -7871,7 +7683,6 @@ function AdminPanel() {
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
                     <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "hours-settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("hours-settings")}><strong>Configuração de horários</strong><span>Defina a jornada semanal da Mirian.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -8273,245 +8084,6 @@ function AdminPanel() {
                                 })}
                             </div>
                         </section>
-                    </section>
-                ) : adminView === "hours-settings" ? (
-                    <section className="admin-hours-settings-page">
-                        <div className="admin-settings__intro">
-                            <div>
-                                <span className="admin-settings__eyebrow">Configuração semanal</span>
-                                <h2>Configuração de horários</h2>
-                                <p>
-                                    Defina a jornada padrão de cada dia. Essa configuração se repete
-                                    automaticamente em todas as semanas.
-                                </p>
-                            </div>
-                        </div>
-
-                        {hoursSettingsError && (
-                            <p className="admin-settings__message admin-settings__message--error">
-                                {hoursSettingsError}
-                            </p>
-                        )}
-
-                        {hoursSettingsSuccess && (
-                            <p className="admin-settings__message admin-settings__message--success">
-                                {hoursSettingsSuccess}
-                            </p>
-                        )}
-
-                        <div className="admin-hours-settings-list">
-                            {adminBusinessHours.map((hours) => (
-                                <article
-                                    className={`admin-hours-day-card${
-                                        !hours.is_open ? " is-closed" : ""
-                                    }`}
-                                    key={hours.id}
-                                >
-                                    <div className="admin-hours-day-card__header">
-                                        <label className="admin-hours-day-toggle">
-                                            <input
-                                                type="checkbox"
-                                                checked={hours.is_open}
-                                                onChange={(event) =>
-                                                    updateAdminBusinessHour(
-                                                        hours.id,
-                                                        "is_open",
-                                                        event.target.checked,
-                                                    )
-                                                }
-                                            />
-                                            <span>{adminDayNames[hours.day_of_week]}</span>
-                                        </label>
-
-                                        <button
-                                            type="button"
-                                            className="admin-hours-close-day"
-                                            onClick={() =>
-                                                updateAdminBusinessHour(
-                                                    hours.id,
-                                                    "is_open",
-                                                    !hours.is_open,
-                                                )
-                                            }
-                                        >
-                                            {hours.is_open
-                                                ? "Bloquear dia inteiro"
-                                                : "Liberar dia"}
-                                        </button>
-                                    </div>
-
-                                    <div className="admin-hours-shifts">
-                                        <section
-                                            className={`admin-hours-shift${
-                                                !hours.morning_enabled
-                                                    ? " is-disabled"
-                                                    : ""
-                                            }`}
-                                        >
-                                            <div className="admin-hours-shift__title">
-                                                <strong>Jornada da manhã</strong>
-                                                <label>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={hours.morning_enabled}
-                                                        disabled={!hours.is_open}
-                                                        onChange={(event) =>
-                                                            updateAdminBusinessHour(
-                                                                hours.id,
-                                                                "morning_enabled",
-                                                                event.target.checked,
-                                                            )
-                                                        }
-                                                    />
-                                                    <span>
-                                                        {hours.morning_enabled
-                                                            ? "Ativa"
-                                                            : "Bloqueada"}
-                                                    </span>
-                                                </label>
-                                            </div>
-
-                                            <div className="admin-hours-time-grid">
-                                                <label>
-                                                    <span>Início</span>
-                                                    <input
-                                                        type="time"
-                                                        step="1800"
-                                                        value={hours.morning_start_time}
-                                                        disabled={
-                                                            !hours.is_open ||
-                                                            !hours.morning_enabled
-                                                        }
-                                                        onChange={(event) =>
-                                                            updateAdminBusinessHour(
-                                                                hours.id,
-                                                                "morning_start_time",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </label>
-
-                                                <label>
-                                                    <span>Fim</span>
-                                                    <input
-                                                        type="time"
-                                                        step="1800"
-                                                        value={hours.morning_end_time}
-                                                        disabled={
-                                                            !hours.is_open ||
-                                                            !hours.morning_enabled
-                                                        }
-                                                        onChange={(event) =>
-                                                            updateAdminBusinessHour(
-                                                                hours.id,
-                                                                "morning_end_time",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </label>
-                                            </div>
-                                        </section>
-
-                                        <section
-                                            className={`admin-hours-shift${
-                                                !hours.afternoon_enabled
-                                                    ? " is-disabled"
-                                                    : ""
-                                            }`}
-                                        >
-                                            <div className="admin-hours-shift__title">
-                                                <strong>Jornada da tarde/noite</strong>
-                                                <label>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={hours.afternoon_enabled}
-                                                        disabled={!hours.is_open}
-                                                        onChange={(event) =>
-                                                            updateAdminBusinessHour(
-                                                                hours.id,
-                                                                "afternoon_enabled",
-                                                                event.target.checked,
-                                                            )
-                                                        }
-                                                    />
-                                                    <span>
-                                                        {hours.afternoon_enabled
-                                                            ? "Ativa"
-                                                            : "Bloqueada"}
-                                                    </span>
-                                                </label>
-                                            </div>
-
-                                            <div className="admin-hours-time-grid">
-                                                <label>
-                                                    <span>Início</span>
-                                                    <input
-                                                        type="time"
-                                                        step="1800"
-                                                        value={hours.afternoon_start_time}
-                                                        disabled={
-                                                            !hours.is_open ||
-                                                            !hours.afternoon_enabled
-                                                        }
-                                                        onChange={(event) =>
-                                                            updateAdminBusinessHour(
-                                                                hours.id,
-                                                                "afternoon_start_time",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </label>
-
-                                                <label>
-                                                    <span>Fim</span>
-                                                    <input
-                                                        type="time"
-                                                        step="1800"
-                                                        value={hours.afternoon_end_time}
-                                                        disabled={
-                                                            !hours.is_open ||
-                                                            !hours.afternoon_enabled
-                                                        }
-                                                        onChange={(event) =>
-                                                            updateAdminBusinessHour(
-                                                                hours.id,
-                                                                "afternoon_end_time",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </label>
-                                            </div>
-                                        </section>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        className="admin-hours-day-card__save"
-                                        disabled={savingBusinessHourId === hours.id}
-                                        onClick={() =>
-                                            void saveAdminBusinessHour(hours)
-                                        }
-                                    >
-                                        {savingBusinessHourId === hours.id
-                                            ? "Salvando..."
-                                            : "Salvar este dia"}
-                                    </button>
-                                </article>
-                            ))}
-                        </div>
-
-                        <div className="admin-hours-settings-note">
-                            <strong>Bloqueio pontual continua separado</strong>
-                            <p>
-                                Use “Bloquear horários” na agenda quando precisar fechar somente
-                                um horário específico de uma data. A configuração acima é semanal
-                                e recorrente.
-                            </p>
-                        </div>
                     </section>
                 ) : adminView === "clients" ? (
                     <section className="admin-clients">
@@ -8962,6 +8534,7 @@ function AdminPanel() {
                                 <div className="admin-edit-form">
                                     <label>Nome da cliente<input value={editAppointmentName} onChange={(event) => setEditAppointmentName(event.target.value)}/></label>
                                     <label>Telefone<input value={editAppointmentPhone} onChange={(event) => setEditAppointmentPhone(event.target.value)}/></label>
+
                                     <label className="admin-edit-form__full">
                                         Gosto musical
                                         <textarea
@@ -8972,10 +8545,389 @@ function AdminPanel() {
                                             maxLength={500}
                                         />
                                     </label>
+
                                     <label className="admin-edit-form__full">E-mail<input type="email" value={editAppointmentEmail} onChange={(event) => setEditAppointmentEmail(event.target.value)}/></label>
-                                    <label>Serviço<select value={editAppointmentService} onChange={(event) => setEditAppointmentService(event.target.value)}>{adminServices.map((service) => <option key={service.id} value={service.name}>{service.name}</option>)}</select></label>
-                                    <label>Data<input type="date" value={editAppointmentDate} onChange={(event) => setEditAppointmentDate(event.target.value)}/></label>
-                                    <label>Horário<select value={editAppointmentTime} onChange={(event) => setEditAppointmentTime(event.target.value)}>{allDayTimes.map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
+
+                                    <label className="admin-edit-form__full">
+                                        Serviço
+                                        <select
+                                            value={editAppointmentService}
+                                            onChange={(event) => {
+                                                setEditAppointmentService(event.target.value);
+                                                setEditAppointmentTime("");
+                                                setAppointmentEditError("");
+                                            }}
+                                        >
+                                            {adminServices.map((service) => (
+                                                <option key={service.id} value={service.name}>
+                                                    {service.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <div className="admin-edit-date-time admin-edit-form__full">
+                                        <span className="admin-edit-date-time__label">Data e horário</span>
+
+                                        <button
+                                            type="button"
+                                            className="admin-edit-date-time__toggle"
+                                            onClick={() => {
+                                                setShowEditDateTimePicker((current) => !current);
+                                                setAppointmentEditError("");
+                                            }}
+                                        >
+                                            <div>
+                                                <small>Selecionado</small>
+                                                <strong>
+                                                    {editAppointmentDate
+                                                        ? formatAdminDate(editAppointmentDate)
+                                                        : "Escolha a data"}
+                                                    {editAppointmentTime
+                                                        ? ` às ${editAppointmentTime}`
+                                                        : ""}
+                                                </strong>
+                                            </div>
+                                            <span>{showEditDateTimePicker ? "⌃" : "⌄"}</span>
+                                        </button>
+
+                                        {showEditDateTimePicker && (
+                                            <div className="admin-edit-date-time__picker">
+                                                <div className="admin-manual-week-picker">
+                                                    <div className="admin-manual-week-picker__top">
+                                                        <div className="admin-manual-week-picker__month">
+                                                            <button
+                                                                type="button"
+                                                                onClick={openEditAppointmentMonthCalendar}
+                                                                aria-label="Abrir calendário mensal"
+                                                            >
+                                                                📅
+                                                            </button>
+
+                                                            <strong>
+                                                                {new Date(
+                                                                    `${editWeekReferenceDate}T12:00:00`,
+                                                                ).toLocaleDateString(
+                                                                    "pt-BR",
+                                                                    {
+                                                                        month: "long",
+                                                                        year: "numeric",
+                                                                    },
+                                                                )}
+                                                            </strong>
+                                                        </div>
+
+                                                        <div className="admin-manual-week-picker__navs">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    moveEditAppointmentWeek(-1)
+                                                                }
+                                                                aria-label="Semana anterior"
+                                                            >
+                                                                ‹
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    moveEditAppointmentWeek(1)
+                                                                }
+                                                                aria-label="Próxima semana"
+                                                            >
+                                                                ›
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="admin-manual-week-days">
+                                                        <div className="admin-manual-week-days__row admin-manual-week-days__row--four">
+                                                            {editVisibleWeekDates
+                                                                .slice(0, 4)
+                                                                .map((date) => {
+                                                                    const parsed =
+                                                                        new Date(
+                                                                            `${date}T12:00:00`,
+                                                                        );
+                                                                    const isPast =
+                                                                        date <
+                                                                        formatDateForInput(
+                                                                            new Date(),
+                                                                        );
+
+                                                                    return (
+                                                                        <button
+                                                                            key={date}
+                                                                            type="button"
+                                                                            disabled={isPast}
+                                                                            className={`admin-manual-week-day${
+                                                                                editAppointmentDate ===
+                                                                                date
+                                                                                    ? " is-selected"
+                                                                                    : ""
+                                                                            }${
+                                                                                isPast
+                                                                                    ? " is-past"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                selectEditAppointmentDate(
+                                                                                    date,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <span>
+                                                                                {parsed
+                                                                                    .toLocaleDateString(
+                                                                                        "pt-BR",
+                                                                                        {
+                                                                                            weekday:
+                                                                                                "short",
+                                                                                        },
+                                                                                    )
+                                                                                    .replace(
+                                                                                        ".",
+                                                                                        "",
+                                                                                    )}
+                                                                            </span>
+                                                                            <strong>
+                                                                                {String(
+                                                                                    parsed.getDate(),
+                                                                                ).padStart(
+                                                                                    2,
+                                                                                    "0",
+                                                                                )}
+                                                                            </strong>
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                        </div>
+
+                                                        <div className="admin-manual-week-days__row admin-manual-week-days__row--three">
+                                                            {editVisibleWeekDates
+                                                                .slice(4)
+                                                                .map((date) => {
+                                                                    const parsed =
+                                                                        new Date(
+                                                                            `${date}T12:00:00`,
+                                                                        );
+                                                                    const isPast =
+                                                                        date <
+                                                                        formatDateForInput(
+                                                                            new Date(),
+                                                                        );
+
+                                                                    return (
+                                                                        <button
+                                                                            key={date}
+                                                                            type="button"
+                                                                            disabled={isPast}
+                                                                            className={`admin-manual-week-day${
+                                                                                editAppointmentDate ===
+                                                                                date
+                                                                                    ? " is-selected"
+                                                                                    : ""
+                                                                            }${
+                                                                                isPast
+                                                                                    ? " is-past"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                selectEditAppointmentDate(
+                                                                                    date,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <span>
+                                                                                {parsed
+                                                                                    .toLocaleDateString(
+                                                                                        "pt-BR",
+                                                                                        {
+                                                                                            weekday:
+                                                                                                "short",
+                                                                                        },
+                                                                                    )
+                                                                                    .replace(
+                                                                                        ".",
+                                                                                        "",
+                                                                                    )}
+                                                                            </span>
+                                                                            <strong>
+                                                                                {String(
+                                                                                    parsed.getDate(),
+                                                                                ).padStart(
+                                                                                    2,
+                                                                                    "0",
+                                                                                )}
+                                                                            </strong>
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                        </div>
+                                                    </div>
+
+                                                    {showEditMonthCalendar && (
+                                                        <div className="admin-manual-month-calendar">
+                                                            <div className="admin-manual-month-calendar__header">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setEditCalendarMonth(
+                                                                            (current) =>
+                                                                                new Date(
+                                                                                    current.getFullYear(),
+                                                                                    current.getMonth() -
+                                                                                    1,
+                                                                                    1,
+                                                                                ),
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    ‹
+                                                                </button>
+
+                                                                <strong>
+                                                                    {editCalendarMonth.toLocaleDateString(
+                                                                        "pt-BR",
+                                                                        {
+                                                                            month: "long",
+                                                                            year: "numeric",
+                                                                        },
+                                                                    )}
+                                                                </strong>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setEditCalendarMonth(
+                                                                            (current) =>
+                                                                                new Date(
+                                                                                    current.getFullYear(),
+                                                                                    current.getMonth() +
+                                                                                    1,
+                                                                                    1,
+                                                                                ),
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    ›
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="admin-manual-month-calendar__weekdays">
+                                                                {[
+                                                                    "SEG",
+                                                                    "TER",
+                                                                    "QUA",
+                                                                    "QUI",
+                                                                    "SEX",
+                                                                    "SÁB",
+                                                                    "DOM",
+                                                                ].map((day) => (
+                                                                    <span key={day}>
+                                                                        {day}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+
+                                                            <div className="admin-manual-month-calendar__grid">
+                                                                {getEditAppointmentMonthCells().map(
+                                                                    (date, index) => {
+                                                                        if (!date) {
+                                                                            return (
+                                                                                <span
+                                                                                    className="is-empty"
+                                                                                    key={`edit-empty-${index}`}
+                                                                                />
+                                                                            );
+                                                                        }
+
+                                                                        const isPast =
+                                                                            date <
+                                                                            formatDateForInput(
+                                                                                new Date(),
+                                                                            );
+
+                                                                        return (
+                                                                            <button
+                                                                                type="button"
+                                                                                key={date}
+                                                                                disabled={isPast}
+                                                                                className={`${
+                                                                                    editAppointmentDate ===
+                                                                                    date
+                                                                                        ? "is-selected"
+                                                                                        : ""
+                                                                                }${
+                                                                                    isPast
+                                                                                        ? " is-past"
+                                                                                        : ""
+                                                                                }`}
+                                                                                onClick={() =>
+                                                                                    selectEditAppointmentDate(
+                                                                                        date,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                {new Date(
+                                                                                    `${date}T12:00:00`,
+                                                                                ).getDate()}
+                                                                            </button>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="admin-edit-date-time__times">
+                                                    <div className="admin-edit-date-time__times-heading">
+                                                        <strong>Horários disponíveis</strong>
+                                                        <span>
+                                                            {editSelectedService
+                                                                ? `${editSelectedService.duration_minutes} min`
+                                                                : ""}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="admin-manual-times">
+                                                        {editAppointmentAvailableTimes.map(
+                                                            (time) => (
+                                                                <button
+                                                                    key={time}
+                                                                    type="button"
+                                                                    className={
+                                                                        editAppointmentTime ===
+                                                                        time
+                                                                            ? "is-selected"
+                                                                            : ""
+                                                                    }
+                                                                    onClick={() => {
+                                                                        setEditAppointmentTime(
+                                                                            time,
+                                                                        );
+                                                                        setAppointmentEditError(
+                                                                            "",
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    {time}
+                                                                </button>
+                                                            ),
+                                                        )}
+                                                    </div>
+
+                                                    {!editAppointmentAvailableTimes.length && (
+                                                        <div className="admin-manual-times__empty">
+                                                            Nenhum horário disponível
+                                                            para este serviço neste dia.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                     {appointmentEditError && <p className="admin-reschedule__message admin-edit-form__full">{appointmentEditError}</p>}
                                     <div className="admin-edit-actions">
                                         <button className="save" type="button" disabled={isSavingAppointment} onClick={() => void saveAppointmentChanges()}>{isSavingAppointment ? "Salvando..." : "Salvar alterações"}</button>
