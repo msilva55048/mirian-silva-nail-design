@@ -2587,6 +2587,41 @@ function PublicSite() {
                                     WhatsApp
                                 </a>
                             </div>
+
+                            <div
+                                style={{
+                                    marginTop: "34px",
+                                    paddingTop: "24px",
+                                    textAlign: "center",
+                                    color: "#6d4a55",
+                                }}
+                            >
+                                <strong
+                                    style={{
+                                        display: "block",
+                                        fontSize: "clamp(1.15rem, 4vw, 1.45rem)",
+                                        fontWeight: 800,
+                                        letterSpacing: "0.02em",
+                                        lineHeight: 1.25,
+                                    }}
+                                >
+                                    Suas unhas. Sua marca.
+                                </strong>
+
+                                <span
+                                    style={{
+                                        display: "block",
+                                        marginTop: "8px",
+                                        fontSize: "clamp(0.95rem, 3.4vw, 1.12rem)",
+                                        fontWeight: 500,
+                                        fontStyle: "italic",
+                                        color: "#9b6f7c",
+                                        lineHeight: 1.4,
+                                    }}
+                                >
+                                    O detalhe que completa você.
+                                </span>
+                            </div>
                         </div>
 
                         <div className="hero__decoration hero__decoration--one"/>
