@@ -2631,6 +2631,7 @@ type AdminClient = {
     name: string;
     phone: string;
     email: string;
+    musicalTaste: string;
     appointments: AdminAppointment[];
     lastAppointment: AdminAppointment | null;
     nextAppointment: AdminAppointment | null;
@@ -2641,6 +2642,7 @@ type ClientProfile = {
     full_name: string;
     phone: string;
     email: string | null;
+    musical_taste?: string | null;
     phone_digits?: string;
     user_id?: string | null;
     created_at?: string;
@@ -5913,6 +5915,25 @@ const adminMusicTasteStyles = `
     white-space: normal;
     overflow-wrap: anywhere;
 }
+
+.admin-client-editor textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 92px;
+    resize: vertical;
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 12px 13px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+    line-height: 1.45;
+}
+.admin-client-editor textarea:focus {
+    outline: none;
+    border-color: #a86175;
+    box-shadow: 0 0 0 3px rgba(168,97,117,.1);
+}
 `;
 
 function AdminPanel() {
@@ -5978,6 +5999,7 @@ function AdminPanel() {
     const [editClientName, setEditClientName] = useState("");
     const [editClientPhone, setEditClientPhone] = useState("");
     const [editClientEmail, setEditClientEmail] = useState("");
+    const [editClientMusicTaste, setEditClientMusicTaste] = useState("");
     const [clientEditError, setClientEditError] = useState("");
     const [isSavingClient, setIsSavingClient] = useState(false);
     const [deletingClientKey, setDeletingClientKey] = useState("");
@@ -6110,7 +6132,7 @@ function AdminPanel() {
                     .select("id, day_of_week, is_open, start_time, end_time, morning_enabled, morning_start_time, morning_end_time, morning_slot_interval_minutes, afternoon_enabled, afternoon_start_time, afternoon_end_time, afternoon_slot_interval_minutes")
                     .order("day_of_week", {ascending: true}),
                 supabase.from("client_profiles")
-                    .select("id, full_name, phone, email, phone_digits, user_id, created_at, updated_at")
+                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
                     .order("full_name", {ascending: true}),
             ]);
 
@@ -6433,7 +6455,7 @@ function AdminPanel() {
     async function findClientProfile(client: AdminClient): Promise<ClientProfile | null> {
         const {data, error} = await supabase
             .from("client_profiles")
-            .select("id, full_name, phone, email, created_at, updated_at");
+            .select("id, full_name, phone, email, musical_taste, created_at, updated_at");
 
         if (error) {
             throw error;
@@ -6464,6 +6486,7 @@ function AdminPanel() {
                 full_name: client.name.trim(),
                 phone: client.phone.trim(),
                 email: client.email.trim() || null,
+                musical_taste: client.musicalTaste.trim() || null,
                 updated_at: new Date().toISOString(),
             };
 
@@ -6471,7 +6494,7 @@ function AdminPanel() {
                 .from("client_profiles")
                 .update(updates)
                 .eq("id", existingProfile.id)
-                .select("id, full_name, phone, email, created_at, updated_at")
+                .select("id, full_name, phone, email, musical_taste, created_at, updated_at")
                 .single();
 
             if (updateError) {
@@ -6487,8 +6510,9 @@ function AdminPanel() {
                 full_name: client.name.trim(),
                 phone: client.phone.trim(),
                 email: client.email.trim() || null,
+                musical_taste: client.musicalTaste.trim() || null,
             })
-            .select("id, full_name, phone, email, created_at, updated_at")
+            .select("id, full_name, phone, email, musical_taste, created_at, updated_at")
             .single();
 
         if (error) {
@@ -6811,6 +6835,7 @@ function AdminPanel() {
                 name: reference.client_name,
                 phone: reference.client_phone,
                 email: reference.client_email ?? "",
+                musicalTaste: reference.musical_taste ?? "",
                 appointments: ordered,
                 lastAppointment: completed[0] ?? null,
                 nextAppointment: upcoming[0] ?? null,
@@ -7014,36 +7039,99 @@ function AdminPanel() {
         setEditClientName(client.name);
         setEditClientPhone(client.phone);
         setEditClientEmail(client.email);
+
+        const phoneDigits = normalizeClientPhone(client.phone);
+        const profile = adminClientProfiles.find(
+            (item) => normalizeClientPhone(item.phone ?? "") === phoneDigits,
+        );
+
+        setEditClientMusicTaste(
+            profile?.musical_taste ?? client.musicalTaste ?? "",
+        );
         setClientEditError("");
     }
 
     async function saveClientChanges() {
         if (!editingClient) return;
-        if (editClientName.trim().length < 3 || editClientPhone.replace(/\D/g, "").length < 10) {
+
+        if (
+            editClientName.trim().length < 3 ||
+            editClientPhone.replace(/\D/g, "").length < 10
+        ) {
             setClientEditError("Informe nome completo e telefone válido.");
             return;
         }
+
         setIsSavingClient(true);
+        setClientEditError("");
+
         const ids = editingClient.appointments.map((item) => item.id);
         const normalizedPhone = formatBrazilianPhone(editClientPhone);
-        const {error} = await supabase.from("appointments").update({
-            client_name: editClientName.trim(),
-            client_phone: normalizedPhone,
-            client_email: editClientEmail.trim() || null,
-        }).in("id", ids);
-        if (error) {
+        const musicalTaste = editClientMusicTaste.trim() || null;
+
+        try {
+            if (ids.length) {
+                const {error: appointmentError} = await supabase
+                    .from("appointments")
+                    .update({
+                        client_name: editClientName.trim(),
+                        client_phone: normalizedPhone,
+                        client_email: editClientEmail.trim() || null,
+                        musical_taste: musicalTaste,
+                    })
+                    .in("id", ids);
+
+                if (appointmentError) throw appointmentError;
+            }
+
+            const existingProfile = await findClientProfile(editingClient);
+
+            if (existingProfile) {
+                const {data: updatedProfile, error: profileError} = await supabase
+                    .from("client_profiles")
+                    .update({
+                        full_name: editClientName.trim(),
+                        phone: normalizedPhone,
+                        email: editClientEmail.trim() || null,
+                        musical_taste: musicalTaste,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", existingProfile.id)
+                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
+                    .single();
+
+                if (profileError) throw profileError;
+
+                setAdminClientProfiles((current) =>
+                    current.map((profile) =>
+                        profile.id === existingProfile.id
+                            ? updatedProfile as ClientProfile
+                            : profile,
+                    ),
+                );
+            }
+
+            setAppointments((current) =>
+                current.map((item) =>
+                    ids.includes(item.id)
+                        ? {
+                            ...item,
+                            client_name: editClientName.trim(),
+                            client_phone: normalizedPhone,
+                            client_email: editClientEmail.trim() || null,
+                            musical_taste: musicalTaste,
+                        }
+                        : item,
+                ),
+            );
+
+            setEditingClient(null);
+        } catch (error) {
+            console.error("Erro ao atualizar cadastro da cliente:", error);
             setClientEditError("Não foi possível atualizar o cadastro.");
+        } finally {
             setIsSavingClient(false);
-            return;
         }
-        setAppointments((current) => current.map((item) => ids.includes(item.id) ? {
-            ...item,
-            client_name: editClientName.trim(),
-            client_phone: normalizedPhone,
-            client_email: editClientEmail.trim() || null,
-        } : item));
-        setEditingClient(null);
-        setIsSavingClient(false);
     }
 
     async function deleteClient(client: AdminClient) {
@@ -9105,6 +9193,16 @@ function AdminPanel() {
                             <label>Nome<input value={editClientName} onChange={(event) => setEditClientName(event.target.value)}/></label>
                             <label>Telefone<input value={editClientPhone} onChange={(event) => setEditClientPhone(formatBrazilianPhone(event.target.value))} maxLength={15} inputMode="numeric"/></label>
                             <label>E-mail<input type="email" value={editClientEmail} onChange={(event) => setEditClientEmail(event.target.value)}/></label>
+                            <label>
+                                Gosto musical
+                                <textarea
+                                    value={editClientMusicTaste}
+                                    onChange={(event) => setEditClientMusicTaste(event.target.value)}
+                                    placeholder="Ex.: pagode, sertanejo, pop, anos 80..."
+                                    rows={3}
+                                    maxLength={500}
+                                />
+                            </label>
                             {clientEditError && <p className="admin-reschedule__message">{clientEditError}</p>}
                             <button className="admin-primary-button" type="button" disabled={isSavingClient} onClick={() => void saveClientChanges()}>{isSavingClient ? "Salvando..." : "Salvar cadastro"}</button>
                         </section>
