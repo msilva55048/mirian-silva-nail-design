@@ -4474,14 +4474,18 @@ const adminEnhancementStyles = `
     font-size: .86rem;
 }
 .admin-message-center__count {
-    min-width: 42px;
-    height: 42px;
+    min-width: 64px;
+    height: 46px;
     display: grid;
     place-items: center;
-    border-radius: 50%;
-    background: #6d3445;
-    color: #fff;
+    border: 1px solid #d8bfc7;
+    border-radius: 14px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    background: #fff7f9;
+    color: #7a3f52;
     font-weight: 900;
+    box-shadow: 0 6px 16px rgba(83, 48, 58, 0.06);
 }
 .admin-message-center__list {
     display: grid;
