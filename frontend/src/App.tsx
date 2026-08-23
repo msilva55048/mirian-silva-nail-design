@@ -5261,6 +5261,10 @@ const adminEnhancementStyles = `
 .admin-finance-month-picker {
     position: relative;
     width: min(100%, 430px);
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: visible;
 }
 
 .admin-finance-month-picker__quick {
@@ -5268,9 +5272,16 @@ const adminEnhancementStyles = `
     grid-template-columns: 52px minmax(0, 1fr) 52px;
     align-items: stretch;
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .admin-finance-month-picker__quick > button {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     border: 1px solid #d8c0c8;
     border-radius: 14px;
     background: #fff;
@@ -5285,8 +5296,13 @@ const adminEnhancementStyles = `
     grid-template-columns: 42px minmax(0, 1fr) 30px !important;
     align-items: center;
     gap: 10px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     min-height: 58px;
     padding: 9px 12px !important;
+    box-sizing: border-box;
+    overflow: hidden;
     text-align: left;
     background:
         linear-gradient(135deg, #fffafb, #f7e9ee) !important;
@@ -5325,9 +5341,14 @@ const adminEnhancementStyles = `
 }
 
 .admin-finance-month-picker__selected-text strong {
+    display: block;
+    max-width: 100%;
     color: #623a48;
     font-size: .9rem;
-    overflow-wrap: anywhere;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .admin-finance-month-picker__chevron {
@@ -5580,10 +5601,38 @@ const adminEnhancementStyles = `
 
     .admin-finance-month-picker {
         width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        align-self: stretch;
     }
 
     .admin-finance-month-picker__quick {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
         grid-template-columns: 46px minmax(0, 1fr) 46px;
+    }
+
+    .admin-finance-month-picker__selected {
+        min-width: 0;
+        max-width: 100%;
+        grid-template-columns: 40px minmax(0, 1fr) 28px !important;
+        gap: 8px;
+        padding: 8px 9px !important;
+    }
+
+    .admin-finance-month-picker__icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .admin-finance-month-picker__selected-text small {
+        font-size: .56rem;
+        letter-spacing: .055em;
+    }
+
+    .admin-finance-month-picker__selected-text strong {
+        font-size: .83rem;
     }
 
     .admin-finance-month-panel {
