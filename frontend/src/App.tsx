@@ -7879,17 +7879,28 @@ function AdminPanel() {
     }, [adminClientProfiles, clients]);
 
     const filteredManualBookingClients = useMemo(() => {
-        const query = manualClientSearch.trim().toLowerCase();
+        const query = manualClientSearch
+            .trim()
+            .toLocaleLowerCase("pt-BR");
         const digits = manualClientSearch.replace(/\D/g, "");
 
         if (!query) return [] as AdminBookingClient[];
 
         return manualBookingClients
-            .filter((client) =>
-                client.name.toLowerCase().includes(query) ||
-                client.phone.toLowerCase().includes(query) ||
-                Boolean(digits && client.phone.replace(/\D/g, "").includes(digits)),
-            )
+            .filter((client) => {
+                const normalizedName = client.name
+                    .trim()
+                    .toLocaleLowerCase("pt-BR");
+
+                const clientPhoneDigits = client.phone.replace(/\D/g, "");
+
+                const matchesName = normalizedName.startsWith(query);
+                const matchesPhone =
+                    Boolean(digits) &&
+                    clientPhoneDigits.includes(digits);
+
+                return matchesName || matchesPhone;
+            })
             .slice(0, 8);
     }, [manualBookingClients, manualClientSearch]);
 
