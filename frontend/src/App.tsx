@@ -2601,7 +2601,7 @@ function PublicSite() {
                                         fontFamily:
                                             '"Cormorant Garamond", Georgia, "Times New Roman", serif',
                                         fontSize:
-                                            "clamp(2.2rem, 8.5vw, 4.2rem)",
+                                            "clamp(1.75rem, 6.4vw, 3.2rem)",
                                         fontWeight: 500,
                                         fontStyle: "italic",
                                         letterSpacing: "-0.015em",
@@ -2617,14 +2617,14 @@ function PublicSite() {
                                         display: "block",
                                         marginTop: "16px",
                                         fontSize:
-                                            "clamp(1.05rem, 3.8vw, 1.3rem)",
+                                            "clamp(1.18rem, 4.3vw, 1.48rem)",
                                         fontWeight: 800,
                                         letterSpacing: "0.02em",
                                         lineHeight: 1.3,
                                         color: "#6d4a55",
                                     }}
                                 >
-                                    O detalhe que completa você.
+                                    O detalhe que completa você
                                 </span>
                             </div>
                         </div>
