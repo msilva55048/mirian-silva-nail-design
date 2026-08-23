@@ -5525,40 +5525,68 @@ const adminEnhancementStyles = `
     margin-bottom: 18px;
 }
 
-.admin-finance-table-wrapper {
+.admin-finance-service-cards {
     width: 100%;
-    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+    display: grid;
+    gap: 14px;
+    box-sizing: border-box;
 }
 
-.admin-finance-table {
+.admin-finance-service-card {
     width: 100%;
-    min-width: 820px;
-    border-collapse: collapse;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid #ead9de;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(83, 48, 58, 0.05);
 }
 
-.admin-finance-table th,
-.admin-finance-table td {
-    padding: 13px 12px;
-    border-bottom: 1px solid #eee4e7;
-    text-align: left;
-    vertical-align: middle;
+.admin-finance-service-card__row {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #f0e4e8;
 }
 
-.admin-finance-table th {
-    color: #80666e;
-    font-size: 0.72rem;
+.admin-finance-service-card__row span {
+    color: #8b7078;
+    font-size: 0.69rem;
     font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.045em;
 }
 
-.admin-finance-table td {
-    color: #4d363e;
-    font-size: 0.88rem;
+.admin-finance-service-card__row strong {
+    color: #5b3c46;
+    font-size: 0.96rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
-.admin-finance-table tbody tr:last-child td {
+.admin-finance-service-card__row--service {
+    background: linear-gradient(135deg, #fffafb, #f8edf1);
+}
+
+.admin-finance-service-card__row--service strong {
+    color: #473239;
+    font-size: 1rem;
+}
+
+.admin-finance-service-card__row--total {
     border-bottom: 0;
+    background: #f7e9ee;
+}
+
+.admin-finance-service-card__row--total strong {
+    color: #793e51;
+    font-size: 1.05rem;
 }
 
 .admin-finance__empty {
@@ -5597,6 +5625,26 @@ const adminEnhancementStyles = `
 @media (max-width: 620px) {
     .admin-finance__cards {
         grid-template-columns: 1fr;
+    }
+
+    .admin-finance,
+    .admin-finance__header,
+    .admin-finance__cards,
+    .admin-finance__services,
+    .admin-finance-service-cards,
+    .admin-finance-service-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .admin-finance__services {
+        overflow: hidden;
+    }
+
+    .admin-finance-service-card__row {
+        padding: 13px 14px;
     }
 
     .admin-finance-month-picker {
@@ -8820,31 +8868,52 @@ function AdminPanel() {
                             </div>
 
                             {financeServiceSummary.length ? (
-                                <div className="admin-finance-table-wrapper">
-                                    <table className="admin-finance-table">
-                                        <thead>
-                                        <tr>
-                                            <th>Serviço</th>
-                                            <th>Realizados</th>
-                                            <th>Valor realizado</th>
-                                            <th>Agendados</th>
-                                            <th>Valor agendado</th>
-                                            <th>Total previsto</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {financeServiceSummary.map((service) => (
-                                            <tr key={service.serviceName}>
-                                                <td><strong>{service.serviceName}</strong></td>
-                                                <td>{service.completedCount}</td>
-                                                <td>{formatCurrency(service.completedCents)}</td>
-                                                <td>{service.scheduledCount}</td>
-                                                <td>{formatCurrency(service.scheduledCents)}</td>
-                                                <td><strong>{formatCurrency(service.completedCents + service.scheduledCents)}</strong></td>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </table>
+                                <div className="admin-finance-service-cards">
+                                    {financeServiceSummary.map((service) => (
+                                        <article
+                                            className="admin-finance-service-card"
+                                            key={service.serviceName}
+                                        >
+                                            <div className="admin-finance-service-card__row admin-finance-service-card__row--service">
+                                                <span>Serviço</span>
+                                                <strong>{service.serviceName}</strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Atendimentos realizados</span>
+                                                <strong>{service.completedCount}</strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Valor realizado</span>
+                                                <strong>
+                                                    {formatCurrency(service.completedCents)}
+                                                </strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Atendimentos agendados</span>
+                                                <strong>{service.scheduledCount}</strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Valor agendado</span>
+                                                <strong>
+                                                    {formatCurrency(service.scheduledCents)}
+                                                </strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row admin-finance-service-card__row--total">
+                                                <span>Total previsto</span>
+                                                <strong>
+                                                    {formatCurrency(
+                                                        service.completedCents +
+                                                        service.scheduledCents,
+                                                    )}
+                                                </strong>
+                                            </div>
+                                        </article>
+                                    ))}
                                 </div>
                             ) : (
                                 <div className="admin-finance__empty">
