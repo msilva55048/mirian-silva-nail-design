@@ -2071,6 +2071,31 @@ function PublicSite() {
     return (
         <main className="home">
             <style>{clientAccountStyles}</style>
+            <style>{`
+                @media (max-width: 700px) {
+                    .home {
+                        min-height: 100dvh;
+                        overflow-x: hidden;
+                    }
+
+                    .home > .hero {
+                        min-height: auto !important;
+                        height: auto !important;
+                        padding-bottom: 28px !important;
+                        margin-bottom: 0 !important;
+                        box-sizing: border-box;
+                    }
+
+                    .home > .hero .hero__content {
+                        padding-bottom: 0 !important;
+                        margin-bottom: 0 !important;
+                    }
+
+                    .home > .hero .hero__content > div:last-of-type {
+                        margin-bottom: 0 !important;
+                    }
+                }
+            `}</style>
 
             {clientUserId && clientProfile ? (
                 <div className="client-logged-page">
