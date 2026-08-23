@@ -3061,7 +3061,7 @@ const adminStyles = `
 
 .admin-client-card__metrics {
     display: grid;
-    grid-template-columns: 0.8fr 1.2fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
     margin: 16px 0 12px;
 }
@@ -4235,6 +4235,14 @@ function getAppointmentDateTime(appointment: AdminAppointment) {
     );
 }
 
+function getAppointmentEndDateTime(appointment: AdminAppointment) {
+    const start = getAppointmentDateTime(appointment);
+
+    return new Date(
+        start.getTime() + appointment.duration_minutes * 60_000,
+    );
+}
+
 
 type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
 
@@ -4572,7 +4580,7 @@ const adminEnhancementStyles = `
     color: #fff;
 }
 .admin-client-card__metrics {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .admin-block-manager--bottom {
@@ -5660,6 +5668,27 @@ const adminServiceManagerStyles = `
 
 
 
+const adminClientScheduledMetricStyles = `
+@media (max-width: 620px) {
+    .admin-client-card__metrics {
+        gap: 7px;
+    }
+
+    .admin-client-card__metrics div {
+        padding: 9px 8px;
+    }
+
+    .admin-client-card__metrics span {
+        font-size: .61rem;
+        line-height: 1.2;
+    }
+
+    .admin-client-card__metrics strong {
+        font-size: .9rem;
+    }
+}
+`;
+
 const adminEditDateTimeStyles = `
 .admin-edit-date-time {
     display: grid;
@@ -5950,6 +5979,55 @@ function AdminPanel() {
 
         return () => window.clearInterval(clock);
     }, []);
+
+    useEffect(() => {
+        if (!isAuthenticated || !appointments.length) return;
+
+        const completedIds = appointments
+            .filter(
+                (appointment) =>
+                    (appointment.status === "confirmed" ||
+                        appointment.status === "pending") &&
+                    getAppointmentEndDateTime(appointment).getTime() <=
+                    adminNow.getTime(),
+            )
+            .map((appointment) => appointment.id);
+
+        if (!completedIds.length) return;
+
+        let cancelled = false;
+
+        async function markFinishedAppointmentsAsCompleted() {
+            const {error} = await supabase
+                .from("appointments")
+                .update({status: "completed"})
+                .in("id", completedIds);
+
+            if (error) {
+                console.error(
+                    "Erro ao concluir atendimentos automaticamente:",
+                    error,
+                );
+                return;
+            }
+
+            if (cancelled) return;
+
+            setAppointments((current) =>
+                current.map((appointment) =>
+                    completedIds.includes(appointment.id)
+                        ? {...appointment, status: "completed"}
+                        : appointment,
+                ),
+            );
+        }
+
+        void markFinishedAppointmentsAsCompleted();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, appointments, adminNow]);
 
 
     useEffect(() => {
@@ -6832,30 +6910,67 @@ function AdminPanel() {
 
     const clients = useMemo<AdminClient[]>(() => {
         const grouped = new Map<string, AdminAppointment[]>();
-        appointments.filter((appointment) => !appointment.client_hidden).forEach((appointment) => {
-            const digits = normalizeClientPhone(appointment.client_phone);
-            const key = digits || appointment.id;
-            grouped.set(key, [...(grouped.get(key) ?? []), appointment]);
-        });
-        const now = new Date();
-        return Array.from(grouped.entries()).map(([key, clientAppointments]) => {
-            const ordered = [...clientAppointments].sort((a, b) => getAppointmentDateTime(b).getTime() - getAppointmentDateTime(a).getTime());
-            const reference = ordered[0];
-            const completed = ordered.filter((item) => item.status !== "cancelled" && getAppointmentDateTime(item).getTime() < now.getTime());
-            const upcoming = ordered.filter((item) => item.status !== "cancelled" && getAppointmentDateTime(item).getTime() >= now.getTime())
-                .sort((a, b) => getAppointmentDateTime(a).getTime() - getAppointmentDateTime(b).getTime());
-            return {
-                key,
-                name: reference.client_name,
-                phone: reference.client_phone,
-                email: reference.client_email ?? "",
-                musicalTaste: reference.musical_taste ?? "",
-                appointments: ordered,
-                lastAppointment: completed[0] ?? null,
-                nextAppointment: upcoming[0] ?? null,
-            };
-        }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-    }, [appointments]);
+
+        appointments
+            .filter((appointment) => !appointment.client_hidden)
+            .forEach((appointment) => {
+                const digits = normalizeClientPhone(appointment.client_phone);
+                const key = digits || appointment.id;
+                grouped.set(
+                    key,
+                    [...(grouped.get(key) ?? []), appointment],
+                );
+            });
+
+        return Array.from(grouped.entries())
+            .map(([key, clientAppointments]) => {
+                const ordered = [...clientAppointments].sort(
+                    (a, b) =>
+                        getAppointmentDateTime(b).getTime() -
+                        getAppointmentDateTime(a).getTime(),
+                );
+
+                const reference = ordered[0];
+
+                const completed = ordered.filter(
+                    (item) =>
+                        item.status !== "cancelled" &&
+                        item.status !== "no-show" &&
+                        (
+                            item.status === "completed" ||
+                            getAppointmentEndDateTime(item).getTime() <=
+                            adminNow.getTime()
+                        ),
+                );
+
+                const upcoming = ordered
+                    .filter(
+                        (item) =>
+                            item.status !== "cancelled" &&
+                            item.status !== "no-show" &&
+                            item.status !== "completed" &&
+                            getAppointmentEndDateTime(item).getTime() >
+                            adminNow.getTime(),
+                    )
+                    .sort(
+                        (a, b) =>
+                            getAppointmentDateTime(a).getTime() -
+                            getAppointmentDateTime(b).getTime(),
+                    );
+
+                return {
+                    key,
+                    name: reference.client_name,
+                    phone: reference.client_phone,
+                    email: reference.client_email ?? "",
+                    musicalTaste: reference.musical_taste ?? "",
+                    appointments: ordered,
+                    lastAppointment: completed[0] ?? null,
+                    nextAppointment: upcoming[0] ?? null,
+                };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    }, [appointments, adminNow]);
 
     const filteredClients = useMemo(() => {
         const query = clientSearch.trim().toLowerCase();
@@ -7717,13 +7832,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -7741,7 +7856,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -8162,12 +8277,47 @@ function AdminPanel() {
                         <div className="admin-clients__search"><label>Buscar cliente<input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Nome ou telefone"/></label></div>
                         <div className="admin-clients__grid">
                             {filteredClients.map((client) => {
-                                const realized = client.appointments.filter((item) => item.status !== "cancelled" && getAppointmentDateTime(item).getTime() < Date.now()).length;
-                                const cancelled = client.appointments.filter((item) => item.status === "cancelled").length;
+                                const realized = client.appointments.filter(
+                                    (item) =>
+                                        item.status !== "cancelled" &&
+                                        item.status !== "no-show" &&
+                                        (
+                                            item.status === "completed" ||
+                                            getAppointmentEndDateTime(item).getTime() <=
+                                            adminNow.getTime()
+                                        ),
+                                ).length;
+
+                                const scheduled = client.appointments.filter(
+                                    (item) =>
+                                        item.status !== "cancelled" &&
+                                        item.status !== "no-show" &&
+                                        item.status !== "completed" &&
+                                        getAppointmentEndDateTime(item).getTime() >
+                                        adminNow.getTime(),
+                                ).length;
+
+                                const cancelled = client.appointments.filter(
+                                    (item) => item.status === "cancelled",
+                                ).length;
+
                                 return (
                                     <article className="admin-client-card" key={client.key}>
                                         <div className="admin-client-card__top"><div className="admin-client-card__avatar">{client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div><div><h3>{client.name}</h3><a href={`https://wa.me/${normalizePhoneForWhatsApp(client.phone)}`} target="_blank" rel="noopener noreferrer">{client.phone}</a><span>{client.email || "E-mail não informado"}</span></div></div>
-                                        <div className="admin-client-card__metrics"><div><span>Atendimentos realizados</span><strong>{realized}</strong></div><div><span>Atendimentos cancelados</span><strong>{cancelled}</strong></div></div>
+                                        <div className="admin-client-card__metrics">
+                                            <div>
+                                                <span>Atendimentos realizados</span>
+                                                <strong>{realized}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Atendimentos agendados</span>
+                                                <strong>{scheduled}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Atendimentos cancelados</span>
+                                                <strong>{cancelled}</strong>
+                                            </div>
+                                        </div>
                                         {client.nextAppointment && <div className="admin-client-card__next"><span>Próximo</span><strong>{formatAdminDate(client.nextAppointment.appointment_date)} às {String(client.nextAppointment.start_time).slice(0, 5)}</strong></div>}
                                         <div className="admin-client-card__actions">
                                             <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
