@@ -7835,14 +7835,27 @@ function AdminPanel() {
     }, [appointments, adminNow]);
 
     const filteredClients = useMemo(() => {
-        const query = clientSearch.trim().toLowerCase();
+        const query = clientSearch
+            .trim()
+            .toLocaleLowerCase("pt-BR");
         const digits = clientSearch.replace(/\D/g, "");
+
         if (!query) return clients;
-        return clients.filter((client) =>
-            client.name.toLowerCase().includes(query) ||
-            client.phone.toLowerCase().includes(query) ||
-            Boolean(digits && client.phone.replace(/\D/g, "").includes(digits)),
-        );
+
+        return clients.filter((client) => {
+            const normalizedName = client.name
+                .trim()
+                .toLocaleLowerCase("pt-BR");
+
+            const clientPhoneDigits = client.phone.replace(/\D/g, "");
+
+            const matchesName = normalizedName.startsWith(query);
+            const matchesPhone =
+                Boolean(digits) &&
+                clientPhoneDigits.includes(digits);
+
+            return matchesName || matchesPhone;
+        });
     }, [clients, clientSearch]);
 
     const manualBookingClients = useMemo<AdminBookingClient[]>(() => {
