@@ -4779,28 +4779,176 @@ const adminEnhancementStyles = `
     color: #755961;
 }
 
-.admin-finance__month-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
+.admin-finance-month-picker {
+    position: relative;
+    width: min(100%, 430px);
 }
 
-.admin-finance__month-controls button,
-.admin-finance__month-controls input {
-    min-height: 42px;
-    box-sizing: border-box;
-    border: 1px solid #d7c0c7;
-    border-radius: 11px;
-    padding: 9px 12px;
+.admin-finance-month-picker__quick {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.admin-finance-month-picker__quick > button {
+    border: 1px solid #d8c0c8;
+    border-radius: 14px;
     background: #fff;
-    color: #6d3445;
+    color: #7b4053;
     font: inherit;
-    font-weight: 750;
+    font-weight: 900;
+    cursor: pointer;
 }
 
-.admin-finance__month-controls button {
+.admin-finance-month-picker__selected {
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) 30px !important;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    padding: 9px 12px !important;
+    text-align: left;
+    background:
+        linear-gradient(135deg, #fffafb, #f7e9ee) !important;
+    box-shadow: 0 8px 22px rgba(103, 57, 72, .07);
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.admin-finance-month-picker__selected.is-open {
+    border-color: #b8798d !important;
+    box-shadow: 0 10px 28px rgba(103, 57, 72, .12);
+}
+
+.admin-finance-month-picker__icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #efdce2;
+    font-size: 1.05rem;
+}
+
+.admin-finance-month-picker__selected-text {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    text-transform: capitalize;
+}
+
+.admin-finance-month-picker__selected-text small {
+    color: #9b7d87;
+    font-size: .62rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+}
+
+.admin-finance-month-picker__selected-text strong {
+    color: #623a48;
+    font-size: .9rem;
+    overflow-wrap: anywhere;
+}
+
+.admin-finance-month-picker__chevron {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #fff;
+    color: #854d5f;
+}
+
+.admin-finance-month-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid #dfcbd1;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 20px 50px rgba(72, 39, 51, .16);
+}
+
+.admin-finance-month-panel__header {
+    display: grid;
+    grid-template-columns: 42px 1fr 42px;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-finance-month-panel__header strong {
+    text-align: center;
+    color: #543740;
+    font-size: 1rem;
+}
+
+.admin-finance-month-panel__header button,
+.admin-finance-month-panel__current {
+    border: 1px solid #dfcbd1;
+    border-radius: 11px;
+    background: #fff8fa;
+    color: #814b5d;
+    font: inherit;
+    font-weight: 900;
     cursor: pointer;
+}
+
+.admin-finance-month-panel__header button {
+    height: 40px;
+}
+
+.admin-finance-month-panel__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+}
+
+.admin-finance-month-panel__grid button {
+    min-height: 64px;
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    border: 1px solid #ead9de;
+    border-radius: 14px;
+    padding: 8px;
+    background: #fffafb;
+    color: #70505a;
+    font: inherit;
+    cursor: pointer;
+}
+
+.admin-finance-month-panel__grid button span {
+    color: #a4828c;
+    font-size: .63rem;
+    font-weight: 850;
+    text-transform: uppercase;
+}
+
+.admin-finance-month-panel__grid button strong {
+    font-size: .76rem;
+}
+
+.admin-finance-month-panel__grid button.is-selected {
+    border-color: #9a5368;
+    background: linear-gradient(135deg, #965168, #74384b);
+    color: #fff;
+    box-shadow: 0 7px 18px rgba(116, 56, 75, .18);
+}
+
+.admin-finance-month-panel__grid button.is-selected span {
+    color: rgba(255,255,255,.78);
+}
+
+.admin-finance-month-panel__current {
+    width: 100%;
+    min-height: 42px;
 }
 
 .admin-finance__period {
@@ -4951,13 +5099,21 @@ const adminEnhancementStyles = `
         grid-template-columns: 1fr;
     }
 
-    .admin-finance__month-controls {
+    .admin-finance-month-picker {
         width: 100%;
     }
 
-    .admin-finance__month-controls input {
-        flex: 1;
-        min-width: 140px;
+    .admin-finance-month-picker__quick {
+        grid-template-columns: 46px minmax(0, 1fr) 46px;
+    }
+
+    .admin-finance-month-panel {
+        position: static;
+        margin-top: 10px;
+    }
+
+    .admin-finance-month-panel__grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -5879,6 +6035,8 @@ function AdminPanel() {
     const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings">("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
     const [financeMonth, setFinanceMonth] = useState(() => formatDateForInput(new Date()).slice(0, 7));
+    const [showFinanceMonthPicker, setShowFinanceMonthPicker] = useState(false);
+    const [financePickerYear, setFinancePickerYear] = useState(() => new Date().getFullYear());
 
     const [showManualForm, setShowManualForm] = useState(false);
     const [adminClientProfiles, setAdminClientProfiles] = useState<ClientProfile[]>([]);
@@ -7347,6 +7505,42 @@ function AdminPanel() {
         });
     }, [financeMonth]);
 
+    const financeMonthOptions = [
+        "Janeiro",
+        "Fevereiro",
+        "Março",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+    ];
+
+    function selectFinanceMonth(monthIndex: number) {
+        const month = String(monthIndex + 1).padStart(2, "0");
+        setFinanceMonth(`${financePickerYear}-${month}`);
+        setShowFinanceMonthPicker(false);
+    }
+
+    function openFinanceMonthPicker() {
+        const [year] = financeMonth.split("-").map(Number);
+        setFinancePickerYear(year);
+        setShowFinanceMonthPicker((current) => !current);
+    }
+
+    function selectCurrentFinanceMonth() {
+        const now = new Date();
+        setFinanceMonth(
+            `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+        );
+        setFinancePickerYear(now.getFullYear());
+        setShowFinanceMonthPicker(false);
+    }
+
     const financeAppointments = useMemo(
         () => appointments.filter((appointment) => appointment.appointment_date.startsWith(financeMonth)),
         [appointments, financeMonth],
@@ -7952,11 +8146,109 @@ function AdminPanel() {
                                 <p>Valores calculados automaticamente a partir dos agendamentos do mês.</p>
                             </div>
 
-                            <div className="admin-finance__month-controls">
-                                <button type="button" onClick={() => setFinanceMonth((current) => addMonthsToFinanceMonth(current, -1))}>←</button>
-                                <input type="month" value={financeMonth} onChange={(event) => setFinanceMonth(event.target.value)}/>
-                                <button type="button" onClick={() => setFinanceMonth((current) => addMonthsToFinanceMonth(current, 1))}>→</button>
-                                <button type="button" onClick={() => setFinanceMonth(formatDateForInput(new Date()).slice(0, 7))}>Mês atual</button>
+                            <div className="admin-finance-month-picker">
+                                <div className="admin-finance-month-picker__quick">
+                                    <button
+                                        type="button"
+                                        aria-label="Mês anterior"
+                                        onClick={() =>
+                                            setFinanceMonth((current) =>
+                                                addMonthsToFinanceMonth(current, -1)
+                                            )
+                                        }
+                                    >
+                                        ←
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className={`admin-finance-month-picker__selected${
+                                            showFinanceMonthPicker ? " is-open" : ""
+                                        }`}
+                                        onClick={openFinanceMonthPicker}
+                                    >
+                                        <span className="admin-finance-month-picker__icon">📅</span>
+
+                                        <span className="admin-finance-month-picker__selected-text">
+                                            <small>Mês selecionado</small>
+                                            <strong>{financeMonthLabel}</strong>
+                                        </span>
+
+                                        <span className="admin-finance-month-picker__chevron">
+                                            {showFinanceMonthPicker ? "⌃" : "⌄"}
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        aria-label="Próximo mês"
+                                        onClick={() =>
+                                            setFinanceMonth((current) =>
+                                                addMonthsToFinanceMonth(current, 1)
+                                            )
+                                        }
+                                    >
+                                        →
+                                    </button>
+                                </div>
+
+                                {showFinanceMonthPicker && (
+                                    <div className="admin-finance-month-panel">
+                                        <div className="admin-finance-month-panel__header">
+                                            <button
+                                                type="button"
+                                                aria-label="Ano anterior"
+                                                onClick={() =>
+                                                    setFinancePickerYear((current) => current - 1)
+                                                }
+                                            >
+                                                ‹
+                                            </button>
+
+                                            <strong>{financePickerYear}</strong>
+
+                                            <button
+                                                type="button"
+                                                aria-label="Próximo ano"
+                                                onClick={() =>
+                                                    setFinancePickerYear((current) => current + 1)
+                                                }
+                                            >
+                                                ›
+                                            </button>
+                                        </div>
+
+                                        <div className="admin-finance-month-panel__grid">
+                                            {financeMonthOptions.map((monthName, index) => {
+                                                const monthValue =
+                                                    `${financePickerYear}-${String(index + 1).padStart(2, "0")}`;
+
+                                                const selected =
+                                                    financeMonth === monthValue;
+
+                                                return (
+                                                    <button
+                                                        key={monthName}
+                                                        type="button"
+                                                        className={selected ? "is-selected" : ""}
+                                                        onClick={() => selectFinanceMonth(index)}
+                                                    >
+                                                        <span>{monthName.slice(0, 3)}</span>
+                                                        <strong>{monthName}</strong>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            className="admin-finance-month-panel__current"
+                                            onClick={selectCurrentFinanceMonth}
+                                        >
+                                            Ir para o mês atual
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
