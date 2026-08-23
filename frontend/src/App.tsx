@@ -2590,19 +2590,23 @@ function PublicSite() {
 
                             <div
                                 style={{
-                                    marginTop: "34px",
-                                    paddingTop: "24px",
+                                    marginTop: "42px",
+                                    paddingTop: "26px",
                                     textAlign: "center",
-                                    color: "#6d4a55",
                                 }}
                             >
                                 <strong
                                     style={{
                                         display: "block",
-                                        fontSize: "clamp(1.15rem, 4vw, 1.45rem)",
-                                        fontWeight: 800,
-                                        letterSpacing: "0.02em",
-                                        lineHeight: 1.25,
+                                        fontFamily:
+                                            '"Cormorant Garamond", Georgia, "Times New Roman", serif',
+                                        fontSize:
+                                            "clamp(2.2rem, 8.5vw, 4.2rem)",
+                                        fontWeight: 500,
+                                        fontStyle: "italic",
+                                        letterSpacing: "-0.015em",
+                                        lineHeight: 1.02,
+                                        color: "#c77f91",
                                     }}
                                 >
                                     Suas unhas. Sua marca.
@@ -2611,12 +2615,13 @@ function PublicSite() {
                                 <span
                                     style={{
                                         display: "block",
-                                        marginTop: "8px",
-                                        fontSize: "clamp(0.95rem, 3.4vw, 1.12rem)",
-                                        fontWeight: 500,
-                                        fontStyle: "italic",
-                                        color: "#9b6f7c",
-                                        lineHeight: 1.4,
+                                        marginTop: "16px",
+                                        fontSize:
+                                            "clamp(1.05rem, 3.8vw, 1.3rem)",
+                                        fontWeight: 800,
+                                        letterSpacing: "0.02em",
+                                        lineHeight: 1.3,
+                                        color: "#6d4a55",
                                     }}
                                 >
                                     O detalhe que completa você.
