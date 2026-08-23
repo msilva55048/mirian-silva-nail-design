@@ -5663,37 +5663,87 @@ const adminEditDateTimeStyles = `
 }
 .admin-edit-date-time__label {
     color: #513a42;
-    font-size: .82rem;
-    font-weight: 800;
+    font-size: .9rem;
+    font-weight: 850;
 }
 .admin-edit-date-time__toggle {
     width: 100%;
-    display: flex;
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) 38px;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    border: 1px solid #dbc8ce;
-    border-radius: 14px;
-    padding: 13px 15px;
-    background: #fff;
+    gap: 12px;
+    border: 1px solid #dfcbd1;
+    border-radius: 17px;
+    padding: 13px 14px;
+    background:
+        linear-gradient(135deg, rgba(255,248,250,.98), rgba(250,238,242,.98));
     color: #513a42;
     text-align: left;
     font: inherit;
     cursor: pointer;
+    box-shadow: 0 8px 22px rgba(112, 62, 79, .07);
+    transition:
+        border-color .18s ease,
+        box-shadow .18s ease,
+        transform .18s ease;
 }
-.admin-edit-date-time__toggle div {
+.admin-edit-date-time__toggle:hover,
+.admin-edit-date-time__toggle.is-open {
+    border-color: #bd8798;
+    box-shadow: 0 10px 28px rgba(112, 62, 79, .11);
+}
+.admin-edit-date-time__toggle:active {
+    transform: scale(.995);
+}
+.admin-edit-date-time__icon {
     display: grid;
-    gap: 3px;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: #f2dfe5;
+    color: #874b5f;
+    font-size: 1.25rem;
 }
-.admin-edit-date-time__toggle small {
-    color: #a0878f;
-    font-size: .69rem;
-    font-weight: 800;
+.admin-edit-date-time__selected {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+.admin-edit-date-time__selected small {
+    color: #9b7f88;
+    font-size: .66rem;
+    font-weight: 850;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: .075em;
 }
-.admin-edit-date-time__toggle strong {
-    font-size: .94rem;
+.admin-edit-date-time__selected strong {
+    color: #463138;
+    font-size: .92rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+.admin-edit-date-time__time {
+    width: fit-content;
+    margin-top: 2px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: #7d3f53;
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 900;
+}
+.admin-edit-date-time__chevron {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #fff;
+    color: #824b5d;
+    font-size: 1rem;
+    font-weight: 900;
+    box-shadow: 0 4px 12px rgba(83, 47, 59, .08);
 }
 .admin-edit-date-time__picker {
     display: grid;
@@ -5702,6 +5752,7 @@ const adminEditDateTimeStyles = `
     border-radius: 18px;
     padding: 14px;
     background: #fffafb;
+    box-shadow: 0 12px 30px rgba(86, 49, 62, .06);
 }
 .admin-edit-date-time__times {
     display: grid;
@@ -5746,11 +5797,27 @@ const adminEditDateTimeStyles = `
     box-shadow: 0 0 0 3px rgba(168,97,117,.1);
 }
 @media (max-width: 620px) {
+    .admin-edit-date-time__toggle {
+        grid-template-columns: 42px minmax(0, 1fr) 34px;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 15px;
+    }
+    .admin-edit-date-time__icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        font-size: 1.1rem;
+    }
+    .admin-edit-date-time__selected strong {
+        font-size: .88rem;
+    }
     .admin-edit-date-time__picker {
         padding: 11px;
     }
 }
 `;
+
 
 function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -7652,7 +7719,7 @@ function AdminPanel() {
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -7670,7 +7737,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -8567,28 +8634,43 @@ function AdminPanel() {
                                     </label>
 
                                     <div className="admin-edit-date-time admin-edit-form__full">
-                                        <span className="admin-edit-date-time__label">Data e horário</span>
+                                        <span className="admin-edit-date-time__label">Data e hora</span>
 
                                         <button
                                             type="button"
-                                            className="admin-edit-date-time__toggle"
+                                            className={`admin-edit-date-time__toggle${
+                                                showEditDateTimePicker ? " is-open" : ""
+                                            }`}
                                             onClick={() => {
                                                 setShowEditDateTimePicker((current) => !current);
                                                 setAppointmentEditError("");
                                             }}
                                         >
-                                            <div>
-                                                <small>Selecionado</small>
+                                            <span className="admin-edit-date-time__icon" aria-hidden="true">
+                                                📅
+                                            </span>
+
+                                            <div className="admin-edit-date-time__selected">
+                                                <small>Data selecionada</small>
                                                 <strong>
                                                     {editAppointmentDate
                                                         ? formatAdminDate(editAppointmentDate)
-                                                        : "Escolha a data"}
-                                                    {editAppointmentTime
-                                                        ? ` às ${editAppointmentTime}`
-                                                        : ""}
+                                                        : "Escolha uma data"}
                                                 </strong>
+
+                                                <span className="admin-edit-date-time__time">
+                                                    {editAppointmentTime
+                                                        ? editAppointmentTime
+                                                        : "Escolha o horário"}
+                                                </span>
                                             </div>
-                                            <span>{showEditDateTimePicker ? "⌃" : "⌄"}</span>
+
+                                            <span
+                                                className="admin-edit-date-time__chevron"
+                                                aria-hidden="true"
+                                            >
+                                                {showEditDateTimePicker ? "⌃" : "⌄"}
+                                            </span>
                                         </button>
 
                                         {showEditDateTimePicker && (
