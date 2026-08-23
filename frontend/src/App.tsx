@@ -2652,6 +2652,21 @@ function PublicSite() {
                                     O detalhe que completa você
                                 </span>
                             </div>
+
+                            <div
+                                style={{
+                                    marginTop: "34px",
+                                    paddingTop: "18px",
+                                    textAlign: "center",
+                                    color: "#000000",
+                                    fontSize: "clamp(0.95rem, 3.2vw, 1.08rem)",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.02em",
+                                    lineHeight: 1.3,
+                                }}
+                            >
+                                @msilva55048
+                            </div>
                         </div>
 
                         <div className="hero__decoration hero__decoration--one"/>
