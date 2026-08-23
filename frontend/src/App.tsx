@@ -4828,6 +4828,125 @@ const adminEnhancementStyles = `
     padding: 10px 12px;
     font: inherit;
 }
+.admin-section-date-controls--agenda {
+    align-items: stretch;
+}
+.admin-agenda-date-picker {
+    position: relative;
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+.admin-agenda-date-picker__trigger {
+    width: 100%;
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 16px !important;
+    text-align: left;
+    border-radius: 16px !important;
+}
+.admin-agenda-date-picker__trigger.is-open {
+    border-color: #b76f86;
+    background: #fff8fa;
+}
+.admin-agenda-date-picker__trigger-text {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.admin-agenda-date-picker__trigger-text small {
+    color: #8e6b76;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.admin-agenda-date-picker__trigger-text strong {
+    color: #5b3744;
+    font-size: 0.98rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+.admin-agenda-date-picker__chevron {
+    color: #8b5366;
+    font-size: 1rem;
+    line-height: 1;
+}
+.admin-agenda-date-picker__panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    z-index: 40;
+    width: min(620px, calc(100vw - 48px));
+    max-width: 100%;
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+    border: 1px solid #ead9de;
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(83, 48, 58, 0.14);
+}
+.admin-agenda-date-picker__panel-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+.admin-agenda-date-picker__month {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.admin-agenda-date-picker__month strong {
+    color: #5b3944;
+    font-size: 1rem;
+    text-transform: capitalize;
+}
+.admin-agenda-date-picker__month button,
+.admin-agenda-date-picker__panel-navs button {
+    width: 44px;
+    height: 44px;
+    padding: 0 !important;
+    border-radius: 14px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.admin-agenda-date-picker__panel-navs {
+    display: flex;
+    gap: 8px;
+}
+.admin-agenda-date-picker__week-days {
+    display: grid;
+    gap: 10px;
+}
+.admin-agenda-date-picker__week-days .client-week-day {
+    min-height: 78px;
+}
+@media (max-width: 640px) {
+    .admin-agenda-date-picker {
+        flex-basis: 100%;
+        min-width: 0;
+    }
+
+    .admin-agenda-date-picker__panel {
+        width: min(calc(100vw - 36px), 100%);
+        padding: 16px;
+    }
+
+    .admin-agenda-date-picker__panel-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-agenda-date-picker__month,
+    .admin-agenda-date-picker__panel-navs {
+        justify-content: space-between;
+    }
+}
 
 .admin-card-list {
     display: grid;
@@ -6610,6 +6729,15 @@ function AdminPanel() {
 
     const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings">("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
+    const [agendaWeekReferenceDate, setAgendaWeekReferenceDate] = useState(
+        formatDateForInput(new Date()),
+    );
+    const [showAgendaDatePicker, setShowAgendaDatePicker] = useState(false);
+    const [showAgendaMonthCalendar, setShowAgendaMonthCalendar] = useState(false);
+    const [agendaCalendarMonth, setAgendaCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [financeMonth, setFinanceMonth] = useState(() => formatDateForInput(new Date()).slice(0, 7));
     const [showFinanceMonthPicker, setShowFinanceMonthPicker] = useState(false);
     const [financePickerYear, setFinancePickerYear] = useState(() => new Date().getFullYear());
@@ -8035,6 +8163,58 @@ function AdminPanel() {
         return Array.from({length: 7}, (_, index) => addDaysToInputDate(monday, index));
     }, [agendaDate]);
 
+    const agendaVisibleWeekDates = useMemo(
+        () => getManualWeekDates(agendaWeekReferenceDate),
+        [agendaWeekReferenceDate],
+    );
+
+    function selectAgendaPickerDate(date: string) {
+        setAgendaDate(date);
+        setAgendaWeekReferenceDate(date);
+        setShowAgendaMonthCalendar(false);
+        setShowAgendaDatePicker(false);
+    }
+
+    function moveAgendaPickerWeek(amount: number) {
+        const currentWeek = getManualWeekDates(agendaWeekReferenceDate);
+        const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
+
+        setAgendaWeekReferenceDate(nextReference);
+        setShowAgendaMonthCalendar(false);
+    }
+
+    function openAgendaMonthCalendar() {
+        const reference = new Date(`${agendaDate || agendaWeekReferenceDate}T12:00:00`);
+        setAgendaCalendarMonth(
+            new Date(reference.getFullYear(), reference.getMonth(), 1),
+        );
+        setShowAgendaMonthCalendar((current) => !current);
+    }
+
+    function getAgendaMonthCalendarCells() {
+        const year = agendaCalendarMonth.getFullYear();
+        const month = agendaCalendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({ length: leadingEmpty }, () => null),
+            ...Array.from({ length: daysInMonth }, (_, index) =>
+                formatDateForInput(new Date(year, month, index + 1)),
+            ),
+        ];
+    }
+
+    const agendaPickerMonthLabel = useMemo(() => {
+        const reference = new Date(`${agendaWeekReferenceDate}T12:00:00`);
+        return reference.toLocaleDateString("pt-BR", {
+            month: "long",
+            year: "numeric",
+        });
+    }, [agendaWeekReferenceDate]);
+
     function shouldShowAppointmentInAdminAgenda(appointment: AdminAppointment) {
         if (
             appointment.status === "cancelled" ||
@@ -8685,11 +8865,299 @@ function AdminPanel() {
                                         : `${formatAdminDate(weekDates[0])} até ${formatAdminDate(weekDates[6])}`}
                                 </strong>
                             </div>
-                            <div className="admin-section-date-controls">
-                                <button type="button" onClick={() => setAgendaDate((current) => addDaysToInputDate(current, adminView === "week" ? -7 : -1))}>←</button>
-                                <input type="date" value={agendaDate} onChange={(event) => setAgendaDate(event.target.value)}/>
-                                <button type="button" onClick={() => setAgendaDate((current) => addDaysToInputDate(current, adminView === "week" ? 7 : 1))}>→</button>
-                                <button type="button" onClick={() => setAgendaDate(formatDateForInput(new Date()))}>Hoje</button>
+                            <div className="admin-section-date-controls admin-section-date-controls--agenda">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const nextDate = addDaysToInputDate(
+                                            agendaDate,
+                                            adminView === "week" ? -7 : -1,
+                                        );
+                                        setAgendaDate(nextDate);
+                                        setAgendaWeekReferenceDate(nextDate);
+                                        setShowAgendaDatePicker(false);
+                                        setShowAgendaMonthCalendar(false);
+                                    }}
+                                >
+                                    ←
+                                </button>
+
+                                <div className="admin-agenda-date-picker">
+                                    <button
+                                        type="button"
+                                        className={`admin-agenda-date-picker__trigger${
+                                            showAgendaDatePicker ? " is-open" : ""
+                                        }`}
+                                        onClick={() =>
+                                            setShowAgendaDatePicker((current) => {
+                                                const nextValue = !current;
+
+                                                if (nextValue) {
+                                                    setAgendaWeekReferenceDate(agendaDate);
+                                                    setShowAgendaMonthCalendar(false);
+                                                }
+
+                                                return nextValue;
+                                            })
+                                        }
+                                    >
+                                        <span className="admin-agenda-date-picker__trigger-text">
+                                            <small>
+                                                {adminView === "agenda"
+                                                    ? "Data selecionada"
+                                                    : "Semana selecionada"}
+                                            </small>
+                                            <strong>
+                                                {adminView === "agenda"
+                                                    ? formatAdminDate(agendaDate)
+                                                    : `${formatAdminDate(
+                                                        weekDates[0],
+                                                    )} até ${formatAdminDate(
+                                                        weekDates[6],
+                                                    )}`}
+                                            </strong>
+                                        </span>
+
+                                        <span className="admin-agenda-date-picker__chevron">
+                                            {showAgendaDatePicker ? "⌃" : "⌄"}
+                                        </span>
+                                    </button>
+
+                                    {showAgendaDatePicker && (
+                                        <div className="admin-agenda-date-picker__panel">
+                                            <div className="admin-agenda-date-picker__panel-header">
+                                                <div className="admin-agenda-date-picker__month">
+                                                    <strong>{agendaPickerMonthLabel}</strong>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={openAgendaMonthCalendar}
+                                                        aria-label="Abrir calendário do mês"
+                                                    >
+                                                        📅
+                                                    </button>
+                                                </div>
+
+                                                <div className="admin-agenda-date-picker__panel-navs">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveAgendaPickerWeek(-1)}
+                                                        aria-label="Semana anterior"
+                                                    >
+                                                        ‹
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveAgendaPickerWeek(1)}
+                                                        aria-label="Próxima semana"
+                                                    >
+                                                        ›
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {showAgendaMonthCalendar && (
+                                                <div className="client-month-calendar">
+                                                    <div className="client-month-calendar__header">
+                                                        <button
+                                                            className="client-week-picker__nav"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setAgendaCalendarMonth(
+                                                                    (current) =>
+                                                                        new Date(
+                                                                            current.getFullYear(),
+                                                                            current.getMonth() - 1,
+                                                                            1,
+                                                                        ),
+                                                                )
+                                                            }
+                                                            aria-label="Mês anterior"
+                                                        >
+                                                            ‹
+                                                        </button>
+                                                        <strong>
+                                                            {agendaCalendarMonth.toLocaleDateString(
+                                                                "pt-BR",
+                                                                {
+                                                                    month: "long",
+                                                                    year: "numeric",
+                                                                },
+                                                            )}
+                                                        </strong>
+                                                        <button
+                                                            className="client-week-picker__nav"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setAgendaCalendarMonth(
+                                                                    (current) =>
+                                                                        new Date(
+                                                                            current.getFullYear(),
+                                                                            current.getMonth() + 1,
+                                                                            1,
+                                                                        ),
+                                                                )
+                                                            }
+                                                            aria-label="Próximo mês"
+                                                        >
+                                                            ›
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="client-month-calendar__weekdays">
+                                                        {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day) => (
+                                                            <span key={day}>{day}</span>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="client-month-calendar__grid">
+                                                        {getAgendaMonthCalendarCells().map(
+                                                            (date, index) => {
+                                                                if (!date) {
+                                                                    return (
+                                                                        <span
+                                                                            className="client-month-calendar__day is-empty"
+                                                                            key={`agenda-empty-${index}`}
+                                                                        />
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <button
+                                                                        key={date}
+                                                                        type="button"
+                                                                        className={[
+                                                                            "client-month-calendar__day",
+                                                                            date === agendaDate
+                                                                                ? "is-selected"
+                                                                                : "",
+                                                                        ]
+                                                                            .filter(Boolean)
+                                                                            .join(" ")}
+                                                                        onClick={() =>
+                                                                            selectAgendaPickerDate(
+                                                                                date,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {new Date(
+                                                                            `${date}T12:00:00`,
+                                                                        ).getDate()}
+                                                                    </button>
+                                                                );
+                                                            },
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="client-week-days admin-agenda-date-picker__week-days">
+                                                {[
+                                                    {
+                                                        dates: agendaVisibleWeekDates.slice(
+                                                            0,
+                                                            4,
+                                                        ),
+                                                        rowClass:
+                                                            "client-week-days__row--four",
+                                                    },
+                                                    {
+                                                        dates: agendaVisibleWeekDates.slice(
+                                                            4,
+                                                            7,
+                                                        ),
+                                                        rowClass:
+                                                            "client-week-days__row--three",
+                                                    },
+                                                ].map((row, rowIndex) => (
+                                                    <div
+                                                        className={`client-week-days__row ${row.rowClass}`}
+                                                        key={`agenda-week-row-${rowIndex}`}
+                                                    >
+                                                        {row.dates.map((date) => {
+                                                            const parsed = new Date(
+                                                                `${date}T12:00:00`,
+                                                            );
+
+                                                            return (
+                                                                <button
+                                                                    key={date}
+                                                                    type="button"
+                                                                    className={[
+                                                                        "client-week-day",
+                                                                        date === agendaDate
+                                                                            ? "is-selected"
+                                                                            : "",
+                                                                    ]
+                                                                        .filter(Boolean)
+                                                                        .join(" ")}
+                                                                    onClick={() =>
+                                                                        selectAgendaPickerDate(
+                                                                            date,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <span>
+                                                                        {parsed
+                                                                            .toLocaleDateString(
+                                                                                "pt-BR",
+                                                                                {
+                                                                                    weekday:
+                                                                                        "short",
+                                                                                },
+                                                                            )
+                                                                            .replace(
+                                                                                ".",
+                                                                                "",
+                                                                            )}
+                                                                    </span>
+                                                                    <strong>
+                                                                        {parsed.toLocaleDateString(
+                                                                            "pt-BR",
+                                                                            {
+                                                                                day: "2-digit",
+                                                                                month: "2-digit",
+                                                                            },
+                                                                        )}
+                                                                    </strong>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const nextDate = addDaysToInputDate(
+                                            agendaDate,
+                                            adminView === "week" ? 7 : 1,
+                                        );
+                                        setAgendaDate(nextDate);
+                                        setAgendaWeekReferenceDate(nextDate);
+                                        setShowAgendaDatePicker(false);
+                                        setShowAgendaMonthCalendar(false);
+                                    }}
+                                >
+                                    →
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const today = formatDateForInput(new Date());
+                                        setAgendaDate(today);
+                                        setAgendaWeekReferenceDate(today);
+                                        setShowAgendaDatePicker(false);
+                                        setShowAgendaMonthCalendar(false);
+                                    }}
+                                >
+                                    Hoje
+                                </button>
                             </div>
                         </div>
 
