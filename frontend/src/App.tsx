@@ -593,6 +593,114 @@ const clientAccountStyles = `
     background: #efe4e7;
     color: #6d3445;
 }
+.client-account__edit-profile {
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 28px;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    border: 1px solid #ead9de;
+    border-radius: 16px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #fffafb, #f6e8ed);
+    color: #563941;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    box-shadow: 0 7px 18px rgba(83, 48, 58, .05);
+}
+.client-account__edit-profile-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    background: #ead4db;
+    color: #7d3d53;
+    font-size: 1.1rem;
+    font-weight: 900;
+}
+.client-account__edit-profile > span:nth-child(2) {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+.client-account__edit-profile strong {
+    color: #55383f;
+    font-size: .91rem;
+}
+.client-account__edit-profile small {
+    color: #927780;
+    font-size: .71rem;
+}
+.client-account__edit-profile-arrow {
+    color: #8b5365;
+    font-size: 1.35rem;
+    font-weight: 900;
+}
+.client-profile-editor {
+    width: min(540px, calc(100% - 28px));
+}
+.client-profile-editor__form {
+    display: grid;
+    gap: 14px;
+}
+.client-profile-editor__form label {
+    display: grid;
+    gap: 7px;
+    color: #5f454d;
+    font-size: .85rem;
+    font-weight: 800;
+}
+.client-profile-editor__form input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 12px 13px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+.client-profile-editor__form input:focus {
+    outline: none;
+    border-color: #a86175;
+    box-shadow: 0 0 0 3px rgba(168, 97, 117, .1);
+}
+.client-profile-editor__hint {
+    color: #9a7d86;
+    font-weight: 500;
+    font-size: .72rem;
+}
+.client-profile-editor__actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 9px;
+    margin-top: 4px;
+}
+.client-profile-editor__save,
+.client-profile-editor__cancel {
+    border: 0;
+    border-radius: 13px;
+    padding: 13px 15px;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.client-profile-editor__save {
+    background: linear-gradient(135deg, #8d4960, #6e3447);
+    color: #fff;
+}
+.client-profile-editor__cancel {
+    background: #eee4e7;
+    color: #6d4853;
+}
+.client-profile-editor__save:disabled,
+.client-profile-editor__cancel:disabled {
+    opacity: .6;
+    cursor: wait;
+}
 .client-account__section {
     margin-top: 22px;
 }
@@ -917,6 +1025,9 @@ const clientAccountStyles = `
     .client-account__appointment {
         grid-template-columns: 1fr;
     }
+    .client-profile-editor__actions {
+        grid-template-columns: 1fr;
+    }
 }
 `;
 
@@ -941,6 +1052,16 @@ function PublicSite() {
     const [isLoadingClientAccount, setIsLoadingClientAccount] = useState(false);
     const [showClientAuth, setShowClientAuth] = useState(false);
     const [showClientAccount, setShowClientAccount] = useState(false);
+    const [showClientProfileEditor, setShowClientProfileEditor] = useState(false);
+    const [profileEditName, setProfileEditName] = useState("");
+    const [profileEditPhone, setProfileEditPhone] = useState("");
+    const [profileEditEmail, setProfileEditEmail] = useState("");
+    const [profileEditPassword, setProfileEditPassword] = useState("");
+    const [profileEditPasswordConfirm, setProfileEditPasswordConfirm] = useState("");
+    const [showProfileEditPassword, setShowProfileEditPassword] = useState(false);
+    const [profileEditError, setProfileEditError] = useState("");
+    const [profileEditSuccess, setProfileEditSuccess] = useState("");
+    const [isSavingProfileEdit, setIsSavingProfileEdit] = useState(false);
     const [, setFocusClientAppointments] = useState(false);
     const [clientAuthMode, setClientAuthMode] = useState<"login" | "signup">("login");
     const [authFullName, setAuthFullName] = useState("");
@@ -1182,9 +1303,177 @@ function PublicSite() {
         }
     }
 
+    function openClientProfileEditor() {
+        if (!clientProfile) return;
+
+        setProfileEditName(clientProfile.full_name);
+        setProfileEditPhone(formatBrazilianPhone(clientProfile.phone));
+        setProfileEditEmail(clientProfile.email || clientUserEmail);
+        setProfileEditPassword("");
+        setProfileEditPasswordConfirm("");
+        setShowProfileEditPassword(false);
+        setProfileEditError("");
+        setProfileEditSuccess("");
+        setShowClientProfileEditor(true);
+    }
+
+    function closeClientProfileEditor() {
+        if (isSavingProfileEdit) return;
+
+        setShowClientProfileEditor(false);
+        setProfileEditPassword("");
+        setProfileEditPasswordConfirm("");
+        setProfileEditError("");
+        setProfileEditSuccess("");
+    }
+
+    async function saveClientProfileChanges(
+        event: React.FormEvent<HTMLFormElement>,
+    ) {
+        event.preventDefault();
+
+        if (!clientProfile || !clientUserId) return;
+
+        setProfileEditError("");
+        setProfileEditSuccess("");
+
+        const fullName = profileEditName.trim().replace(/\s+/g, " ");
+        const phone = formatBrazilianPhone(profileEditPhone);
+        const phoneDigits = phone.replace(/\D/g, "");
+        const email = profileEditEmail.trim().toLowerCase();
+        const newPassword = profileEditPassword;
+
+        if (fullName.length < 3) {
+            setProfileEditError("Informe seu nome completo.");
+            return;
+        }
+
+        if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            setProfileEditError("Informe um telefone válido com DDD.");
+            return;
+        }
+
+        if (!email || !email.includes("@")) {
+            setProfileEditError("Informe um e-mail válido.");
+            return;
+        }
+
+        if (newPassword && newPassword.length < 6) {
+            setProfileEditError("A nova senha precisa ter pelo menos 6 caracteres.");
+            return;
+        }
+
+        if (newPassword !== profileEditPasswordConfirm) {
+            setProfileEditError("A confirmação da nova senha não confere.");
+            return;
+        }
+
+        setIsSavingProfileEdit(true);
+
+        try {
+            const {data: profileData, error: profileError} = await supabase.rpc(
+                "update_my_client_profile",
+                {
+                    p_full_name: fullName,
+                    p_phone: phone,
+                    p_email: email,
+                },
+            );
+
+            if (profileError) {
+                throw profileError;
+            }
+
+            const updatedProfile = normalizeRpcRow<PublicClientProfile>(
+                profileData as
+                    | PublicClientProfile[]
+                    | PublicClientProfile
+                    | null,
+            );
+
+            if (!updatedProfile) {
+                throw new Error("O perfil atualizado não foi retornado.");
+            }
+
+            const authUpdates: {
+                email?: string;
+                password?: string;
+                data: {
+                    full_name: string;
+                    phone: string;
+                };
+            } = {
+                data: {
+                    full_name: fullName,
+                    phone,
+                },
+            };
+
+            if (email !== clientUserEmail.trim().toLowerCase()) {
+                authUpdates.email = email;
+            }
+
+            if (newPassword) {
+                authUpdates.password = newPassword;
+            }
+
+            const {data: authData, error: authError} =
+                await supabase.auth.updateUser(authUpdates);
+
+            if (authError) {
+                throw authError;
+            }
+
+            setClientProfile(updatedProfile);
+            setClientName(updatedProfile.full_name);
+            setClientPhone(formatBrazilianPhone(updatedProfile.phone));
+            setClientUserEmail(
+                authData.user?.email ?? updatedProfile.email ?? email,
+            );
+
+            await loadClientAppointments(updatedProfile.id);
+
+            setProfileEditPassword("");
+            setProfileEditPasswordConfirm("");
+
+            const emailChanged =
+                email !== clientUserEmail.trim().toLowerCase();
+
+            setProfileEditSuccess(
+                emailChanged
+                    ? "Perfil atualizado. Se o Supabase solicitar confirmação do novo e-mail, confirme pelo link recebido."
+                    : "Perfil atualizado com sucesso.",
+            );
+        } catch (error) {
+            console.error("Erro ao atualizar perfil da cliente:", error);
+
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Não foi possível atualizar o perfil.";
+
+            if (
+                message.toLowerCase().includes("duplicate") ||
+                message.toLowerCase().includes("already") ||
+                message.toLowerCase().includes("unique")
+            ) {
+                setProfileEditError(
+                    "Este telefone ou e-mail já está vinculado a outra conta.",
+                );
+            } else {
+                setProfileEditError(
+                    "Não foi possível atualizar o perfil. Confira os dados e tente novamente.",
+                );
+            }
+        } finally {
+            setIsSavingProfileEdit(false);
+        }
+    }
+
     async function logoutClient() {
         await supabase.auth.signOut();
         setShowClientAccount(false);
+        setShowClientProfileEditor(false);
         setClientProfile(null);
         setClientAppointments([]);
         setClientUserId(null);
@@ -2443,7 +2732,24 @@ function PublicSite() {
                                 </div>
 
                                 <div className="client-account__actions">
-                                    <button className="client-account__logout" type="button" onClick={() => void logoutClient()}>
+                                    <button
+                                        className="client-account__edit-profile"
+                                        type="button"
+                                        onClick={openClientProfileEditor}
+                                    >
+                                        <span className="client-account__edit-profile-icon">✎</span>
+                                        <span>
+                                            <strong>Editar perfil</strong>
+                                            <small>Nome, telefone, e-mail e senha</small>
+                                        </span>
+                                        <span className="client-account__edit-profile-arrow">›</span>
+                                    </button>
+
+                                    <button
+                                        className="client-account__logout"
+                                        type="button"
+                                        onClick={() => void logoutClient()}
+                                    >
                                         Sair da conta
                                     </button>
                                 </div>
@@ -2495,6 +2801,179 @@ function PublicSite() {
                                 Sua conta está autenticada, mas o perfil ainda não foi vinculado. Saia e entre novamente; se continuar, fale com a Mirian.
                             </div>
                         )}
+                    </section>
+                </div>
+            )}
+
+            {showClientProfileEditor && clientProfile && (
+                <div
+                    className="client-modal-backdrop"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) {
+                            closeClientProfileEditor();
+                        }
+                    }}
+                >
+                    <section className="client-modal client-profile-editor">
+                        <button
+                            className="client-modal__close"
+                            type="button"
+                            onClick={closeClientProfileEditor}
+                            aria-label="Fechar edição do perfil"
+                        >
+                            ×
+                        </button>
+
+                        <span className="client-modal__eyebrow">Meu perfil</span>
+                        <h2>Editar perfil</h2>
+                        <p>
+                            Atualize seus dados. As alterações são feitas no mesmo
+                            cadastro já vinculado à sua conta.
+                        </p>
+
+                        <form
+                            className="client-profile-editor__form"
+                            onSubmit={saveClientProfileChanges}
+                        >
+                            <label>
+                                Nome completo
+                                <input
+                                    value={profileEditName}
+                                    onChange={(event) =>
+                                        setProfileEditName(event.target.value)
+                                    }
+                                    autoComplete="name"
+                                    maxLength={80}
+                                    required
+                                />
+                            </label>
+
+                            <label>
+                                Telefone / WhatsApp
+                                <input
+                                    type="tel"
+                                    inputMode="numeric"
+                                    value={profileEditPhone}
+                                    onChange={(event) =>
+                                        setProfileEditPhone(
+                                            formatBrazilianPhone(
+                                                event.target.value,
+                                            ),
+                                        )
+                                    }
+                                    placeholder="(00) 00000-0000"
+                                    maxLength={15}
+                                    autoComplete="tel"
+                                    required
+                                />
+                            </label>
+
+                            <label>
+                                E-mail
+                                <input
+                                    type="email"
+                                    value={profileEditEmail}
+                                    onChange={(event) =>
+                                        setProfileEditEmail(event.target.value)
+                                    }
+                                    autoComplete="email"
+                                    required
+                                />
+                            </label>
+
+                            <label>
+                                Nova senha
+                                <small className="client-profile-editor__hint">
+                                    Deixe em branco para manter a senha atual.
+                                </small>
+
+                                <div className="client-password-field">
+                                    <input
+                                        type={
+                                            showProfileEditPassword
+                                                ? "text"
+                                                : "password"
+                                        }
+                                        value={profileEditPassword}
+                                        onChange={(event) =>
+                                            setProfileEditPassword(
+                                                event.target.value,
+                                            )
+                                        }
+                                        autoComplete="new-password"
+                                        minLength={6}
+                                        placeholder="Nova senha"
+                                    />
+
+                                    <button
+                                        className="client-password-toggle"
+                                        type="button"
+                                        onClick={() =>
+                                            setShowProfileEditPassword(
+                                                (current) => !current,
+                                            )
+                                        }
+                                    >
+                                        {showProfileEditPassword
+                                            ? "Ocultar"
+                                            : "Mostrar"}
+                                    </button>
+                                </div>
+                            </label>
+
+                            <label>
+                                Confirmar nova senha
+                                <input
+                                    type={
+                                        showProfileEditPassword
+                                            ? "text"
+                                            : "password"
+                                    }
+                                    value={profileEditPasswordConfirm}
+                                    onChange={(event) =>
+                                        setProfileEditPasswordConfirm(
+                                            event.target.value,
+                                        )
+                                    }
+                                    autoComplete="new-password"
+                                    minLength={6}
+                                    placeholder="Repita a nova senha"
+                                />
+                            </label>
+
+                            {profileEditError && (
+                                <p className="client-auth-message is-error">
+                                    {profileEditError}
+                                </p>
+                            )}
+
+                            {profileEditSuccess && (
+                                <p className="client-auth-message is-success">
+                                    {profileEditSuccess}
+                                </p>
+                            )}
+
+                            <div className="client-profile-editor__actions">
+                                <button
+                                    type="submit"
+                                    className="client-profile-editor__save"
+                                    disabled={isSavingProfileEdit}
+                                >
+                                    {isSavingProfileEdit
+                                        ? "Salvando..."
+                                        : "Salvar alterações"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="client-profile-editor__cancel"
+                                    onClick={closeClientProfileEditor}
+                                    disabled={isSavingProfileEdit}
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </form>
                     </section>
                 </div>
             )}
