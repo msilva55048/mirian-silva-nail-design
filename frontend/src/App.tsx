@@ -10262,10 +10262,8 @@ function AdminPanel() {
             types.push("attendance-confirmation");
         }
 
-        if (difference > 0 && difference <= 2 * hour) {
-            types.push("two-hour-reminder");
-        }
-
+        // A segunda mensagem automática, que aparecia quando faltavam
+        // até 2 horas para o atendimento, foi desativada por enquanto.
         return types;
     }
 
