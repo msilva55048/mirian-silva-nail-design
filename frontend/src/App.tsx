@@ -3970,6 +3970,24 @@ const adminStyles = `
     transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 
+.admin-client-history__list article.is-confirmed-deletable {
+    cursor: pointer;
+    border-color: rgba(61, 117, 83, .22);
+    background: #f8fcf9;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.admin-client-history__list article.is-confirmed-deletable:hover {
+    transform: translateY(-1px);
+    border-color: rgba(61, 117, 83, .4);
+    box-shadow: 0 8px 20px rgba(83, 48, 58, .08);
+}
+
+.admin-client-history__list article.is-confirmed-deletable:focus-visible {
+    outline: 3px solid rgba(61, 117, 83, .16);
+    outline-offset: 2px;
+}
+
 .admin-client-history__list article.is-cancelled-cleanable:hover {
     transform: translateY(-1px);
     border-color: rgba(162, 63, 77, .42);
@@ -3994,6 +4012,22 @@ const adminStyles = `
 
 .admin-client-history__cancelled-action small {
     color: #9a7079;
+    font-size: .68rem;
+}
+
+.admin-client-history__confirmed-action {
+    display: grid;
+    gap: 3px;
+    text-align: right;
+}
+
+.admin-client-history__confirmed-action strong {
+    color: #2f7750;
+    font-size: .78rem;
+}
+
+.admin-client-history__confirmed-action small {
+    color: #72867a;
     font-size: .68rem;
 }
 
@@ -7502,6 +7536,8 @@ function AdminPanel() {
     const [deletingClientKey, setDeletingClientKey] = useState("");
     const [clearingCancelledAppointmentId, setClearingCancelledAppointmentId] =
         useState<string | null>(null);
+    const [deletingConfirmedAppointmentId, setDeletingConfirmedAppointmentId] =
+        useState<string | null>(null);
 
     const [nailRecords, setNailRecords] = useState<NailRecord[]>([]);
     const [isLoadingNailRecords, setIsLoadingNailRecords] = useState(false);
@@ -8185,6 +8221,64 @@ function AdminPanel() {
             );
         } finally {
             setClearingCancelledAppointmentId(null);
+        }
+    }
+
+    async function deleteConfirmedAppointmentFromHistory(
+        appointment: AdminAppointment,
+    ) {
+        if (appointment.status !== "confirmed") return;
+
+        const confirmed = window.confirm(
+            `Excluir definitivamente o agendamento confirmado de ${formatAdminDate(
+                appointment.appointment_date,
+            )} às ${String(appointment.start_time).slice(0, 5)}?\n\nEsse agendamento será removido e NÃO ficará no histórico como cancelado.`,
+        );
+
+        if (!confirmed) return;
+
+        setDeletingConfirmedAppointmentId(appointment.id);
+        setPanelError("");
+
+        try {
+            const {error} = await supabase
+                .from("appointments")
+                .delete()
+                .eq("id", appointment.id)
+                .eq("status", "confirmed");
+
+            if (error) {
+                throw error;
+            }
+
+            setAppointments((current) =>
+                current.filter((item) => item.id !== appointment.id),
+            );
+
+            setSelectedClient((current) =>
+                current
+                    ? {
+                        ...current,
+                        appointments: current.appointments.filter(
+                            (item) => item.id !== appointment.id,
+                        ),
+                        nextAppointment:
+                            current.nextAppointment?.id === appointment.id
+                                ? null
+                                : current.nextAppointment,
+                    }
+                    : current,
+            );
+        } catch (error) {
+            console.error(
+                "Erro ao excluir agendamento confirmado pelo ADM:",
+                error,
+            );
+            setPanelError(
+                "Não foi possível excluir o agendamento confirmado.",
+            );
+        } finally {
+            setDeletingConfirmedAppointmentId(null);
         }
     }
 
@@ -12212,48 +12306,83 @@ function AdminPanel() {
 
                                 <div className="admin-client-history__list">
                                     {selectedClient.appointments.map((appointment) => {
-                                        const canClear =
+                                        const canClearCancelled =
                                             appointment.status === "cancelled";
+                                        const canDeleteConfirmed =
+                                            appointment.status === "confirmed";
+
                                         const isClearing =
                                             clearingCancelledAppointmentId ===
                                             appointment.id;
+                                        const isDeletingConfirmed =
+                                            deletingConfirmedAppointmentId ===
+                                            appointment.id;
+
+                                        const isInteractive =
+                                            canClearCancelled ||
+                                            canDeleteConfirmed;
 
                                         return (
                                             <article
                                                 key={appointment.id}
                                                 className={[
-                                                    canClear
+                                                    canClearCancelled
                                                         ? "is-cancelled-cleanable"
                                                         : "",
-                                                    isClearing
+                                                    canDeleteConfirmed
+                                                        ? "is-confirmed-deletable"
+                                                        : "",
+                                                    isClearing ||
+                                                    isDeletingConfirmed
                                                         ? "is-clearing"
                                                         : "",
                                                 ]
                                                     .filter(Boolean)
                                                     .join(" ")}
                                                 role={
-                                                    canClear
+                                                    isInteractive
                                                         ? "button"
                                                         : undefined
                                                 }
                                                 tabIndex={
-                                                    canClear ? 0 : undefined
+                                                    isInteractive
+                                                        ? 0
+                                                        : undefined
                                                 }
                                                 onClick={() => {
-                                                    if (canClear) {
+                                                    if (canClearCancelled) {
                                                         void clearCancelledAppointmentFromHistory(
+                                                            appointment,
+                                                        );
+                                                        return;
+                                                    }
+
+                                                    if (canDeleteConfirmed) {
+                                                        void deleteConfirmedAppointmentFromHistory(
                                                             appointment,
                                                         );
                                                     }
                                                 }}
                                                 onKeyDown={(event) => {
                                                     if (
-                                                        canClear &&
-                                                        (event.key === "Enter" ||
-                                                            event.key === " ")
+                                                        !isInteractive ||
+                                                        (event.key !== "Enter" &&
+                                                            event.key !== " ")
                                                     ) {
-                                                        event.preventDefault();
+                                                        return;
+                                                    }
+
+                                                    event.preventDefault();
+
+                                                    if (canClearCancelled) {
                                                         void clearCancelledAppointmentFromHistory(
+                                                            appointment,
+                                                        );
+                                                        return;
+                                                    }
+
+                                                    if (canDeleteConfirmed) {
+                                                        void deleteConfirmedAppointmentFromHistory(
                                                             appointment,
                                                         );
                                                     }
@@ -12276,7 +12405,7 @@ function AdminPanel() {
                                                     </span>
                                                 </div>
 
-                                                {canClear ? (
+                                                {canClearCancelled ? (
                                                     <div className="admin-client-history__cancelled-action">
                                                         <strong>
                                                             {isClearing
@@ -12285,6 +12414,17 @@ function AdminPanel() {
                                                         </strong>
                                                         <small>
                                                             Toque para limpar
+                                                        </small>
+                                                    </div>
+                                                ) : canDeleteConfirmed ? (
+                                                    <div className="admin-client-history__confirmed-action">
+                                                        <strong>
+                                                            {isDeletingConfirmed
+                                                                ? "Excluindo..."
+                                                                : "Confirmado"}
+                                                        </strong>
+                                                        <small>
+                                                            Toque para excluir
                                                         </small>
                                                     </div>
                                                 ) : (
