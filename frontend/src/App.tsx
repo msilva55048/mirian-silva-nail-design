@@ -1319,33 +1319,6 @@ function PublicSite() {
         let mounted = true;
 
         async function initializeClientSession() {
-            const currentUrl = new URL(window.location.href);
-            const currentHash = new URLSearchParams(
-                window.location.hash.replace(/^#/, ""),
-            );
-
-            const recoveryTokenHash =
-                currentUrl.searchParams.get("token_hash") ??
-                currentHash.get("token_hash");
-            const recoveryType =
-                currentUrl.searchParams.get("type") ??
-                currentHash.get("type");
-
-            if (
-                recoveryTokenHash &&
-                recoveryType === "recovery"
-            ) {
-                setShowClientAuth(false);
-                setShowClientAccount(false);
-                setShowPasswordRecoveryRequest(false);
-                setRecoveryNewPassword("");
-                setRecoveryConfirmPassword("");
-                setShowRecoveryPassword(false);
-                setRecoveryResetError("");
-                setRecoveryResetSuccess("");
-                setShowPasswordRecoveryReset(true);
-            }
-
             const {data: {session}} = await supabase.auth.getSession();
 
             if (!mounted) return;
@@ -1494,106 +1467,17 @@ function PublicSite() {
     }
 
     async function ensurePasswordRecoverySession() {
-        const url = new URL(window.location.href);
-        const hashParams = new URLSearchParams(
-            window.location.hash.replace(/^#/, ""),
-        );
-
-        const tokenHash =
-            url.searchParams.get("token_hash") ??
-            hashParams.get("token_hash");
-        const recoveryType =
-            url.searchParams.get("type") ??
-            hashParams.get("type");
-        const code = url.searchParams.get("code");
-        const accessToken =
-            url.searchParams.get("access_token") ??
-            hashParams.get("access_token");
-        const refreshToken =
-            url.searchParams.get("refresh_token") ??
-            hashParams.get("refresh_token");
-
-        // FLUXO PRINCIPAL: token_hash explícito vindo do template do e-mail.
-        // Este é o fluxo mais previsível porque validamos o token diretamente.
-        if (tokenHash && recoveryType === "recovery") {
-            const {
-                data: verifyData,
-                error: verifyError,
-            } = await supabase.auth.verifyOtp({
-                token_hash: tokenHash,
-                type: "recovery",
-            });
-
-            if (verifyError) {
-                console.error(
-                    "Falha ao validar token_hash da recuperação:",
-                    verifyError,
-                );
-                return null;
-            }
-
-            if (verifyData.session?.user) {
-                setRecoverySessionUserId(verifyData.session.user.id);
-                return verifyData.session;
-            }
-        }
-
-        // Compatibilidade com links PKCE que retornem ?code=...
-        if (code) {
-            const {
-                data: exchangeData,
-                error: exchangeError,
-            } = await supabase.auth.exchangeCodeForSession(code);
-
-            if (!exchangeError && exchangeData.session?.user) {
-                setRecoverySessionUserId(exchangeData.session.user.id);
-                return exchangeData.session;
-            }
-
-            if (exchangeError) {
-                console.warn(
-                    "Falha ao trocar code da recuperação:",
-                    exchangeError,
-                );
-            }
-        }
-
-        // Compatibilidade com fluxo implícito no #hash.
-        if (accessToken && refreshToken) {
-            const {
-                data: sessionData,
-                error: sessionError,
-            } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-            });
-
-            if (!sessionError && sessionData.session?.user) {
-                setRecoverySessionUserId(sessionData.session.user.id);
-                return sessionData.session;
-            }
-
-            if (sessionError) {
-                console.warn(
-                    "Falha ao restaurar sessão pelos tokens:",
-                    sessionError,
-                );
-            }
-        }
-
-        // Último recurso: sessão que o SDK já processou.
         const {
             data: {session},
-            error: sessionError,
+            error,
         } = await supabase.auth.getSession();
 
-        if (sessionError || !session?.user) {
-            if (sessionError) {
-                console.error(
-                    "Falha ao obter sessão atual:",
-                    sessionError,
-                );
-            }
+        if (error) {
+            console.error("Erro ao verificar sessão de recuperação:", error);
+            return null;
+        }
+
+        if (!session?.user) {
             return null;
         }
 
@@ -1602,7 +1486,7 @@ function PublicSite() {
             session.user.id !== recoverySessionUserId
         ) {
             console.error(
-                "Sessão atual não corresponde à sessão de recuperação.",
+                "A sessão atual não corresponde ao usuário que abriu o link de recuperação.",
             );
             return null;
         }
@@ -1638,7 +1522,7 @@ function PublicSite() {
 
             if (!recoverySession?.user) {
                 setRecoveryResetError(
-                    "Não foi possível validar este link de recuperação. Solicite um novo link e use somente o e-mail mais recente.",
+                    "O link de recuperação não criou uma sessão válida. Solicite um novo link, abra o e-mail mais recente e faça a troca nesse mesmo navegador.",
                 );
                 return;
             }
@@ -1667,22 +1551,40 @@ function PublicSite() {
         } catch (error) {
             console.error("Erro ao salvar nova senha:", error);
 
-            const message =
+            const originalMessage =
                 error instanceof Error
-                    ? error.message.toLowerCase()
-                    : "";
+                    ? error.message
+                    : "Não foi possível alterar a senha.";
+
+            const message = originalMessage.toLowerCase();
 
             if (
-                message.includes("session") ||
-                message.includes("jwt") ||
-                message.includes("token")
+                message.includes("different from the old password") ||
+                message.includes("same password") ||
+                message.includes("new password should be different")
             ) {
                 setRecoveryResetError(
-                    "A sessão de recuperação não está mais válida. Solicite um novo link e abra somente o link mais recente.",
+                    "A nova senha precisa ser diferente da senha anterior.",
+                );
+            } else if (
+                message.includes("session") ||
+                message.includes("jwt") ||
+                message.includes("token") ||
+                message.includes("auth session missing")
+            ) {
+                setRecoveryResetError(
+                    "A sessão de recuperação não está válida. Solicite um novo link e abra somente o e-mail mais recente.",
+                );
+            } else if (
+                message.includes("password") &&
+                message.includes("characters")
+            ) {
+                setRecoveryResetError(
+                    "A senha não atende aos requisitos do Supabase. Escolha outra senha com pelo menos 6 caracteres.",
                 );
             } else {
                 setRecoveryResetError(
-                    "Não foi possível alterar a senha agora. Tente novamente. Se continuar, solicite um novo link de recuperação.",
+                    `Não foi possível alterar a senha: ${originalMessage}`,
                 );
             }
         } finally {
