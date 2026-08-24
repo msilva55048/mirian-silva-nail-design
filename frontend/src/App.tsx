@@ -36,6 +36,15 @@ type TimeInterval = {
     end: number;
 };
 
+type ScheduleTimeOverride = {
+    id: string;
+    override_date: string;
+    start_time: string;
+    is_available: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+
 const fallbackServices: Service[] = [
     {
         name: "Esmaltação em Gel Decorada",
@@ -184,6 +193,32 @@ function getFixedAdminManualStartMinutes(date: string) {
     return isWeekendDate(date)
         ? [...ADMIN_WEEKEND_START_MINUTES]
         : [...ADMIN_WEEKDAY_START_MINUTES];
+}
+
+function getConfiguredClientStartMinutes(
+    date: string,
+    overrides: ScheduleTimeOverride[] = [],
+) {
+    if (!date) return [] as number[];
+
+    const baseStarts = getFixedClientStartMinutes(date);
+    const dateOverrides = overrides.filter(
+        (item) => item.override_date === date,
+    );
+
+    const removedStarts = new Set(
+        dateOverrides
+            .filter((item) => !item.is_available)
+            .map((item) => timeToMinutes(String(item.start_time).slice(0, 5))),
+    );
+
+    const addedStarts = dateOverrides
+        .filter((item) => item.is_available)
+        .map((item) => timeToMinutes(String(item.start_time).slice(0, 5)));
+
+    return [...new Set([...baseStarts, ...addedStarts])]
+        .filter((start) => !removedStarts.has(start))
+        .sort((a, b) => a - b);
 }
 
 function normalizeBrazilianPhoneDigits(value: string) {
@@ -1101,6 +1136,7 @@ function PublicSite() {
     const [bookingError, setBookingError] = useState("");
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [scheduleBlocks, setScheduleBlocks] = useState<ScheduleBlock[]>([]);
+    const [scheduleTimeOverrides, setScheduleTimeOverrides] = useState<ScheduleTimeOverride[]>([]);
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
     const [services, setServices] = useState<Service[]>(fallbackServices);
@@ -1695,6 +1731,7 @@ function PublicSite() {
             const [
                 {data: appointmentData, error: appointmentError},
                 {data: blockData, error: blockError},
+                {data: overrideData, error: overrideError},
             ] = await Promise.all([
                 supabase
                     .from("occupied_appointments")
@@ -1705,7 +1742,14 @@ function PublicSite() {
                 supabase
                     .from("schedule_blocks")
                     .select("id, block_date, start_time, end_time, reason"),
+                supabase
+                    .from("schedule_time_overrides")
+                    .select("id, override_date, start_time, is_available, created_at, updated_at"),
             ]);
+
+            if (overrideError) {
+                console.warn("Exceções de horário ainda não disponíveis:", overrideError);
+            }
 
             if (appointmentError || blockError) {
                 console.error(
@@ -1743,8 +1787,20 @@ function PublicSite() {
                 }),
             );
 
+            const loadedOverrides: ScheduleTimeOverride[] = (overrideData ?? []).map(
+                (item) => ({
+                    id: item.id,
+                    override_date: item.override_date,
+                    start_time: String(item.start_time).slice(0, 5),
+                    is_available: Boolean(item.is_available),
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                }),
+            );
+
             setAppointments(loadedAppointments);
             setScheduleBlocks(loadedBlocks);
+            setScheduleTimeOverrides(loadedOverrides);
             setIsLoadingAppointments(false);
         }
 
@@ -1780,9 +1836,25 @@ function PublicSite() {
             )
             .subscribe();
 
+        const scheduleOverridesChannel = supabase
+            .channel("public-schedule-time-overrides-updates")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "schedule_time_overrides",
+                },
+                () => {
+                    void loadAppointments();
+                },
+            )
+            .subscribe();
+
         return () => {
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
+            void supabase.removeChannel(scheduleOverridesChannel);
         };
     }, []);
 
@@ -1909,8 +1981,7 @@ function PublicSite() {
     }
 
     function getConfiguredPublicStartMinutes(date: string) {
-        if (!date) return [] as number[];
-        return getFixedClientStartMinutes(date);
+        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
     }
 
     function getAvailableTimes(date: string, serviceDurationMinutes: number) {
@@ -1942,6 +2013,7 @@ function PublicSite() {
     }, [
         appointments,
         scheduleBlocks,
+        scheduleTimeOverrides,
         selectedDate,
         selectedServiceInformation,
         editingClientAppointment,
@@ -1992,6 +2064,7 @@ function PublicSite() {
             const [
                 {data: latestAppointments, error: appointmentLoadError},
                 {data: latestBlocks, error: blockLoadError},
+                {data: latestOverrides, error: overrideLoadError},
             ] = await Promise.all([
                 supabase
                     .from("occupied_appointments")
@@ -2004,7 +2077,15 @@ function PublicSite() {
                     .from("schedule_blocks")
                     .select("id, block_date, start_time, end_time, reason")
                     .eq("block_date", selectedDate),
+                supabase
+                    .from("schedule_time_overrides")
+                    .select("id, override_date, start_time, is_available, created_at, updated_at")
+                    .eq("override_date", selectedDate),
             ]);
+
+            if (overrideLoadError) {
+                console.warn("Não foi possível revalidar exceções de horário:", overrideLoadError);
+            }
 
             if (appointmentLoadError || blockLoadError) {
                 throw appointmentLoadError || blockLoadError;
@@ -2034,11 +2115,31 @@ function PublicSite() {
                 reason: block.reason || "",
             }));
 
+            const latestDateOverrides: ScheduleTimeOverride[] = (latestOverrides ?? []).map(
+                (item) => ({
+                    id: item.id,
+                    override_date: item.override_date,
+                    start_time: String(item.start_time).slice(0, 5),
+                    is_available: Boolean(item.is_available),
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                }),
+            );
+
+            if (!overrideLoadError) {
+                setScheduleTimeOverrides((current) => [
+                    ...current.filter((item) => item.override_date !== selectedDate),
+                    ...latestDateOverrides,
+                ]);
+            }
+
             const selectedStart = timeToMinutes(selectedTime);
             const selectedEnd =
                 selectedStart + selectedServiceInformation.durationMinutes;
 
-            const allowedPublicStarts = getConfiguredPublicStartMinutes(selectedDate);
+            const allowedPublicStarts = overrideLoadError
+                ? getConfiguredPublicStartMinutes(selectedDate)
+                : getConfiguredClientStartMinutes(selectedDate, latestDateOverrides);
 
             if (!allowedPublicStarts.includes(selectedStart)) {
                 setSelectedTime("");
@@ -6506,6 +6607,188 @@ const adminServiceManagerStyles = `
     display: grid;
     gap: 22px;
 }
+
+.admin-schedule-config-card {
+    display: grid;
+    gap: 20px;
+}
+.admin-schedule-config-card .admin-service-form-card__heading p {
+    max-width: 720px;
+    margin: 6px 0 0;
+    color: #8a7078;
+    line-height: 1.5;
+}
+.admin-schedule-config-week {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid #eadde1;
+    border-radius: 18px;
+    background: #fffafb;
+}
+.admin-schedule-config-week__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #563941;
+    text-transform: capitalize;
+}
+.admin-schedule-config-week__top > div {
+    display: flex;
+    gap: 7px;
+}
+.admin-schedule-config-week__top button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #dbc5cc;
+    border-radius: 11px;
+    background: #fff;
+    color: #6d3445;
+    font: inherit;
+    font-size: 1.15rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+.admin-schedule-config-selected-date {
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px;
+    border-radius: 15px;
+    background: #f8eef1;
+}
+.admin-schedule-config-selected-date span,
+.admin-schedule-config-add label > span,
+.admin-schedule-config-times__heading span {
+    color: #9a5d70;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .06em;
+}
+.admin-schedule-config-selected-date strong {
+    color: #4f353e;
+    text-transform: capitalize;
+}
+.admin-schedule-config-add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+}
+.admin-schedule-config-add label {
+    display: grid;
+    gap: 7px;
+}
+.admin-schedule-config-add input,
+.admin-schedule-config-time input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 12px 13px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+.admin-schedule-config-add button,
+.admin-schedule-config-time button {
+    border: 0;
+    border-radius: 11px;
+    padding: 11px 14px;
+    background: #7b3f53;
+    color: #fff;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.admin-schedule-config-add button:disabled,
+.admin-schedule-config-time button:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+.admin-schedule-config-times {
+    display: grid;
+    gap: 12px;
+}
+.admin-schedule-config-times__heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+.admin-schedule-config-times__heading > div {
+    display: grid;
+    gap: 4px;
+}
+.admin-schedule-config-times__heading strong {
+    color: #4f353e;
+}
+.admin-schedule-config-times__heading small {
+    color: #927780;
+}
+.admin-schedule-config-time-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 9px;
+}
+.admin-schedule-config-time {
+    display: grid;
+    grid-template-columns: minmax(62px, 1fr) auto auto;
+    gap: 7px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #eadde1;
+    border-radius: 13px;
+    background: #fff;
+}
+.admin-schedule-config-time strong {
+    color: #50373f;
+    font-size: 1rem;
+}
+.admin-schedule-config-time button.is-secondary {
+    background: #eee4e7;
+    color: #6d4853;
+}
+.admin-schedule-config-time button.is-danger {
+    background: #fff0f1;
+    color: #a23f4d;
+}
+.admin-schedule-config-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #9a5d70;
+    font-size: .76rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.admin-schedule-config-divider::before,
+.admin-schedule-config-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #ead9de;
+}
+@media (max-width: 700px) {
+    .admin-schedule-config-add {
+        grid-template-columns: 1fr;
+    }
+    .admin-schedule-config-times__heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .admin-schedule-config-time-list {
+        grid-template-columns: 1fr;
+    }
+    .admin-schedule-config-time {
+        grid-template-columns: 1fr 1fr;
+    }
+    .admin-schedule-config-time strong,
+    .admin-schedule-config-time input {
+        grid-column: 1 / -1;
+    }
+}
 .admin-service-form-card,
 .admin-service-list-section {
     border: 1px solid rgba(154, 97, 115, .16);
@@ -7096,6 +7379,17 @@ function AdminPanel() {
         };
     }, [nailRecordFilePreviews]);
 
+    const [adminTimeOverrides, setAdminTimeOverrides] = useState<ScheduleTimeOverride[]>([]);
+
+    const [scheduleConfigDate, setScheduleConfigDate] = useState(formatDateForInput(new Date()));
+    const [scheduleConfigWeekReferenceDate, setScheduleConfigWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [scheduleConfigNewTime, setScheduleConfigNewTime] = useState("");
+    const [scheduleConfigEditingTime, setScheduleConfigEditingTime] = useState<string | null>(null);
+    const [scheduleConfigEditedTime, setScheduleConfigEditedTime] = useState("");
+    const [scheduleConfigError, setScheduleConfigError] = useState("");
+    const [scheduleConfigSuccess, setScheduleConfigSuccess] = useState("");
+    const [isSavingScheduleConfig, setIsSavingScheduleConfig] = useState(false);
+
     const [blockDate, setBlockDate] = useState(formatDateForInput(new Date()));
     const [blockWeekReferenceDate, setBlockWeekReferenceDate] = useState(formatDateForInput(new Date()));
     const [selectedBlockTimes, setSelectedBlockTimes] = useState<string[]>([]);
@@ -7223,6 +7517,7 @@ function AdminPanel() {
                 {data: blockData, error: blockLoadError},
                 {data: serviceData, error: serviceLoadError},
                 {data: clientProfileData, error: clientProfileLoadError},
+                {data: timeOverrideData, error: timeOverrideLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
                     .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at")
@@ -7239,7 +7534,15 @@ function AdminPanel() {
                 supabase.from("client_profiles")
                     .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
                     .order("full_name", {ascending: true}),
+                supabase.from("schedule_time_overrides")
+                    .select("id, override_date, start_time, is_available, created_at, updated_at")
+                    .order("override_date", {ascending: true})
+                    .order("start_time", {ascending: true}),
             ]);
+
+            if (timeOverrideLoadError) {
+                console.warn("Exceções de horário ainda não disponíveis no ADM:", timeOverrideLoadError);
+            }
 
             if (appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError) {
                 console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError);
@@ -7252,6 +7555,12 @@ function AdminPanel() {
             setAdminBlocks((blockData ?? []) as AdminScheduleBlock[]);
             setAdminServices((serviceData ?? []) as AdminServiceSetting[]);
             setAdminClientProfiles((clientProfileData ?? []) as ClientProfile[]);
+            setAdminTimeOverrides(
+                ((timeOverrideData ?? []) as ScheduleTimeOverride[]).map((item) => ({
+                    ...item,
+                    start_time: String(item.start_time).slice(0, 5),
+                })),
+            );
             if (serviceData?.length) setManualServiceName(serviceData[0].name);
             setIsLoading(false);
         }
@@ -7272,10 +7581,19 @@ function AdminPanel() {
             )
             .subscribe();
 
+        const timeOverridesChannel = supabase.channel("admin-schedule-time-overrides-updates")
+            .on(
+                "postgres_changes",
+                {event: "*", schema: "public", table: "schedule_time_overrides"},
+                () => void loadAdminData(),
+            )
+            .subscribe();
+
         return () => {
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
             void supabase.removeChannel(clientProfilesChannel);
+            void supabase.removeChannel(timeOverridesChannel);
         };
     }, [isAuthenticated]);
 
@@ -8941,6 +9259,255 @@ function AdminPanel() {
             );
     }, [appointments, notificationClock, openedWhatsAppNotifications]);
 
+
+    const scheduleConfigVisibleWeekDates = useMemo(
+        () => getManualWeekDates(scheduleConfigWeekReferenceDate),
+        [scheduleConfigWeekReferenceDate],
+    );
+
+    const scheduleConfigTimes = useMemo(
+        () =>
+            getConfiguredClientStartMinutes(
+                scheduleConfigDate,
+                adminTimeOverrides,
+            ).map(minutesToTime),
+        [scheduleConfigDate, adminTimeOverrides],
+    );
+
+    function selectScheduleConfigDate(date: string) {
+        const today = formatDateForInput(new Date());
+        if (date < today) return;
+
+        setScheduleConfigDate(date);
+        setScheduleConfigWeekReferenceDate(date);
+        setScheduleConfigEditingTime(null);
+        setScheduleConfigEditedTime("");
+        setScheduleConfigNewTime("");
+        setScheduleConfigError("");
+        setScheduleConfigSuccess("");
+    }
+
+    function moveScheduleConfigWeek(amount: number) {
+        const currentWeek = getManualWeekDates(scheduleConfigWeekReferenceDate);
+        const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
+        const nextWeek = getManualWeekDates(nextReference);
+        const today = formatDateForInput(new Date());
+        const firstSelectable = nextWeek.find((date) => date >= today);
+
+        setScheduleConfigWeekReferenceDate(nextReference);
+        setScheduleConfigEditingTime(null);
+        setScheduleConfigEditedTime("");
+        setScheduleConfigError("");
+        setScheduleConfigSuccess("");
+
+        if (firstSelectable) {
+            setScheduleConfigDate(firstSelectable);
+        }
+    }
+
+    function normalizeScheduleConfigTime(value: string) {
+        const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+
+        const hours = Number(match[1]);
+        const minutes = Number(match[2]);
+
+        if (
+            !Number.isInteger(hours) ||
+            !Number.isInteger(minutes) ||
+            hours < 0 ||
+            hours > 23 ||
+            minutes < 0 ||
+            minutes > 59
+        ) {
+            return null;
+        }
+
+        return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+
+    function mergeSavedTimeOverrides(rows: ScheduleTimeOverride[]) {
+        setAdminTimeOverrides((current) => {
+            const savedKeys = new Set(
+                rows.map(
+                    (item) =>
+                        `${item.override_date}|${String(item.start_time).slice(0, 5)}`,
+                ),
+            );
+
+            return [
+                ...current.filter(
+                    (item) =>
+                        !savedKeys.has(
+                            `${item.override_date}|${String(item.start_time).slice(0, 5)}`,
+                        ),
+                ),
+                ...rows.map((item) => ({
+                    ...item,
+                    start_time: String(item.start_time).slice(0, 5),
+                })),
+            ];
+        });
+    }
+
+    async function saveScheduleTimeOverride(
+        time: string,
+        isAvailable: boolean,
+    ) {
+        const normalizedTime = normalizeScheduleConfigTime(time);
+
+        if (!normalizedTime) {
+            throw new Error("Informe um horário válido.");
+        }
+
+        const {data, error} = await supabase
+            .from("schedule_time_overrides")
+            .upsert(
+                {
+                    override_date: scheduleConfigDate,
+                    start_time: normalizedTime,
+                    is_available: isAvailable,
+                    updated_at: new Date().toISOString(),
+                },
+                {onConflict: "override_date,start_time"},
+            )
+            .select("id, override_date, start_time, is_available, created_at, updated_at");
+
+        if (error) throw error;
+
+        mergeSavedTimeOverrides((data ?? []) as ScheduleTimeOverride[]);
+    }
+
+    async function addScheduleConfigTime() {
+        setScheduleConfigError("");
+        setScheduleConfigSuccess("");
+
+        const normalizedTime = normalizeScheduleConfigTime(scheduleConfigNewTime);
+
+        if (!normalizedTime) {
+            setScheduleConfigError("Informe um horário válido.");
+            return;
+        }
+
+        if (scheduleConfigTimes.includes(normalizedTime)) {
+            setScheduleConfigError("Esse horário já está disponível nessa data.");
+            return;
+        }
+
+        setIsSavingScheduleConfig(true);
+
+        try {
+            await saveScheduleTimeOverride(normalizedTime, true);
+            setScheduleConfigNewTime("");
+            setScheduleConfigSuccess(
+                `Horário ${normalizedTime} adicionado somente em ${new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR")}.`,
+            );
+        } catch (error) {
+            console.error("Erro ao adicionar exceção de horário:", error);
+            setScheduleConfigError("Não foi possível adicionar esse horário.");
+        } finally {
+            setIsSavingScheduleConfig(false);
+        }
+    }
+
+    async function removeScheduleConfigTime(time: string) {
+        const confirmed = window.confirm(
+            `Remover ${time} somente de ${new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR")}?`,
+        );
+
+        if (!confirmed) return;
+
+        setScheduleConfigError("");
+        setScheduleConfigSuccess("");
+        setIsSavingScheduleConfig(true);
+
+        try {
+            await saveScheduleTimeOverride(time, false);
+            setScheduleConfigEditingTime(null);
+            setScheduleConfigEditedTime("");
+            setScheduleConfigSuccess(
+                `Horário ${time} removido somente dessa data.`,
+            );
+        } catch (error) {
+            console.error("Erro ao remover exceção de horário:", error);
+            setScheduleConfigError("Não foi possível remover esse horário.");
+        } finally {
+            setIsSavingScheduleConfig(false);
+        }
+    }
+
+    function beginEditScheduleConfigTime(time: string) {
+        setScheduleConfigEditingTime(time);
+        setScheduleConfigEditedTime(time);
+        setScheduleConfigError("");
+        setScheduleConfigSuccess("");
+    }
+
+    async function saveEditedScheduleConfigTime() {
+        if (!scheduleConfigEditingTime) return;
+
+        const normalizedNewTime = normalizeScheduleConfigTime(
+            scheduleConfigEditedTime,
+        );
+
+        if (!normalizedNewTime) {
+            setScheduleConfigError("Informe um novo horário válido.");
+            return;
+        }
+
+        if (normalizedNewTime === scheduleConfigEditingTime) {
+            setScheduleConfigEditingTime(null);
+            setScheduleConfigEditedTime("");
+            return;
+        }
+
+        if (scheduleConfigTimes.includes(normalizedNewTime)) {
+            setScheduleConfigError("O novo horário já existe nessa data.");
+            return;
+        }
+
+        setScheduleConfigError("");
+        setScheduleConfigSuccess("");
+        setIsSavingScheduleConfig(true);
+
+        try {
+            const {data, error} = await supabase
+                .from("schedule_time_overrides")
+                .upsert(
+                    [
+                        {
+                            override_date: scheduleConfigDate,
+                            start_time: scheduleConfigEditingTime,
+                            is_available: false,
+                            updated_at: new Date().toISOString(),
+                        },
+                        {
+                            override_date: scheduleConfigDate,
+                            start_time: normalizedNewTime,
+                            is_available: true,
+                            updated_at: new Date().toISOString(),
+                        },
+                    ],
+                    {onConflict: "override_date,start_time"},
+                )
+                .select("id, override_date, start_time, is_available, created_at, updated_at");
+
+            if (error) throw error;
+
+            mergeSavedTimeOverrides((data ?? []) as ScheduleTimeOverride[]);
+            setScheduleConfigEditingTime(null);
+            setScheduleConfigEditedTime("");
+            setScheduleConfigSuccess(
+                `Horário alterado de ${scheduleConfigEditingTime} para ${normalizedNewTime} somente nessa data.`,
+            );
+        } catch (error) {
+            console.error("Erro ao alterar exceção de horário:", error);
+            setScheduleConfigError("Não foi possível alterar esse horário.");
+        } finally {
+            setIsSavingScheduleConfig(false);
+        }
+    }
+
     const blockVisibleWeekDates = useMemo(
         () => getManualWeekDates(blockWeekReferenceDate),
         [blockWeekReferenceDate],
@@ -9326,7 +9893,7 @@ function AdminPanel() {
                     <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configurações</strong><span>Horários por data e serviços do site.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -9908,8 +10475,8 @@ function AdminPanel() {
                         <div className="admin-settings__intro">
                             <div>
                                 <span className="admin-settings__eyebrow">Configurações do site</span>
-                                <h2>Configuração de serviços</h2>
-                                <p>Cadastre, edite ou exclua os serviços. A lista é organizada do maior para o menor valor.</p>
+                                <h2>Configurações</h2>
+                                <p>Ajuste horários de datas específicas e gerencie os serviços do site.</p>
                             </div>
                         </div>
 
@@ -9924,6 +10491,206 @@ function AdminPanel() {
                                 {settingsSuccess}
                             </p>
                         )}
+
+
+                        <section className="admin-service-form-card admin-schedule-config-card">
+                            <div className="admin-service-form-card__heading">
+                                <div>
+                                    <span>CONFIGURAÇÃO DE HORÁRIOS</span>
+                                    <h3>Horários de uma data específica</h3>
+                                    <p>
+                                        Escolha o dia e altere somente aquela data. Nenhuma mudança é repetida
+                                        automaticamente nas outras semanas.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="admin-schedule-config-week">
+                                <div className="admin-schedule-config-week__top">
+                                    <strong>
+                                        {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
+                                            month: "long",
+                                            year: "numeric",
+                                        })}
+                                    </strong>
+
+                                    <div>
+                                        <button
+                                            type="button"
+                                            aria-label="Semana anterior"
+                                            onClick={() => moveScheduleConfigWeek(-1)}
+                                        >
+                                            ‹
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label="Próxima semana"
+                                            onClick={() => moveScheduleConfigWeek(1)}
+                                        >
+                                            ›
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-manual-week-days">
+                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--four">
+                                        {scheduleConfigVisibleWeekDates.slice(0, 4).map((date) => {
+                                            const parsed = new Date(`${date}T12:00:00`);
+                                            const isPast = date < formatDateForInput(new Date());
+
+                                            return (
+                                                <button
+                                                    key={date}
+                                                    type="button"
+                                                    disabled={isPast}
+                                                    className={`admin-manual-week-day${date === scheduleConfigDate ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                    onClick={() => selectScheduleConfigDate(date)}
+                                                >
+                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                    <strong>{parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}</strong>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--three">
+                                        {scheduleConfigVisibleWeekDates.slice(4).map((date) => {
+                                            const parsed = new Date(`${date}T12:00:00`);
+                                            const isPast = date < formatDateForInput(new Date());
+
+                                            return (
+                                                <button
+                                                    key={date}
+                                                    type="button"
+                                                    disabled={isPast}
+                                                    className={`admin-manual-week-day${date === scheduleConfigDate ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                    onClick={() => selectScheduleConfigDate(date)}
+                                                >
+                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                    <strong>{parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}</strong>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="admin-schedule-config-selected-date">
+                                <span>DATA SELECIONADA</span>
+                                <strong>
+                                    {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
+                                        weekday: "long",
+                                        day: "2-digit",
+                                        month: "long",
+                                        year: "numeric",
+                                    })}
+                                </strong>
+                            </div>
+
+                            <div className="admin-schedule-config-add">
+                                <label>
+                                    <span>ADICIONAR NOVO HORÁRIO NESSA DATA</span>
+                                    <input
+                                        type="time"
+                                        value={scheduleConfigNewTime}
+                                        onChange={(event) => setScheduleConfigNewTime(event.target.value)}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    disabled={isSavingScheduleConfig || !scheduleConfigNewTime}
+                                    onClick={() => void addScheduleConfigTime()}
+                                >
+                                    Adicionar horário
+                                </button>
+                            </div>
+
+                            {scheduleConfigError && (
+                                <p className="admin-settings__message admin-settings__message--error">
+                                    {scheduleConfigError}
+                                </p>
+                            )}
+
+                            {scheduleConfigSuccess && (
+                                <p className="admin-settings__message admin-settings__message--success">
+                                    {scheduleConfigSuccess}
+                                </p>
+                            )}
+
+                            <div className="admin-schedule-config-times">
+                                <div className="admin-schedule-config-times__heading">
+                                    <div>
+                                        <span>HORÁRIOS MOSTRADOS ÀS CLIENTES</span>
+                                        <strong>{scheduleConfigTimes.length} horário(s)</strong>
+                                    </div>
+                                    <small>Esses horários valem somente para a data selecionada.</small>
+                                </div>
+
+                                {scheduleConfigTimes.length ? (
+                                    <div className="admin-schedule-config-time-list">
+                                        {scheduleConfigTimes.map((time) => (
+                                            <div className="admin-schedule-config-time" key={time}>
+                                                {scheduleConfigEditingTime === time ? (
+                                                    <>
+                                                        <input
+                                                            type="time"
+                                                            value={scheduleConfigEditedTime}
+                                                            onChange={(event) => setScheduleConfigEditedTime(event.target.value)}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            disabled={isSavingScheduleConfig}
+                                                            onClick={() => void saveEditedScheduleConfigTime()}
+                                                        >
+                                                            Salvar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="is-secondary"
+                                                            disabled={isSavingScheduleConfig}
+                                                            onClick={() => {
+                                                                setScheduleConfigEditingTime(null);
+                                                                setScheduleConfigEditedTime("");
+                                                                setScheduleConfigError("");
+                                                            }}
+                                                        >
+                                                            Cancelar
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <strong>{time}</strong>
+                                                        <button
+                                                            type="button"
+                                                            disabled={isSavingScheduleConfig}
+                                                            onClick={() => beginEditScheduleConfigTime(time)}
+                                                        >
+                                                            Alterar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="is-danger"
+                                                            disabled={isSavingScheduleConfig}
+                                                            onClick={() => void removeScheduleConfigTime(time)}
+                                                        >
+                                                            Excluir
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="admin-empty">
+                                        Nenhum horário público disponível nessa data.
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        <div className="admin-schedule-config-divider">
+                            <span>Serviços</span>
+                        </div>
 
                         <section
                             id="admin-service-form"
