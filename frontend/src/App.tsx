@@ -5759,6 +5759,11 @@ const adminEnhancementStyles = `
     display: grid;
     gap: 16px;
 }
+
+.admin-active-content-anchor {
+    height: 1px;
+    scroll-margin-top: 16px;
+}
 .admin-section-heading {
     display: flex;
     justify-content: space-between;
@@ -6337,26 +6342,33 @@ const adminEnhancementStyles = `
     text-transform: capitalize;
 }
 .admin-top-agenda .admin-booking-card {
-    border: 1px solid rgba(255,255,255,.14);
-    border-left: 0;
-    background: linear-gradient(135deg, #71364a, #a66075);
-    color: #fff;
-    box-shadow: 0 14px 34px rgba(83, 48, 58, 0.16);
+    border: 1px solid #e0c7cf;
+    border-left: 6px solid #8b485d;
+    background: #fffafb;
+    color: #35272c;
+    box-shadow: 0 9px 26px rgba(83, 48, 58, 0.07);
 }
 .admin-top-agenda .admin-booking-card:hover {
-    box-shadow: 0 18px 40px rgba(83, 48, 58, 0.22);
+    box-shadow: 0 13px 32px rgba(83, 48, 58, 0.10);
 }
-.admin-top-agenda .admin-booking-card h3,
-.admin-top-agenda .admin-booking-card__time,
-.admin-top-agenda .admin-booking-card__details strong { color: #fff; }
+.admin-top-agenda .admin-booking-card h3 {
+    color: #302126;
+}
+.admin-top-agenda .admin-booking-card__time {
+    color: #8b485d;
+}
+.admin-top-agenda .admin-booking-card__details strong {
+    color: #50373f;
+}
 .admin-top-agenda .admin-booking-card__details div {
-    background: rgba(255,255,255,.11);
+    background: #f8eef1;
 }
 .admin-top-agenda .admin-booking-card__details span {
-    color: rgba(255,255,255,.74);
+    color: #80666e;
 }
 .admin-top-agenda .admin-booking-card.is-cancelled {
-    background: linear-gradient(135deg, #777073, #9a8f93);
+    border-left-color: #aaa0a4;
+    background: #f7f4f5;
 }
 .admin-empty--top {
     border: 1px dashed #d9bec7;
@@ -10800,6 +10812,35 @@ function AdminPanel() {
         return "Confirmado";
     }
 
+    type AdminDashboardView =
+        | "agenda"
+        | "week"
+        | "month"
+        | "new"
+        | "clients"
+        | "finance"
+        | "schedule"
+        | "settings";
+
+    function openAdminDashboardView(view: AdminDashboardView) {
+        setAdminView(view);
+
+        if (view === "new") {
+            setShowManualForm(true);
+            setManualError("");
+            setManualSuccess("");
+        }
+
+        window.setTimeout(() => {
+            document
+                .getElementById("admin-active-content")
+                ?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
+        }, 40);
+    }
+
     const renderAppointmentCard = (appointment: AdminAppointment) => {
         const dueTypes = getDueNotificationTypes(appointment);
 
@@ -10889,26 +10930,21 @@ function AdminPanel() {
                 </header>
 
                 <div className="admin-dashboard-cards">
-                    <button className={`admin-dashboard-card${adminView === "agenda" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("agenda")}><strong>Agenda do dia</strong><span>Veja todos os atendimentos do dia.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "month" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("month")}><strong>Agenda mensal</strong><span>Veja os atendimentos organizados ao longo do mês.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "agenda" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("agenda")}><strong>Agenda do dia</strong><span>Veja todos os atendimentos do dia.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "month" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("month")}><strong>Agenda mensal</strong><span>Veja os atendimentos organizados ao longo do mês.</span></button>
                     <button
                         className={`admin-dashboard-card${adminView === "new" ? " is-active" : ""}`}
                         type="button"
-                        onClick={() => {
-                            setAdminView("new");
-                            setShowManualForm(true);
-                            setManualError("");
-                            setManualSuccess("");
-                        }}
+                        onClick={() => openAdminDashboardView("new")}
                     >
                         <strong>Novo agendamento</strong>
                         <span>Cadastre um novo atendimento para uma cliente.</span>
                     </button>
-                    <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "schedule" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("schedule")}><strong>Configuração de horários</strong><span>Adicione, altere ou remova horários de uma data específica.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "schedule" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("schedule")}><strong>Configuração de horários</strong><span>Adicione, altere ou remova horários de uma data específica.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -10943,6 +10979,12 @@ function AdminPanel() {
                         <p className="admin-message-center__empty">Nenhuma mensagem pendente neste momento.</p>
                     )}
                 </section>
+
+                <div
+                    id="admin-active-content"
+                    className="admin-active-content-anchor"
+                    aria-hidden="true"
+                />
 
                 {(adminView === "agenda" || adminView === "week") && (
                     <section className="admin-top-agenda">
