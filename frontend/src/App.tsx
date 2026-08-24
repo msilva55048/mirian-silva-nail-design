@@ -5681,6 +5681,52 @@ const adminEnhancementStyles = `
     height: 1px;
     scroll-margin-top: 16px;
 }
+
+.admin-back-to-top {
+    position: fixed;
+    right: 14px;
+    bottom: 18px;
+    z-index: 120;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(109, 52, 69, .20);
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c4356, #a95470);
+    color: #fff;
+    box-shadow: 0 8px 22px rgba(83, 48, 58, .22);
+    font: inherit;
+    font-size: 1.35rem;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        transform .16s ease,
+        opacity .16s ease,
+        box-shadow .16s ease;
+}
+
+.admin-back-to-top:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 11px 26px rgba(83, 48, 58, .28);
+}
+
+.admin-back-to-top:focus-visible {
+    outline: 3px solid rgba(154, 83, 104, .24);
+    outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+    .admin-back-to-top {
+        right: 12px;
+        bottom: 14px;
+        width: 42px;
+        height: 42px;
+        font-size: 1.25rem;
+    }
+}
 .admin-section-heading {
     display: flex;
     justify-content: space-between;
@@ -8037,6 +8083,7 @@ function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [adminNow, setAdminNow] = useState(() => new Date());
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [showAdminBackToTop, setShowAdminBackToTop] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loginError, setLoginError] = useState("");
@@ -8257,6 +8304,22 @@ function AdminPanel() {
     }, [openedWhatsAppNotifications]);
 
     useEffect(() => {
+        function updateBackToTopVisibility() {
+            setShowAdminBackToTop(window.scrollY > 320);
+        }
+
+        updateBackToTopVisibility();
+
+        window.addEventListener("scroll", updateBackToTopVisibility, {
+            passive: true,
+        });
+
+        return () => {
+            window.removeEventListener("scroll", updateBackToTopVisibility);
+        };
+    }, []);
+
+    useEffect(() => {
         function sessionIsMirianAdmin(session: {user?: {email?: string | null}} | null) {
             return session?.user?.email?.trim().toLowerCase() === MIRIAN_ADMIN_EMAIL;
         }
@@ -8407,6 +8470,13 @@ function AdminPanel() {
 
     async function handleLogout() {
         await supabase.auth.signOut();
+    }
+
+    function scrollAdminToTop() {
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
     }
 
     function appointmentConflicts(
@@ -12404,6 +12474,18 @@ function AdminPanel() {
                         </section>
                     </section>
                 ) : null}
+
+                {showAdminBackToTop && (
+                    <button
+                        className="admin-back-to-top"
+                        type="button"
+                        onClick={scrollAdminToTop}
+                        aria-label="Voltar ao topo do painel"
+                        title="Voltar ao topo"
+                    >
+                        ↑
+                    </button>
+                )}
 
                 {selectedAdminAppointment && (
                     <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedAdminAppointment(null);}}>
