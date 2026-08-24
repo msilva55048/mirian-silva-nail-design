@@ -656,6 +656,48 @@ const clientAccountStyles = `
     background: #edf8f1;
     color: #287044;
 }
+
+.client-forgot-password {
+    justify-self: end;
+    margin-top: -4px;
+    border: 0;
+    padding: 2px 0;
+    background: transparent;
+    color: #8b485d;
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 850;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.client-recovery-actions {
+    display: grid;
+    gap: 9px;
+}
+
+.client-recovery-secondary {
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    padding: 12px 15px;
+    background: #fff;
+    color: #6d3445;
+    font: inherit;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.client-recovery-secondary:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+
+.client-recovery-success-actions {
+    display: grid;
+    gap: 9px;
+    margin-top: 4px;
+}
 .client-account__profile {
     display: grid;
     grid-template-columns: repeat(3, minmax(0,1fr));
@@ -1173,6 +1215,20 @@ function PublicSite() {
     const [authError, setAuthError] = useState("");
     const [authSuccess, setAuthSuccess] = useState("");
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+
+    const [showPasswordRecoveryRequest, setShowPasswordRecoveryRequest] = useState(false);
+    const [recoveryEmail, setRecoveryEmail] = useState("");
+    const [recoveryRequestError, setRecoveryRequestError] = useState("");
+    const [recoveryRequestSuccess, setRecoveryRequestSuccess] = useState("");
+    const [isSendingRecoveryEmail, setIsSendingRecoveryEmail] = useState(false);
+
+    const [showPasswordRecoveryReset, setShowPasswordRecoveryReset] = useState(false);
+    const [recoveryNewPassword, setRecoveryNewPassword] = useState("");
+    const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState("");
+    const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+    const [recoveryResetError, setRecoveryResetError] = useState("");
+    const [recoveryResetSuccess, setRecoveryResetSuccess] = useState("");
+    const [isUpdatingRecoveryPassword, setIsUpdatingRecoveryPassword] = useState(false);
     const [editingClientAppointment, setEditingClientAppointment] = useState<PublicClientAppointment | null>(null);
     const [isCancellingClientAppointment, setIsCancellingClientAppointment] = useState(false);
     const [weekReferenceDate, setWeekReferenceDate] = useState(() => formatDateForInput(new Date()));
@@ -1280,7 +1336,19 @@ function PublicSite() {
 
         void initializeClientSession();
 
-        const {data: authListener} = supabase.auth.onAuthStateChange((_event, session) => {
+        const {data: authListener} = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "PASSWORD_RECOVERY") {
+                setShowClientAuth(false);
+                setShowClientAccount(false);
+                setShowPasswordRecoveryRequest(false);
+                setRecoveryNewPassword("");
+                setRecoveryConfirmPassword("");
+                setShowRecoveryPassword(false);
+                setRecoveryResetError("");
+                setRecoveryResetSuccess("");
+                setShowPasswordRecoveryReset(true);
+            }
+
             window.setTimeout(() => {
                 if (!mounted) return;
 
@@ -1314,6 +1382,138 @@ function PublicSite() {
         setShowAuthPassword(false);
         resetAuthMessages();
         setShowClientAuth(true);
+    }
+
+    function openPasswordRecoveryRequest() {
+        setRecoveryEmail(authEmail.trim().toLowerCase());
+        setRecoveryRequestError("");
+        setRecoveryRequestSuccess("");
+        setShowClientAuth(false);
+        setShowPasswordRecoveryRequest(true);
+    }
+
+    function closePasswordRecoveryRequest() {
+        if (isSendingRecoveryEmail) return;
+
+        setShowPasswordRecoveryRequest(false);
+        setRecoveryRequestError("");
+        setRecoveryRequestSuccess("");
+    }
+
+    async function submitPasswordRecoveryRequest(
+        event: React.FormEvent<HTMLFormElement>,
+    ) {
+        event.preventDefault();
+
+        const email = recoveryEmail.trim().toLowerCase();
+
+        setRecoveryRequestError("");
+        setRecoveryRequestSuccess("");
+
+        if (!email) {
+            setRecoveryRequestError("Informe o e-mail usado no cadastro.");
+            return;
+        }
+
+        setIsSendingRecoveryEmail(true);
+
+        try {
+            const redirectTo = `${window.location.origin}/?password-recovery=1`;
+
+            const {error} = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo,
+            });
+
+            if (error) {
+                console.error("Erro ao solicitar recuperação de senha:", error);
+                throw error;
+            }
+
+            setRecoveryRequestSuccess(
+                "Se existir uma conta com esse e-mail, você receberá um link para criar uma nova senha. Confira também a pasta de spam.",
+            );
+        } catch (error) {
+            console.error("Erro na recuperação de senha:", error);
+            setRecoveryRequestError(
+                "Não foi possível enviar o e-mail de recuperação agora. Tente novamente em alguns minutos.",
+            );
+        } finally {
+            setIsSendingRecoveryEmail(false);
+        }
+    }
+
+    function closePasswordRecoveryReset() {
+        if (isUpdatingRecoveryPassword) return;
+
+        setShowPasswordRecoveryReset(false);
+        setRecoveryNewPassword("");
+        setRecoveryConfirmPassword("");
+        setShowRecoveryPassword(false);
+        setRecoveryResetError("");
+        setRecoveryResetSuccess("");
+
+        const cleanUrl = `${window.location.pathname}${window.location.search
+            .replace(/[?&]password-recovery=1(&|$)/, "$1")
+            .replace(/[?&]$/, "")}`;
+
+        window.history.replaceState(
+            {},
+            document.title,
+            cleanUrl || "/",
+        );
+    }
+
+    async function submitPasswordRecoveryReset(
+        event: React.FormEvent<HTMLFormElement>,
+    ) {
+        event.preventDefault();
+
+        setRecoveryResetError("");
+        setRecoveryResetSuccess("");
+
+        if (recoveryNewPassword.length < 6) {
+            setRecoveryResetError(
+                "A nova senha precisa ter pelo menos 6 caracteres.",
+            );
+            return;
+        }
+
+        if (recoveryNewPassword !== recoveryConfirmPassword) {
+            setRecoveryResetError("As duas senhas precisam ser iguais.");
+            return;
+        }
+
+        setIsUpdatingRecoveryPassword(true);
+
+        try {
+            const {error} = await supabase.auth.updateUser({
+                password: recoveryNewPassword,
+            });
+
+            if (error) {
+                console.error("Erro ao atualizar senha:", error);
+                throw error;
+            }
+
+            setRecoveryNewPassword("");
+            setRecoveryConfirmPassword("");
+            setRecoveryResetSuccess(
+                "Senha alterada com sucesso. Sua conta já está pronta para usar.",
+            );
+
+            window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname || "/",
+            );
+        } catch (error) {
+            console.error("Erro ao salvar nova senha:", error);
+            setRecoveryResetError(
+                "Não foi possível alterar a senha. O link pode ter expirado. Solicite um novo link de recuperação.",
+            );
+        } finally {
+            setIsUpdatingRecoveryPassword(false);
+        }
     }
 
     async function submitClientAuth(event: React.FormEvent<HTMLFormElement>) {
@@ -2992,6 +3192,16 @@ function PublicSite() {
                                 </div>
                             </label>
 
+                            {clientAuthMode === "login" && (
+                                <button
+                                    className="client-forgot-password"
+                                    type="button"
+                                    onClick={openPasswordRecoveryRequest}
+                                >
+                                    Esqueci minha senha
+                                </button>
+                            )}
+
                             {authError && <p className="client-auth-message is-error">{authError}</p>}
                             {authSuccess && <p className="client-auth-message is-success">{authSuccess}</p>}
 
@@ -3006,6 +3216,204 @@ function PublicSite() {
                     </section>
                 </div>
             )}
+
+            {showPasswordRecoveryRequest && (
+                <div
+                    className="client-modal-backdrop"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) {
+                            closePasswordRecoveryRequest();
+                        }
+                    }}
+                >
+                    <section className="client-modal">
+                        <button
+                            className="client-modal__close"
+                            type="button"
+                            onClick={closePasswordRecoveryRequest}
+                            disabled={isSendingRecoveryEmail}
+                        >
+                            ×
+                        </button>
+
+                        <span className="client-modal__eyebrow">
+                            Recuperar senha
+                        </span>
+                        <h2>Esqueceu sua senha?</h2>
+                        <p>
+                            Informe o mesmo e-mail usado no cadastro. Enviaremos
+                            um link para você criar uma nova senha.
+                        </p>
+
+                        <form
+                            className="client-auth-form"
+                            onSubmit={submitPasswordRecoveryRequest}
+                        >
+                            <label>
+                                E-mail
+                                <input
+                                    type="email"
+                                    value={recoveryEmail}
+                                    onChange={(event) =>
+                                        setRecoveryEmail(event.target.value)
+                                    }
+                                    autoComplete="email"
+                                    required
+                                    autoFocus
+                                />
+                            </label>
+
+                            {recoveryRequestError && (
+                                <p className="client-auth-message is-error">
+                                    {recoveryRequestError}
+                                </p>
+                            )}
+
+                            {recoveryRequestSuccess && (
+                                <p className="client-auth-message is-success">
+                                    {recoveryRequestSuccess}
+                                </p>
+                            )}
+
+                            <div className="client-recovery-actions">
+                                <button
+                                    className="client-auth-submit"
+                                    type="submit"
+                                    disabled={isSendingRecoveryEmail}
+                                >
+                                    {isSendingRecoveryEmail
+                                        ? "Enviando..."
+                                        : "Enviar link de recuperação"}
+                                </button>
+
+                                <button
+                                    className="client-recovery-secondary"
+                                    type="button"
+                                    disabled={isSendingRecoveryEmail}
+                                    onClick={() => {
+                                        closePasswordRecoveryRequest();
+                                        openClientAuth("login");
+                                    }}
+                                >
+                                    Voltar para o login
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+            )}
+
+            {showPasswordRecoveryReset && (
+                <div className="client-modal-backdrop">
+                    <section className="client-modal">
+                        <span className="client-modal__eyebrow">
+                            Nova senha
+                        </span>
+                        <h2>Crie sua nova senha</h2>
+                        <p>
+                            Escolha uma nova senha com pelo menos 6 caracteres.
+                        </p>
+
+                        <form
+                            className="client-auth-form"
+                            onSubmit={submitPasswordRecoveryReset}
+                        >
+                            <label>
+                                Nova senha
+                                <div className="client-password-field">
+                                    <input
+                                        type={
+                                            showRecoveryPassword
+                                                ? "text"
+                                                : "password"
+                                        }
+                                        value={recoveryNewPassword}
+                                        onChange={(event) =>
+                                            setRecoveryNewPassword(
+                                                event.target.value,
+                                            )
+                                        }
+                                        autoComplete="new-password"
+                                        minLength={6}
+                                        required
+                                    />
+                                    <button
+                                        className="client-password-toggle"
+                                        type="button"
+                                        onClick={() =>
+                                            setShowRecoveryPassword(
+                                                (current) => !current,
+                                            )
+                                        }
+                                    >
+                                        {showRecoveryPassword
+                                            ? "Ocultar"
+                                            : "Mostrar"}
+                                    </button>
+                                </div>
+                            </label>
+
+                            <label>
+                                Confirmar nova senha
+                                <input
+                                    type={
+                                        showRecoveryPassword
+                                            ? "text"
+                                            : "password"
+                                    }
+                                    value={recoveryConfirmPassword}
+                                    onChange={(event) =>
+                                        setRecoveryConfirmPassword(
+                                            event.target.value,
+                                        )
+                                    }
+                                    autoComplete="new-password"
+                                    minLength={6}
+                                    required
+                                />
+                            </label>
+
+                            {recoveryResetError && (
+                                <p className="client-auth-message is-error">
+                                    {recoveryResetError}
+                                </p>
+                            )}
+
+                            {recoveryResetSuccess && (
+                                <p className="client-auth-message is-success">
+                                    {recoveryResetSuccess}
+                                </p>
+                            )}
+
+                            {!recoveryResetSuccess ? (
+                                <button
+                                    className="client-auth-submit"
+                                    type="submit"
+                                    disabled={isUpdatingRecoveryPassword}
+                                >
+                                    {isUpdatingRecoveryPassword
+                                        ? "Salvando..."
+                                        : "Salvar nova senha"}
+                                </button>
+                            ) : (
+                                <div className="client-recovery-success-actions">
+                                    <button
+                                        className="client-auth-submit"
+                                        type="button"
+                                        onClick={() => {
+                                            closePasswordRecoveryReset();
+                                            setShowClientAccount(true);
+                                        }}
+                                    >
+                                        Ir para minha conta
+                                    </button>
+                                </div>
+                            )}
+                        </form>
+                    </section>
+                </div>
+            )}
+
             {showClientAccount && clientUserId && (
                 <div className="client-modal-backdrop" onMouseDown={(event) => {
                     if (event.target === event.currentTarget) setShowClientAccount(false);
