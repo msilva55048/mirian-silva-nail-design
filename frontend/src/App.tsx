@@ -125,6 +125,7 @@ const CLIENT_WEEKDAY_START_MINUTES = [
     13 * 60,  // 13:00
     17 * 60,  // 17:00
     19 * 60,  // 19:00
+    21 * 60,  // 21:00
 ] as const;
 
 const CLIENT_WEEKEND_START_MINUTES = [
@@ -153,6 +154,10 @@ const ADMIN_WEEKDAY_START_MINUTES = [
     18 * 60,       // 18:00
     18 * 60 + 30,  // 18:30
     19 * 60,       // 19:00
+    19 * 60 + 30,  // 19:30
+    20 * 60,       // 20:00
+    20 * 60 + 30,  // 20:30
+    21 * 60,       // 21:00
 ] as const;
 
 const ADMIN_WEEKEND_START_MINUTES = [
@@ -6612,6 +6617,108 @@ const adminServiceManagerStyles = `
     display: grid;
     gap: 20px;
 }
+.admin-schedule-config-panel {
+    gap: 16px;
+}
+.admin-schedule-config-manual-section {
+    align-items: flex-start;
+}
+.admin-schedule-config-add-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 220px) auto;
+    gap: 12px;
+    align-items: end;
+    margin-top: 8px;
+}
+.admin-schedule-config-add-inline label,
+.admin-schedule-config-editor__actions label {
+    display: grid;
+    gap: 7px;
+}
+.admin-schedule-config-add-inline label > span,
+.admin-schedule-config-current-date span,
+.admin-schedule-config-editor__header span,
+.admin-schedule-config-editor__actions label > span {
+    color: #9a5d70;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .06em;
+}
+.admin-schedule-config-add-inline input,
+.admin-schedule-config-editor__actions input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 14px;
+    padding: 13px 14px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+.admin-schedule-config-add-inline button,
+.admin-schedule-config-editor__actions button {
+    border: 0;
+    border-radius: 14px;
+    padding: 13px 16px;
+    background: linear-gradient(135deg, #7c4356, #b2607d);
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+.admin-schedule-config-add-inline button:disabled,
+.admin-schedule-config-editor__actions button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+.admin-schedule-config-current-date {
+    display: grid;
+    gap: 4px;
+    margin-top: 16px;
+}
+.admin-schedule-config-current-date strong {
+    color: #4f353e;
+}
+.admin-schedule-config-times-grid {
+    margin-top: 14px;
+}
+.admin-schedule-config-editor {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid #eadde1;
+    border-radius: 20px;
+    background: #fffafb;
+}
+.admin-schedule-config-editor__header {
+    display: grid;
+    gap: 4px;
+}
+.admin-schedule-config-editor__header strong {
+    color: #4f353e;
+    font-size: 1.1rem;
+}
+.admin-schedule-config-editor__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 220px) repeat(3, auto);
+    gap: 10px;
+    align-items: end;
+}
+.admin-schedule-config-editor__actions .is-danger {
+    background: #fff0f1;
+    color: #a23f4d;
+}
+.admin-schedule-config-editor__actions .is-secondary {
+    background: #eee4e7;
+    color: #6d4853;
+}
+@media (max-width: 760px) {
+    .admin-schedule-config-add-inline,
+    .admin-schedule-config-editor__actions {
+        grid-template-columns: 1fr;
+    }
+}
 .admin-schedule-config-card .admin-service-form-card__heading p {
     max-width: 720px;
     margin: 6px 0 0;
@@ -7291,7 +7398,7 @@ function AdminPanel() {
         }
     });
 
-    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "settings">("agenda");
+    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "schedule" | "settings">("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
     const [agendaWeekReferenceDate, setAgendaWeekReferenceDate] = useState(
         formatDateForInput(new Date()),
@@ -9893,7 +10000,8 @@ function AdminPanel() {
                     <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
-                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configurações</strong><span>Horários por data e serviços do site.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "schedule" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("schedule")}><strong>Configuração de horários</strong><span>Adicione, altere ou remova horários de uma data específica.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -10470,28 +10578,15 @@ function AdminPanel() {
                             Ao chegar o horário, o agendamento é considerado realizado automaticamente. Cancelados e não comparecimentos não entram nos valores financeiros.
                         </p>
                     </section>
-                ) : adminView === "settings" ? (
+                ) : adminView === "schedule" ? (
                     <section className="admin-settings admin-service-manager">
                         <div className="admin-settings__intro">
                             <div>
                                 <span className="admin-settings__eyebrow">Configurações do site</span>
-                                <h2>Configurações</h2>
-                                <p>Ajuste horários de datas específicas e gerencie os serviços do site.</p>
+                                <h2>Configuração de horários</h2>
+                                <p>Adicione, altere ou exclua horários somente na data escolhida.</p>
                             </div>
                         </div>
-
-                        {settingsError && (
-                            <p className="admin-settings__message admin-settings__message--error">
-                                {settingsError}
-                            </p>
-                        )}
-
-                        {settingsSuccess && (
-                            <p className="admin-settings__message admin-settings__message--success">
-                                {settingsSuccess}
-                            </p>
-                        )}
-
 
                         <section className="admin-service-form-card admin-schedule-config-card">
                             <div className="admin-service-form-card__heading">
@@ -10499,22 +10594,23 @@ function AdminPanel() {
                                     <span>CONFIGURAÇÃO DE HORÁRIOS</span>
                                     <h3>Horários de uma data específica</h3>
                                     <p>
-                                        Escolha o dia e altere somente aquela data. Nenhuma mudança é repetida
-                                        automaticamente nas outras semanas.
+                                        Selecione o dia abaixo. Depois adicione um novo horário ou toque em um horário disponível para alterar ou excluir somente nessa data.
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="admin-schedule-config-week">
-                                <div className="admin-schedule-config-week__top">
-                                    <strong>
-                                        {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
-                                            month: "long",
-                                            year: "numeric",
-                                        })}
-                                    </strong>
+                            <div className="admin-manual-week-picker admin-schedule-config-panel">
+                                <div className="admin-manual-week-picker__top">
+                                    <div className="admin-manual-week-picker__month">
+                                        <strong>
+                                            {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
+                                                month: "long",
+                                                year: "numeric",
+                                            })}
+                                        </strong>
+                                    </div>
 
-                                    <div>
+                                    <div className="admin-manual-week-picker__navs">
                                         <button
                                             type="button"
                                             aria-label="Semana anterior"
@@ -10575,122 +10671,152 @@ function AdminPanel() {
                                 </div>
                             </div>
 
-                            <div className="admin-schedule-config-selected-date">
-                                <span>DATA SELECIONADA</span>
-                                <strong>
-                                    {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
-                                        weekday: "long",
-                                        day: "2-digit",
-                                        month: "long",
-                                        year: "numeric",
-                                    })}
-                                </strong>
-                            </div>
+                            <section className="admin-manual-booking__section admin-schedule-config-manual-section">
+                                <span className="admin-manual-booking__step">4</span>
 
-                            <div className="admin-schedule-config-add">
-                                <label>
-                                    <span>ADICIONAR NOVO HORÁRIO NESSA DATA</span>
-                                    <input
-                                        type="time"
-                                        value={scheduleConfigNewTime}
-                                        onChange={(event) => setScheduleConfigNewTime(event.target.value)}
-                                    />
-                                </label>
-                                <button
-                                    type="button"
-                                    disabled={isSavingScheduleConfig || !scheduleConfigNewTime}
-                                    onClick={() => void addScheduleConfigTime()}
-                                >
-                                    Adicionar horário
-                                </button>
-                            </div>
+                                <div className="admin-manual-booking__content">
+                                    <h3>Horário disponível</h3>
+                                    <p>
+                                        Adicione um novo horário abaixo. Depois ele entra automaticamente na lista de horários disponíveis dessa data.
+                                    </p>
 
-                            {scheduleConfigError && (
-                                <p className="admin-settings__message admin-settings__message--error">
-                                    {scheduleConfigError}
-                                </p>
-                            )}
+                                    <div className="admin-schedule-config-add-inline">
+                                        <label>
+                                            <span>ADD NOVO HORÁRIO</span>
+                                            <input
+                                                type="time"
+                                                value={scheduleConfigNewTime}
+                                                onChange={(event) => setScheduleConfigNewTime(event.target.value)}
+                                            />
+                                        </label>
 
-                            {scheduleConfigSuccess && (
-                                <p className="admin-settings__message admin-settings__message--success">
-                                    {scheduleConfigSuccess}
-                                </p>
-                            )}
-
-                            <div className="admin-schedule-config-times">
-                                <div className="admin-schedule-config-times__heading">
-                                    <div>
-                                        <span>HORÁRIOS MOSTRADOS ÀS CLIENTES</span>
-                                        <strong>{scheduleConfigTimes.length} horário(s)</strong>
+                                        <button
+                                            type="button"
+                                            disabled={isSavingScheduleConfig || !scheduleConfigNewTime}
+                                            onClick={() => void addScheduleConfigTime()}
+                                        >
+                                            {isSavingScheduleConfig ? "Salvando..." : "Salvar horário"}
+                                        </button>
                                     </div>
-                                    <small>Esses horários valem somente para a data selecionada.</small>
-                                </div>
 
-                                {scheduleConfigTimes.length ? (
-                                    <div className="admin-schedule-config-time-list">
-                                        {scheduleConfigTimes.map((time) => (
-                                            <div className="admin-schedule-config-time" key={time}>
-                                                {scheduleConfigEditingTime === time ? (
-                                                    <>
-                                                        <input
-                                                            type="time"
-                                                            value={scheduleConfigEditedTime}
-                                                            onChange={(event) => setScheduleConfigEditedTime(event.target.value)}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            disabled={isSavingScheduleConfig}
-                                                            onClick={() => void saveEditedScheduleConfigTime()}
-                                                        >
-                                                            Salvar
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="is-secondary"
-                                                            disabled={isSavingScheduleConfig}
-                                                            onClick={() => {
-                                                                setScheduleConfigEditingTime(null);
-                                                                setScheduleConfigEditedTime("");
-                                                                setScheduleConfigError("");
-                                                            }}
-                                                        >
-                                                            Cancelar
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <strong>{time}</strong>
-                                                        <button
-                                                            type="button"
-                                                            disabled={isSavingScheduleConfig}
-                                                            onClick={() => beginEditScheduleConfigTime(time)}
-                                                        >
-                                                            Alterar
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="is-danger"
-                                                            disabled={isSavingScheduleConfig}
-                                                            onClick={() => void removeScheduleConfigTime(time)}
-                                                        >
-                                                            Excluir
-                                                        </button>
-                                                    </>
-                                                )}
+                                    {scheduleConfigError && (
+                                        <p className="admin-settings__message admin-settings__message--error">
+                                            {scheduleConfigError}
+                                        </p>
+                                    )}
+
+                                    {scheduleConfigSuccess && (
+                                        <p className="admin-settings__message admin-settings__message--success">
+                                            {scheduleConfigSuccess}
+                                        </p>
+                                    )}
+
+                                    <div className="admin-schedule-config-current-date">
+                                        <span>DATA SELECIONADA</span>
+                                        <strong>
+                                            {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
+                                                weekday: "short",
+                                                day: "2-digit",
+                                                month: "2-digit",
+                                                year: "numeric",
+                                            })}
+                                        </strong>
+                                    </div>
+
+                                    {scheduleConfigTimes.length ? (
+                                        <div className="admin-manual-times admin-schedule-config-times-grid">
+                                            {scheduleConfigTimes.map((time) => (
+                                                <button
+                                                    key={time}
+                                                    type="button"
+                                                    className={scheduleConfigEditingTime === time ? "is-selected" : ""}
+                                                    onClick={() => beginEditScheduleConfigTime(time)}
+                                                >
+                                                    {time}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="admin-manual-times__empty">
+                                            Nenhum horário disponível nessa data.
+                                        </div>
+                                    )}
+
+                                    {scheduleConfigEditingTime && (
+                                        <div className="admin-schedule-config-editor">
+                                            <div className="admin-schedule-config-editor__header">
+                                                <span>HORÁRIO SELECIONADO</span>
+                                                <strong>{scheduleConfigEditingTime}</strong>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="admin-empty">
-                                        Nenhum horário público disponível nessa data.
-                                    </div>
-                                )}
-                            </div>
-                        </section>
 
-                        <div className="admin-schedule-config-divider">
-                            <span>Serviços</span>
+                                            <div className="admin-schedule-config-editor__actions">
+                                                <label>
+                                                    <span>NOVO HORÁRIO</span>
+                                                    <input
+                                                        type="time"
+                                                        value={scheduleConfigEditedTime}
+                                                        onChange={(event) => setScheduleConfigEditedTime(event.target.value)}
+                                                    />
+                                                </label>
+
+                                                <button
+                                                    type="button"
+                                                    disabled={isSavingScheduleConfig}
+                                                    onClick={() => void saveEditedScheduleConfigTime()}
+                                                >
+                                                    Salvar alteração
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className="is-danger"
+                                                    disabled={isSavingScheduleConfig}
+                                                    onClick={() => void removeScheduleConfigTime(scheduleConfigEditingTime)}
+                                                >
+                                                    Excluir horário
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className="is-secondary"
+                                                    disabled={isSavingScheduleConfig}
+                                                    onClick={() => {
+                                                        setScheduleConfigEditingTime(null);
+                                                        setScheduleConfigEditedTime("");
+                                                        setScheduleConfigError("");
+                                                    }}
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                ) : adminView === "settings" ? (
+                    <section className="admin-settings admin-service-manager">
+                        <div className="admin-settings__intro">
+                            <div>
+                                <span className="admin-settings__eyebrow">Configurações do site</span>
+                                <h2>Configuração de serviços</h2>
+                                <p>Cadastre, edite ou exclua os serviços. A lista é organizada do maior para o menor valor.</p>
+                            </div>
                         </div>
+
+                        {settingsError && (
+                            <p className="admin-settings__message admin-settings__message--error">
+                                {settingsError}
+                            </p>
+                        )}
+
+                        {settingsSuccess && (
+                            <p className="admin-settings__message admin-settings__message--success">
+                                {settingsSuccess}
+                            </p>
+                        )}
+
 
                         <section
                             id="admin-service-form"
