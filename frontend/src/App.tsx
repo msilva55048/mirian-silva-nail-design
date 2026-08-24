@@ -10081,18 +10081,6 @@ function AdminPanel() {
         [financeAppointments, adminNow],
     );
 
-    const completedRevenueCents = useMemo(
-        () => completedFinanceAppointments.reduce((total, appointment) => total + (appointment.price_cents ?? 0), 0),
-        [completedFinanceAppointments],
-    );
-
-    const scheduledRevenueCents = useMemo(
-        () => scheduledFinanceAppointments.reduce((total, appointment) => total + (appointment.price_cents ?? 0), 0),
-        [scheduledFinanceAppointments],
-    );
-
-    const forecastRevenueCents = completedRevenueCents + scheduledRevenueCents;
-
     const financeServiceSummary = useMemo(() => {
         const summary = new Map<string, {
             serviceName: string;
@@ -11420,32 +11408,6 @@ function AdminPanel() {
                         <div className="admin-finance__period">
                             <span>Resumo de</span>
                             <strong>{financeMonthLabel}</strong>
-                        </div>
-
-                        <div className="admin-finance__cards">
-                            <article className="admin-finance-card admin-finance-card--completed">
-                                <span>Faturamento realizado</span>
-                                <strong>{formatCurrency(completedRevenueCents)}</strong>
-                                <small>Somente atendimentos concluídos</small>
-                            </article>
-
-                            <article className="admin-finance-card">
-                                <span>Valor agendado</span>
-                                <strong>{formatCurrency(scheduledRevenueCents)}</strong>
-                                <small>Atendimentos confirmados ou pendentes</small>
-                            </article>
-
-                            <article className="admin-finance-card admin-finance-card--forecast">
-                                <span>Previsão total do mês</span>
-                                <strong>{formatCurrency(forecastRevenueCents)}</strong>
-                                <small>Realizado + agendado</small>
-                            </article>
-
-                            <article className="admin-finance-card">
-                                <span>Atendimentos realizados</span>
-                                <strong>{completedFinanceAppointments.length}</strong>
-                                <small>Serviços marcados como concluídos</small>
-                            </article>
                         </div>
 
                         <section className="admin-finance__services">
