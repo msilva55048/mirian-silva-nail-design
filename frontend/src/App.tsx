@@ -1223,6 +1223,7 @@ function PublicSite() {
     const [isSendingRecoveryEmail, setIsSendingRecoveryEmail] = useState(false);
 
     const [showPasswordRecoveryReset, setShowPasswordRecoveryReset] = useState(false);
+    const [recoverySessionUserId, setRecoverySessionUserId] = useState<string | null>(null);
     const [recoveryNewPassword, setRecoveryNewPassword] = useState("");
     const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState("");
     const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
@@ -1338,6 +1339,7 @@ function PublicSite() {
 
         const {data: authListener} = supabase.auth.onAuthStateChange((event, session) => {
             if (event === "PASSWORD_RECOVERY") {
+                setRecoverySessionUserId(session?.user?.id ?? null);
                 setShowClientAuth(false);
                 setShowClientAccount(false);
                 setShowPasswordRecoveryRequest(false);
@@ -1446,6 +1448,7 @@ function PublicSite() {
         if (isUpdatingRecoveryPassword) return;
 
         setShowPasswordRecoveryReset(false);
+        setRecoverySessionUserId(null);
         setRecoveryNewPassword("");
         setRecoveryConfirmPassword("");
         setShowRecoveryPassword(false);
@@ -1461,6 +1464,136 @@ function PublicSite() {
             document.title,
             cleanUrl || "/",
         );
+    }
+
+    async function ensurePasswordRecoverySession() {
+        const url = new URL(window.location.href);
+        const hashParams = new URLSearchParams(
+            window.location.hash.replace(/^#/, ""),
+        );
+
+        const code = url.searchParams.get("code");
+        const tokenHash =
+            url.searchParams.get("token_hash") ??
+            hashParams.get("token_hash");
+        const recoveryType =
+            url.searchParams.get("type") ??
+            hashParams.get("type");
+        const accessToken =
+            url.searchParams.get("access_token") ??
+            hashParams.get("access_token");
+        const refreshToken =
+            url.searchParams.get("refresh_token") ??
+            hashParams.get("refresh_token");
+
+        let recoveredUserId = recoverySessionUserId;
+
+        // 1) Fluxo PKCE: o Supabase devolve ?code=...
+        if (code) {
+            const {
+                data: exchangeData,
+                error: exchangeError,
+            } = await supabase.auth.exchangeCodeForSession(code);
+
+            if (!exchangeError && exchangeData.session?.user) {
+                recoveredUserId = exchangeData.session.user.id;
+                setRecoverySessionUserId(recoveredUserId);
+                return exchangeData.session;
+            }
+
+            // O SDK pode ter consumido o code automaticamente.
+            // Nesse caso, continuamos e conferimos a sessão já persistida.
+            if (exchangeError) {
+                console.warn(
+                    "O code de recuperação não pôde ser trocado novamente:",
+                    exchangeError,
+                );
+            }
+        }
+
+        // 2) Template com token_hash + type=recovery.
+        if (tokenHash && recoveryType === "recovery") {
+            const {
+                data: verifyData,
+                error: verifyError,
+            } = await supabase.auth.verifyOtp({
+                token_hash: tokenHash,
+                type: "recovery",
+            });
+
+            if (!verifyError && verifyData.session?.user) {
+                recoveredUserId = verifyData.session.user.id;
+                setRecoverySessionUserId(recoveredUserId);
+                return verifyData.session;
+            }
+
+            if (verifyError) {
+                console.warn(
+                    "O token_hash de recuperação não pôde ser validado novamente:",
+                    verifyError,
+                );
+            }
+        }
+
+        // 3) Fluxo implícito: tokens chegam no #hash da URL.
+        if (accessToken && refreshToken) {
+            const {
+                data: sessionData,
+                error: sessionError,
+            } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+            });
+
+            if (!sessionError && sessionData.session?.user) {
+                recoveredUserId = sessionData.session.user.id;
+                setRecoverySessionUserId(recoveredUserId);
+                return sessionData.session;
+            }
+
+            if (sessionError) {
+                console.warn(
+                    "Não foi possível restaurar a sessão pelos tokens do link:",
+                    sessionError,
+                );
+            }
+        }
+
+        // 4) Se o SDK já processou o link sozinho, usa a sessão persistida.
+        const {
+            data: {session},
+            error: sessionLoadError,
+        } = await supabase.auth.getSession();
+
+        if (sessionLoadError) {
+            console.error(
+                "Erro ao verificar a sessão de recuperação:",
+                sessionLoadError,
+            );
+            return null;
+        }
+
+        if (!session?.user) {
+            return null;
+        }
+
+        // Se já sabemos qual usuário veio do link, impedimos que uma sessão
+        // antiga de outra conta seja usada para trocar a senha errada.
+        if (
+            recoveredUserId &&
+            session.user.id !== recoveredUserId
+        ) {
+            console.error(
+                "A sessão atual não corresponde ao usuário do link de recuperação.",
+            );
+            return null;
+        }
+
+        if (!recoveredUserId) {
+            setRecoverySessionUserId(session.user.id);
+        }
+
+        return session;
     }
 
     async function submitPasswordRecoveryReset(
@@ -1486,6 +1619,15 @@ function PublicSite() {
         setIsUpdatingRecoveryPassword(true);
 
         try {
+            const recoverySession = await ensurePasswordRecoverySession();
+
+            if (!recoverySession?.user) {
+                setRecoveryResetError(
+                    "O link foi aberto, mas a sessão de recuperação não ficou válida neste navegador. Solicite um novo link e abra o link mais recente no mesmo navegador em que fará a troca da senha.",
+                );
+                return;
+            }
+
             const {error} = await supabase.auth.updateUser({
                 password: recoveryNewPassword,
             });
@@ -1495,6 +1637,7 @@ function PublicSite() {
                 throw error;
             }
 
+            setRecoverySessionUserId(recoverySession.user.id);
             setRecoveryNewPassword("");
             setRecoveryConfirmPassword("");
             setRecoveryResetSuccess(
@@ -1508,9 +1651,25 @@ function PublicSite() {
             );
         } catch (error) {
             console.error("Erro ao salvar nova senha:", error);
-            setRecoveryResetError(
-                "Não foi possível alterar a senha. O link pode ter expirado. Solicite um novo link de recuperação.",
-            );
+
+            const message =
+                error instanceof Error
+                    ? error.message.toLowerCase()
+                    : "";
+
+            if (
+                message.includes("session") ||
+                message.includes("jwt") ||
+                message.includes("token")
+            ) {
+                setRecoveryResetError(
+                    "A sessão de recuperação não está mais válida. Solicite um novo link e abra somente o link mais recente.",
+                );
+            } else {
+                setRecoveryResetError(
+                    "Não foi possível alterar a senha agora. Tente novamente. Se continuar, solicite um novo link de recuperação.",
+                );
+            }
         } finally {
             setIsUpdatingRecoveryPassword(false);
         }
