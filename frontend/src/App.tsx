@@ -109,21 +109,81 @@ function intervalsOverlap(
     return firstStart < secondEnd && firstEnd > secondStart;
 }
 
-function getFixedClientStartMinutes(date: string) {
-    const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+const CLIENT_WEEKDAY_START_MINUTES = [
+    7 * 60,   // 07:00
+    9 * 60,   // 09:00
+    11 * 60,  // 11:00
+    13 * 60,  // 13:00
+    17 * 60,  // 17:00
+    19 * 60,  // 19:00
+] as const;
 
-    // Segunda a sexta: horários públicos já definidos.
-    // Sábado e domingo: horários públicos fixos solicitados.
-    return isWeekend
-        ? [7 * 60, 9 * 60, 11 * 60, 13 * 60]
-        : [7 * 60, 19 * 60 + 30, 21 * 60];
+const CLIENT_WEEKEND_START_MINUTES = [
+    7 * 60,   // 07:00
+    9 * 60,   // 09:00
+    11 * 60,  // 11:00
+    13 * 60,  // 13:00
+] as const;
+
+const ADMIN_WEEKDAY_START_MINUTES = [
+    7 * 60,        // 07:00
+    7 * 60 + 30,   // 07:30
+    8 * 60,        // 08:00
+    8 * 60 + 30,   // 08:30
+    9 * 60,        // 09:00
+    9 * 60 + 30,   // 09:30
+    10 * 60,       // 10:00
+    10 * 60 + 30,  // 10:30
+    11 * 60,       // 11:00
+    11 * 60 + 30,  // 11:30
+    12 * 60,       // 12:00
+    12 * 60 + 30,  // 12:30
+    13 * 60,       // 13:00
+    17 * 60,       // 17:00
+    17 * 60 + 30,  // 17:30
+    18 * 60,       // 18:00
+    18 * 60 + 30,  // 18:30
+    19 * 60,       // 19:00
+] as const;
+
+const ADMIN_WEEKEND_START_MINUTES = [
+    7 * 60,        // 07:00
+    7 * 60 + 30,   // 07:30
+    8 * 60,        // 08:00
+    8 * 60 + 30,   // 08:30
+    9 * 60,        // 09:00
+    9 * 60 + 30,   // 09:30
+    10 * 60,       // 10:00
+    10 * 60 + 30,  // 10:30
+    11 * 60,       // 11:00
+    11 * 60 + 30,  // 11:30
+    12 * 60,       // 12:00
+    12 * 60 + 30,  // 12:30
+    13 * 60,       // 13:00
+] as const;
+
+function isWeekendDate(date: string) {
+    const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+function getFixedClientStartMinutes(date: string) {
+    if (!date) return [] as number[];
+
+    // ÚNICA fonte da grade pública de horários.
+    // Todas as clientes, antigas ou novas, passam por esta mesma função.
+    return isWeekendDate(date)
+        ? [...CLIENT_WEEKEND_START_MINUTES]
+        : [...CLIENT_WEEKDAY_START_MINUTES];
 }
 
 function getFixedAdminManualStartMinutes(date: string) {
-    return [...getFixedClientStartMinutes(date), 15 * 60]
-        .filter((value, index, values) => values.indexOf(value) === index)
-        .sort((a, b) => a - b);
+    if (!date) return [] as number[];
+
+    // Grade exclusiva do painel ADM para criar/editar agendamentos.
+    return isWeekendDate(date)
+        ? [...ADMIN_WEEKEND_START_MINUTES]
+        : [...ADMIN_WEEKDAY_START_MINUTES];
 }
 
 function normalizeBrazilianPhoneDigits(value: string) {
