@@ -1251,6 +1251,43 @@ function PublicSite() {
         try {
             if (clientAuthMode === "signup") {
                 const formattedPhone = formatBrazilianPhone(phoneDigits);
+
+                // A Mirian já possui uma conta no Supabase Auth usada pelo painel ADM.
+                // Em vez de tentar criar um segundo usuário com o mesmo e-mail,
+                // autenticamos a conta existente e vinculamos também um perfil de cliente.
+                if (email === MIRIAN_ADMIN_EMAIL) {
+                    const {data: adminClientData, error: adminClientError} =
+                        await supabase.auth.signInWithPassword({
+                            email,
+                            password,
+                        });
+
+                    if (adminClientError || !adminClientData.user) {
+                        setAuthError(
+                            "Para cadastrar a Mirian como cliente, informe a mesma senha usada no acesso ADM.",
+                        );
+                        return;
+                    }
+
+                    const {error: claimError} = await supabase.rpc("claim_client_profile", {
+                        p_full_name: fullName,
+                        p_phone: formattedPhone,
+                        p_email: email,
+                    });
+
+                    if (claimError) {
+                        console.error("Erro ao criar/vincular o perfil de cliente da Mirian:", claimError);
+                        throw claimError;
+                    }
+
+                    await loadAuthenticatedClient(adminClientData.user);
+                    setShowClientAuth(false);
+                    setShowClientAccount(false);
+                    setShowAuthPassword(false);
+                    setAuthPassword("");
+                    return;
+                }
+
                 const {data, error} = await supabase.auth.signUp({
                     email,
                     password,
