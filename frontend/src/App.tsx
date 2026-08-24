@@ -7072,9 +7072,18 @@ function AdminPanel() {
             .on("postgres_changes", {event: "*", schema: "public", table: "schedule_blocks"}, () => void loadAdminData())
             .subscribe();
 
+        const clientProfilesChannel = supabase.channel("admin-client-profiles-updates")
+            .on(
+                "postgres_changes",
+                {event: "*", schema: "public", table: "client_profiles"},
+                () => void loadAdminData(),
+            )
+            .subscribe();
+
         return () => {
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
+            void supabase.removeChannel(clientProfilesChannel);
         };
     }, [isAuthenticated]);
 
@@ -7863,28 +7872,98 @@ function AdminPanel() {
     }, [isAuthenticated, selectedClient?.key]);
 
     const clients = useMemo<AdminClient[]>(() => {
-        const grouped = new Map<string, AdminAppointment[]>();
+        type ClientGroup = {
+            key: string;
+            profile: ClientProfile | null;
+            appointments: AdminAppointment[];
+        };
 
-        appointments
-            .filter((appointment) => !appointment.client_hidden)
-            .forEach((appointment) => {
-                const digits = normalizeClientPhone(appointment.client_phone);
-                const key = digits || appointment.id;
-                grouped.set(
-                    key,
-                    [...(grouped.get(key) ?? []), appointment],
-                );
+        const groups = new Map<string, ClientGroup>();
+        const profileIdToKey = new Map<string, string>();
+        const phoneToKey = new Map<string, string>();
+
+        /*
+         * client_profiles é a fonte principal da lista.
+         * Assim, uma cliente aparece no painel imediatamente após criar a conta,
+         * mesmo que ainda não tenha nenhum agendamento.
+         */
+        adminClientProfiles.forEach((profile) => {
+            const digits = normalizeClientPhone(profile.phone ?? "");
+            const key = `profile:${profile.id}`;
+
+            groups.set(key, {
+                key,
+                profile,
+                appointments: [],
             });
 
-        return Array.from(grouped.entries())
-            .map(([key, clientAppointments]) => {
-                const ordered = [...clientAppointments].sort(
+            profileIdToKey.set(profile.id, key);
+
+            if (digits) {
+                phoneToKey.set(digits, key);
+            }
+        });
+
+        /*
+         * Os agendamentos são anexados ao perfil existente pelo client_id.
+         * Para registros antigos sem client_id, usamos o telefone como fallback.
+         * Só criamos um grupo legado quando realmente não existe perfil correspondente.
+         */
+        appointments.forEach((appointment) => {
+            const digits = normalizeClientPhone(appointment.client_phone);
+            const profileKey = appointment.client_id
+                ? profileIdToKey.get(appointment.client_id)
+                : undefined;
+            const phoneKey = digits ? phoneToKey.get(digits) : undefined;
+            const key =
+                profileKey ??
+                phoneKey ??
+                `legacy:${digits || appointment.id}`;
+
+            const existing = groups.get(key);
+
+            if (existing) {
+                existing.appointments.push(appointment);
+                return;
+            }
+
+            groups.set(key, {
+                key,
+                profile: null,
+                appointments: [appointment],
+            });
+
+            if (digits) {
+                phoneToKey.set(digits, key);
+            }
+        });
+
+        return Array.from(groups.values())
+            .map((group): AdminClient | null => {
+                /*
+                 * Preserva a função "Remover da lista":
+                 * se a cliente possui agendamentos e todos foram marcados como ocultos,
+                 * ela continua escondida. Perfil recém-cadastrado, sem agendamentos,
+                 * aparece normalmente.
+                 */
+                const visibleAppointments = group.appointments.filter(
+                    (appointment) => !appointment.client_hidden,
+                );
+
+                if (
+                    group.appointments.length > 0 &&
+                    visibleAppointments.length === 0
+                ) {
+                    return null;
+                }
+
+                const ordered = [...visibleAppointments].sort(
                     (a, b) =>
                         getAppointmentDateTime(b).getTime() -
                         getAppointmentDateTime(a).getTime(),
                 );
 
-                const reference = ordered[0];
+                const reference = ordered[0] ?? null;
 
                 const completed = ordered.filter(
                     (item) =>
@@ -7912,19 +7991,34 @@ function AdminPanel() {
                             getAppointmentDateTime(b).getTime(),
                     );
 
+                const profile = group.profile;
+
                 return {
-                    key,
-                    name: reference.client_name,
-                    phone: reference.client_phone,
-                    email: reference.client_email ?? "",
-                    musicalTaste: reference.musical_taste ?? "",
+                    key: group.key,
+                    name:
+                        profile?.full_name ??
+                        reference?.client_name ??
+                        "Cliente",
+                    phone:
+                        profile?.phone ??
+                        reference?.client_phone ??
+                        "",
+                    email:
+                        profile?.email ??
+                        reference?.client_email ??
+                        "",
+                    musicalTaste:
+                        profile?.musical_taste ??
+                        reference?.musical_taste ??
+                        "",
                     appointments: ordered,
                     lastAppointment: completed[0] ?? null,
                     nextAppointment: upcoming[0] ?? null,
                 };
             })
+            .filter((client): client is AdminClient => client !== null)
             .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-    }, [appointments, adminNow]);
+    }, [appointments, adminClientProfiles, adminNow]);
 
     const filteredClients = useMemo(() => {
         const query = clientSearch
