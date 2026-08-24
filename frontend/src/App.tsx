@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useLayoutEffect, useMemo, useState} from "react";
 import {supabase} from "./lib/supabase";
 import "./App.css";
 
@@ -1174,6 +1174,28 @@ const clientAccountStyles = `
 `;
 
 function PublicSite() {
+    useLayoutEffect(() => {
+        const previousScrollRestoration = window.history.scrollRestoration;
+
+        // No refresh, Chrome/Safari tentam restaurar a posição antiga
+        // antes de o React terminar de montar a página, causando o "pulo".
+        window.history.scrollRestoration = "manual";
+        window.scrollTo(0, 0);
+
+        const firstFrame = window.requestAnimationFrame(() => {
+            window.scrollTo(0, 0);
+
+            window.requestAnimationFrame(() => {
+                window.scrollTo(0, 0);
+            });
+        });
+
+        return () => {
+            window.cancelAnimationFrame(firstFrame);
+            window.history.scrollRestoration = previousScrollRestoration;
+        };
+    }, []);
+
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
