@@ -3963,6 +3963,45 @@ const adminStyles = `
     background: #faf6f7;
 }
 
+.admin-client-history__list article.is-cancelled-cleanable {
+    cursor: pointer;
+    border-color: rgba(162, 63, 77, .24);
+    background: #fff7f8;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.admin-client-history__list article.is-cancelled-cleanable:hover {
+    transform: translateY(-1px);
+    border-color: rgba(162, 63, 77, .42);
+    box-shadow: 0 8px 20px rgba(83, 48, 58, .08);
+}
+
+.admin-client-history__list article.is-cancelled-cleanable:focus-visible {
+    outline: 3px solid rgba(154, 83, 104, .2);
+    outline-offset: 2px;
+}
+
+.admin-client-history__cancelled-action {
+    display: grid;
+    gap: 3px;
+    text-align: right;
+}
+
+.admin-client-history__cancelled-action strong {
+    color: #a23f4d;
+    font-size: .78rem;
+}
+
+.admin-client-history__cancelled-action small {
+    color: #9a7079;
+    font-size: .68rem;
+}
+
+.admin-client-history__list article.is-clearing {
+    opacity: .55;
+    pointer-events: none;
+}
+
 .admin-client-history__list strong,
 .admin-client-history__list span {
     display: block;
@@ -7461,6 +7500,8 @@ function AdminPanel() {
     const [clientEditError, setClientEditError] = useState("");
     const [isSavingClient, setIsSavingClient] = useState(false);
     const [deletingClientKey, setDeletingClientKey] = useState("");
+    const [clearingCancelledAppointmentId, setClearingCancelledAppointmentId] =
+        useState<string | null>(null);
 
     const [nailRecords, setNailRecords] = useState<NailRecord[]>([]);
     const [isLoadingNailRecords, setIsLoadingNailRecords] = useState(false);
@@ -8091,6 +8132,60 @@ function AdminPanel() {
         }
         setAppointments((current) => current.map((item) => item.id === appointment.id ? {...item, status: "cancelled"} : item));
         setSelectedAdminAppointment(null);
+    }
+
+    async function clearCancelledAppointmentFromHistory(
+        appointment: AdminAppointment,
+    ) {
+        if (appointment.status !== "cancelled") return;
+
+        const confirmed = window.confirm(
+            `Limpar do histórico o agendamento cancelado de ${formatAdminDate(
+                appointment.appointment_date,
+            )} às ${String(appointment.start_time).slice(0, 5)}?`,
+        );
+
+        if (!confirmed) return;
+
+        setClearingCancelledAppointmentId(appointment.id);
+        setPanelError("");
+
+        try {
+            const {error} = await supabase
+                .from("appointments")
+                .delete()
+                .eq("id", appointment.id)
+                .eq("status", "cancelled");
+
+            if (error) {
+                throw error;
+            }
+
+            setAppointments((current) =>
+                current.filter((item) => item.id !== appointment.id),
+            );
+
+            setSelectedClient((current) =>
+                current
+                    ? {
+                        ...current,
+                        appointments: current.appointments.filter(
+                            (item) => item.id !== appointment.id,
+                        ),
+                    }
+                    : current,
+            );
+        } catch (error) {
+            console.error(
+                "Erro ao limpar agendamento cancelado do histórico:",
+                error,
+            );
+            setPanelError(
+                "Não foi possível limpar o agendamento cancelado do histórico.",
+            );
+        } finally {
+            setClearingCancelledAppointmentId(null);
+        }
     }
 
     function normalizeClientPhone(value: string) {
@@ -12116,15 +12211,92 @@ function AdminPanel() {
                                 </div>
 
                                 <div className="admin-client-history__list">
-                                    {selectedClient.appointments.map((appointment) => (
-                                        <article key={appointment.id}>
-                                            <div>
-                                                <strong>{appointment.service_name}</strong>
-                                                <span>{formatAdminDate(appointment.appointment_date)} às {String(appointment.start_time).slice(0, 5)}</span>
-                                            </div>
-                                            <span>{getAppointmentStatusLabel(appointment.status)}</span>
-                                        </article>
-                                    ))}
+                                    {selectedClient.appointments.map((appointment) => {
+                                        const canClear =
+                                            appointment.status === "cancelled";
+                                        const isClearing =
+                                            clearingCancelledAppointmentId ===
+                                            appointment.id;
+
+                                        return (
+                                            <article
+                                                key={appointment.id}
+                                                className={[
+                                                    canClear
+                                                        ? "is-cancelled-cleanable"
+                                                        : "",
+                                                    isClearing
+                                                        ? "is-clearing"
+                                                        : "",
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(" ")}
+                                                role={
+                                                    canClear
+                                                        ? "button"
+                                                        : undefined
+                                                }
+                                                tabIndex={
+                                                    canClear ? 0 : undefined
+                                                }
+                                                onClick={() => {
+                                                    if (canClear) {
+                                                        void clearCancelledAppointmentFromHistory(
+                                                            appointment,
+                                                        );
+                                                    }
+                                                }}
+                                                onKeyDown={(event) => {
+                                                    if (
+                                                        canClear &&
+                                                        (event.key === "Enter" ||
+                                                            event.key === " ")
+                                                    ) {
+                                                        event.preventDefault();
+                                                        void clearCancelledAppointmentFromHistory(
+                                                            appointment,
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <div>
+                                                    <strong>
+                                                        {
+                                                            appointment.service_name
+                                                        }
+                                                    </strong>
+                                                    <span>
+                                                        {formatAdminDate(
+                                                            appointment.appointment_date,
+                                                        )}{" "}
+                                                        às{" "}
+                                                        {String(
+                                                            appointment.start_time,
+                                                        ).slice(0, 5)}
+                                                    </span>
+                                                </div>
+
+                                                {canClear ? (
+                                                    <div className="admin-client-history__cancelled-action">
+                                                        <strong>
+                                                            {isClearing
+                                                                ? "Limpando..."
+                                                                : "Cancelado"}
+                                                        </strong>
+                                                        <small>
+                                                            Toque para limpar
+                                                        </small>
+                                                    </div>
+                                                ) : (
+                                                    <span>
+                                                        {getAppointmentStatusLabel(
+                                                            appointment.status,
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </article>
+                                        );
+                                    })}
                                 </div>
                             </section>
                         </section>
