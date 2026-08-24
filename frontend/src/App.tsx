@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {supabase} from "./lib/supabase";
 import "./App.css";
 
@@ -1174,28 +1174,6 @@ const clientAccountStyles = `
 `;
 
 function PublicSite() {
-    useLayoutEffect(() => {
-        const previousScrollRestoration = window.history.scrollRestoration;
-
-        // No refresh, Chrome/Safari tentam restaurar a posição antiga
-        // antes de o React terminar de montar a página, causando o "pulo".
-        window.history.scrollRestoration = "manual";
-        window.scrollTo(0, 0);
-
-        const firstFrame = window.requestAnimationFrame(() => {
-            window.scrollTo(0, 0);
-
-            window.requestAnimationFrame(() => {
-                window.scrollTo(0, 0);
-            });
-        });
-
-        return () => {
-            window.cancelAnimationFrame(firstFrame);
-            window.history.scrollRestoration = previousScrollRestoration;
-        };
-    }, []);
-
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
@@ -1213,7 +1191,7 @@ function PublicSite() {
     const [clientUserEmail, setClientUserEmail] = useState("");
     const [clientProfile, setClientProfile] = useState<PublicClientProfile | null>(null);
     const [clientAppointments, setClientAppointments] = useState<PublicClientAppointment[]>([]);
-    const [, setIsCheckingClientSession] = useState(true);
+    const [isCheckingClientSession, setIsCheckingClientSession] = useState(true);
     const [isLoadingClientAccount, setIsLoadingClientAccount] = useState(false);
     const [showClientAuth, setShowClientAuth] = useState(false);
     const [showClientAccount, setShowClientAccount] = useState(false);
@@ -2569,6 +2547,31 @@ function PublicSite() {
         }
     }
 
+    if (isCheckingClientSession) {
+        return (
+            <main
+                className="home public-session-boot"
+                aria-label="Carregando site"
+            >
+                <style>{`
+                    html,
+                    body,
+                    #root {
+                        margin: 0;
+                        min-height: 100%;
+                        background: #fff8fa;
+                    }
+
+                    .public-session-boot {
+                        min-height: 100vh;
+                        width: 100%;
+                        background: #fff8fa;
+                    }
+                `}</style>
+            </main>
+        );
+    }
+
     return (
         <main className="home">
             <style>{clientAccountStyles}</style>
@@ -2593,6 +2596,14 @@ function PublicSite() {
                     .home > * {
                         max-width: 100%;
                         box-sizing: border-box;
+                    }
+
+                    .home > .hero,
+                    .home > .hero *,
+                    .home > .hero *::before,
+                    .home > .hero *::after {
+                        animation: none !important;
+                        animation-delay: 0s !important;
                     }
 
                     .home > .hero {
