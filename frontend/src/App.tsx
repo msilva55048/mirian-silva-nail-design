@@ -5860,6 +5860,96 @@ const adminEnhancementStyles = `
 .admin-booking-card__footer a.is-opened {
     background: #7f777a;
 }
+
+.admin-month-agenda {
+    display: grid;
+    gap: 18px;
+    margin-top: 18px;
+    padding: 22px;
+    border: 1px solid rgba(154, 97, 115, .16);
+    border-radius: 24px;
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 16px 40px rgba(92,56,67,.07);
+}
+.admin-month-agenda__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+.admin-month-agenda__header > div:first-child {
+    display: grid;
+    gap: 4px;
+}
+.admin-month-agenda__header span {
+    color: #9a5d70;
+    font-size: .74rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.admin-month-agenda__header strong {
+    color: #402f35;
+    font-size: 1.22rem;
+    text-transform: capitalize;
+}
+.admin-month-agenda__nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.admin-month-agenda__nav button {
+    min-width: 42px;
+    height: 42px;
+    border: 1px solid #dbc5cc;
+    border-radius: 12px;
+    background: #fff;
+    color: #6d3445;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+}
+.admin-month-agenda__today {
+    padding: 0 13px;
+    width: auto !important;
+}
+.admin-month-agenda__days {
+    display: grid;
+    gap: 16px;
+}
+.admin-month-agenda__day {
+    display: grid;
+    gap: 9px;
+}
+.admin-month-agenda__day-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.admin-month-agenda__day-header strong {
+    color: #5b3c47;
+    font-size: .95rem;
+}
+.admin-month-agenda__day-header::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #eadde1;
+}
+@media (max-width: 650px) {
+    .admin-month-agenda {
+        padding: 16px;
+    }
+    .admin-month-agenda__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .admin-month-agenda__nav {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
 .admin-message-center {
     display: grid;
     gap: 12px;
@@ -7879,8 +7969,13 @@ function AdminPanel() {
         }
     });
 
-    const [adminView, setAdminView] = useState<"agenda" | "week" | "clients" | "finance" | "schedule" | "settings">("agenda");
+    const [adminView, setAdminView] = useState<
+        "agenda" | "week" | "month" | "new" | "clients" | "finance" | "schedule" | "settings"
+    >("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
+    const [monthlyAgendaMonth, setMonthlyAgendaMonth] = useState(() =>
+        formatDateForInput(new Date()).slice(0, 7),
+    );
     const [agendaWeekReferenceDate, setAgendaWeekReferenceDate] = useState(
         formatDateForInput(new Date()),
     );
@@ -9777,6 +9872,48 @@ function AdminPanel() {
                 .sort((a, b) => `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(`${b.appointment_date}${String(b.start_time).slice(0, 5)}`)),
         [appointments, weekDates, adminNow]);
 
+    function addMonthsToAgendaMonth(monthValue: string, amount: number) {
+        const [year, month] = monthValue.split("-").map(Number);
+        const date = new Date(year, month - 1 + amount, 1, 12, 0, 0);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    const monthlyAgendaMonthLabel = useMemo(() => {
+        const [year, month] = monthlyAgendaMonth.split("-").map(Number);
+        return new Date(year, month - 1, 1, 12, 0, 0).toLocaleDateString("pt-BR", {
+            month: "long",
+            year: "numeric",
+        });
+    }, [monthlyAgendaMonth]);
+
+    const monthlyAgendaAppointments = useMemo(
+        () =>
+            appointments
+                .filter(
+                    (item) =>
+                        item.appointment_date.startsWith(monthlyAgendaMonth) &&
+                        shouldShowAppointmentInAdminAgenda(item),
+                )
+                .sort((a, b) =>
+                    `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(
+                        `${b.appointment_date}${String(b.start_time).slice(0, 5)}`,
+                    ),
+                ),
+        [appointments, monthlyAgendaMonth, adminNow],
+    );
+
+    const monthlyAgendaDates = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    monthlyAgendaAppointments.map(
+                        (appointment) => appointment.appointment_date,
+                    ),
+                ),
+            ),
+        [monthlyAgendaAppointments],
+    );
+
     function addMonthsToFinanceMonth(monthValue: string, amount: number) {
         const [year, month] = monthValue.split("-").map(Number);
         const date = new Date(year, month - 1 + amount, 1, 12, 0, 0);
@@ -10595,6 +10732,20 @@ function AdminPanel() {
                 <div className="admin-dashboard-cards">
                     <button className={`admin-dashboard-card${adminView === "agenda" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("agenda")}><strong>Agenda do dia</strong><span>Veja todos os atendimentos do dia.</span></button>
                     <button className={`admin-dashboard-card${adminView === "week" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("week")}><strong>Agenda semanal</strong><span>Atendimentos em ordem de dia e horário.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "month" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("month")}><strong>Agenda mensal</strong><span>Veja os atendimentos organizados ao longo do mês.</span></button>
+                    <button
+                        className={`admin-dashboard-card${adminView === "new" ? " is-active" : ""}`}
+                        type="button"
+                        onClick={() => {
+                            setAdminView("new");
+                            setShowManualForm(true);
+                            setManualError("");
+                            setManualSuccess("");
+                        }}
+                    >
+                        <strong>Novo agendamento</strong>
+                        <span>Cadastre um novo atendimento para uma cliente.</span>
+                    </button>
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
                     <button className={`admin-dashboard-card${adminView === "schedule" ? " is-active" : ""}`} type="button" onClick={() => setAdminView("schedule")}><strong>Configuração de horários</strong><span>Adicione, altere ou remova horários de uma data específica.</span></button>
@@ -10961,7 +11112,81 @@ function AdminPanel() {
 
                 {panelError && <p className="admin-panel__error">{panelError}</p>}
 
-                {adminView === "finance" ? (
+                {adminView === "month" ? (
+                    <section className="admin-month-agenda">
+                        <div className="admin-month-agenda__header">
+                            <div>
+                                <span>Agenda mensal</span>
+                                <strong>{monthlyAgendaMonthLabel}</strong>
+                            </div>
+
+                            <div className="admin-month-agenda__nav">
+                                <button
+                                    type="button"
+                                    aria-label="Mês anterior"
+                                    onClick={() =>
+                                        setMonthlyAgendaMonth((current) =>
+                                            addMonthsToAgendaMonth(current, -1),
+                                        )
+                                    }
+                                >
+                                    ←
+                                </button>
+
+                                <button
+                                    className="admin-month-agenda__today"
+                                    type="button"
+                                    onClick={() =>
+                                        setMonthlyAgendaMonth(
+                                            formatDateForInput(new Date()).slice(0, 7),
+                                        )
+                                    }
+                                >
+                                    Mês atual
+                                </button>
+
+                                <button
+                                    type="button"
+                                    aria-label="Próximo mês"
+                                    onClick={() =>
+                                        setMonthlyAgendaMonth((current) =>
+                                            addMonthsToAgendaMonth(current, 1),
+                                        )
+                                    }
+                                >
+                                    →
+                                </button>
+                            </div>
+                        </div>
+
+                        {isLoading ? (
+                            <div className="admin-loading">Carregando...</div>
+                        ) : monthlyAgendaDates.length ? (
+                            <div className="admin-month-agenda__days">
+                                {monthlyAgendaDates.map((date) => (
+                                    <section className="admin-month-agenda__day" key={date}>
+                                        <div className="admin-month-agenda__day-header">
+                                            <strong>{formatAdminDate(date)}</strong>
+                                        </div>
+
+                                        <div className="admin-card-list">
+                                            {monthlyAgendaAppointments
+                                                .filter(
+                                                    (appointment) =>
+                                                        appointment.appointment_date === date,
+                                                )
+                                                .map(renderAppointmentCard)}
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="admin-empty">
+                                Nenhum agendamento ativo neste mês.
+                            </div>
+                        )}
+                    </section>
+                ) : adminView === "finance" ? (
                     <section className="admin-finance">
                         <div className="admin-finance__header">
                             <div>
@@ -11685,7 +11910,7 @@ function AdminPanel() {
                             })}
                         </div>
                     </section>
-                ) : (
+                ) : adminView === "new" ? (
                     <section className="admin-content-section">
                         <section className="admin-new-appointment">
                             <div className="admin-new-appointment__header">
@@ -12100,7 +12325,7 @@ function AdminPanel() {
                             </div>
                         </section>
                     </section>
-                )}
+                ) : null}
 
                 {selectedAdminAppointment && (
                     <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedAdminAppointment(null);}}>
