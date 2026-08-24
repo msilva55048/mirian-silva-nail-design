@@ -8105,7 +8105,7 @@ function AdminPanel() {
     });
 
     const [adminView, setAdminView] = useState<
-        "agenda" | "week" | "month" | "new" | "clients" | "finance" | "schedule" | "settings"
+        "agenda" | "week" | "month" | "new" | "clients" | "finance" | "schedule" | "settings" | "blocks"
     >("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
     const [monthlyAgendaMonth, setMonthlyAgendaMonth] = useState(() =>
@@ -10793,7 +10793,8 @@ function AdminPanel() {
         | "clients"
         | "finance"
         | "schedule"
-        | "settings";
+        | "settings"
+        | "blocks";
 
     function openAdminDashboardView(view: AdminDashboardView) {
         setAdminView(view);
@@ -10918,6 +10919,7 @@ function AdminPanel() {
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
                     <button className={`admin-dashboard-card${adminView === "schedule" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("schedule")}><strong>Configuração de horários</strong><span>Adicione, altere ou remova horários de uma data específica.</span></button>
                     <button className={`admin-dashboard-card${adminView === "settings" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("settings")}><strong>Configuração de serviços</strong><span>Cadastre, edite e exclua serviços.</span></button>
+                    <button className={`admin-dashboard-card${adminView === "blocks" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("blocks")}><strong>Bloquear horários</strong><span>Bloqueie horários livres em uma data específica.</span></button>
                 </div>
 
                 <section className="admin-message-center">
@@ -12324,6 +12326,10 @@ function AdminPanel() {
                             )}
                         </section>
 
+
+                    </section>
+                ) : adminView === "blocks" ? (
+                    <section className="admin-content-section">
                         <section className="admin-block-manager admin-block-manager--bottom">
                             <div className="admin-block-manager__header">
                                 <div>
