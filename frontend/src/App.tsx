@@ -3121,6 +3121,36 @@ type AdminClient = {
     nextAppointment: AdminAppointment | null;
 };
 
+type ClientAnamnesisForm = {
+    birthDate: string;
+    referral: string;
+    pregnant: string;
+    diabetes: string;
+    bariatric: string;
+    chemotherapy: string;
+    thyroid: string;
+    nailBiting: string;
+    allergies: string;
+    mycosis: string;
+    continuousMedication: string;
+    cleaningProducts: string;
+};
+
+const emptyClientAnamnesis: ClientAnamnesisForm = {
+    birthDate: "",
+    referral: "",
+    pregnant: "",
+    diabetes: "",
+    bariatric: "",
+    chemotherapy: "",
+    thyroid: "",
+    nailBiting: "",
+    allergies: "",
+    mycosis: "",
+    continuousMedication: "",
+    cleaningProducts: "",
+};
+
 type ClientProfile = {
     id: string;
     full_name: string;
@@ -6772,6 +6802,68 @@ const adminEditDateTimeStyles = `
     border-color: #a86175;
     box-shadow: 0 0 0 3px rgba(168,97,117,.1);
 }
+.admin-anamnesis-card {
+    display: grid;
+    gap: 16px;
+    margin-top: 8px;
+    padding: 18px;
+    border: 1px solid #e6d3d9;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #fffafb, #f8eef1);
+    box-shadow: 0 10px 26px rgba(93, 53, 66, .06);
+}
+.admin-anamnesis-card__header span {
+    display: block;
+    margin-bottom: 4px;
+    color: #a26a7c;
+    font-size: .68rem;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+.admin-anamnesis-card__header h3 {
+    margin: 0;
+    color: #4c333b;
+    font-size: 1.12rem;
+}
+.admin-anamnesis-card__questions {
+    display: grid;
+    gap: 14px;
+}
+.admin-anamnesis-card__questions label {
+    display: grid;
+    gap: 7px;
+    padding: 13px;
+    border: 1px solid #eadde1;
+    border-radius: 15px;
+    background: rgba(255,255,255,.9);
+}
+.admin-anamnesis-card__questions label > span {
+    color: #5e424b;
+    font-size: .82rem;
+    font-weight: 850;
+    line-height: 1.35;
+}
+.admin-anamnesis-card__questions input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbc8ce;
+    border-radius: 11px;
+    padding: 11px 12px;
+    background: #fff;
+    color: #35272c;
+    font: inherit;
+}
+.admin-anamnesis-card__questions input:focus {
+    outline: none;
+    border-color: #a86175;
+    box-shadow: 0 0 0 3px rgba(168,97,117,.1);
+}
+.admin-anamnesis-card__loading {
+    margin: 0;
+    color: #80666e;
+    font-size: .85rem;
+}
 @media (max-width: 620px) {
     .admin-edit-date-time__toggle {
         grid-template-columns: 42px minmax(0, 1fr) 34px;
@@ -6876,6 +6968,9 @@ function AdminPanel() {
     const [editClientPhone, setEditClientPhone] = useState("");
     const [editClientEmail, setEditClientEmail] = useState("");
     const [editClientMusicTaste, setEditClientMusicTaste] = useState("");
+    const [clientAnamnesis, setClientAnamnesis] =
+        useState<ClientAnamnesisForm>(emptyClientAnamnesis);
+    const [isLoadingClientAnamnesis, setIsLoadingClientAnamnesis] = useState(false);
     const [clientEditError, setClientEditError] = useState("");
     const [isSavingClient, setIsSavingClient] = useState(false);
     const [deletingClientKey, setDeletingClientKey] = useState("");
@@ -8224,11 +8319,58 @@ function AdminPanel() {
         adminBlocks,
     ]);
 
-    function openClientEditor(client: AdminClient) {
+    function updateClientAnamnesisField(
+        field: keyof ClientAnamnesisForm,
+        value: string,
+    ) {
+        setClientAnamnesis((current) => ({
+            ...current,
+            [field]: value,
+        }));
+    }
+
+    async function loadClientAnamnesis(profileId: string) {
+        setIsLoadingClientAnamnesis(true);
+
+        const {data, error} = await supabase
+            .from("client_anamnesis")
+            .select(
+                "birth_date, referral, pregnant, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, mycosis, continuous_medication, cleaning_products",
+            )
+            .eq("client_id", profileId)
+            .maybeSingle();
+
+        if (error) {
+            console.error("Erro ao carregar ficha de anamnese:", error);
+            setClientAnamnesis(emptyClientAnamnesis);
+            setIsLoadingClientAnamnesis(false);
+            return;
+        }
+
+        setClientAnamnesis({
+            birthDate: data?.birth_date ?? "",
+            referral: data?.referral ?? "",
+            pregnant: data?.pregnant ?? "",
+            diabetes: data?.diabetes ?? "",
+            bariatric: data?.bariatric ?? "",
+            chemotherapy: data?.chemotherapy ?? "",
+            thyroid: data?.thyroid ?? "",
+            nailBiting: data?.nail_biting ?? "",
+            allergies: data?.allergies ?? "",
+            mycosis: data?.mycosis ?? "",
+            continuousMedication: data?.continuous_medication ?? "",
+            cleaningProducts: data?.cleaning_products ?? "",
+        });
+
+        setIsLoadingClientAnamnesis(false);
+    }
+
+    async function openClientEditor(client: AdminClient) {
         setEditingClient(client);
         setEditClientName(client.name);
         setEditClientPhone(client.phone);
         setEditClientEmail(client.email);
+        setClientAnamnesis(emptyClientAnamnesis);
 
         const phoneDigits = normalizeClientPhone(client.phone);
         const profile = adminClientProfiles.find(
@@ -8239,6 +8381,10 @@ function AdminPanel() {
             profile?.musical_taste ?? client.musicalTaste ?? "",
         );
         setClientEditError("");
+
+        if (profile?.id) {
+            await loadClientAnamnesis(profile.id);
+        }
     }
 
     async function saveClientChanges() {
@@ -8301,6 +8447,38 @@ function AdminPanel() {
                             : profile,
                     ),
                 );
+            }
+
+            if (existingProfile) {
+                const {error: anamnesisError} = await supabase
+                    .from("client_anamnesis")
+                    .upsert(
+                        {
+                            client_id: existingProfile.id,
+                            birth_date: clientAnamnesis.birthDate || null,
+                            referral: clientAnamnesis.referral.trim() || null,
+                            pregnant: clientAnamnesis.pregnant.trim() || null,
+                            diabetes: clientAnamnesis.diabetes.trim() || null,
+                            bariatric: clientAnamnesis.bariatric.trim() || null,
+                            chemotherapy: clientAnamnesis.chemotherapy.trim() || null,
+                            thyroid: clientAnamnesis.thyroid.trim() || null,
+                            nail_biting: clientAnamnesis.nailBiting.trim() || null,
+                            allergies: clientAnamnesis.allergies.trim() || null,
+                            mycosis: clientAnamnesis.mycosis.trim() || null,
+                            continuous_medication:
+                                clientAnamnesis.continuousMedication.trim() || null,
+                            cleaning_products:
+                                clientAnamnesis.cleaningProducts.trim() || null,
+                            updated_at: new Date().toISOString(),
+                        },
+                        {
+                            onConflict: "client_id",
+                        },
+                    );
+
+                if (anamnesisError) {
+                    throw anamnesisError;
+                }
             }
 
             setAppointments((current) =>
@@ -10958,6 +11136,192 @@ function AdminPanel() {
                                     maxLength={500}
                                 />
                             </label>
+
+                            <section className="admin-anamnesis-card">
+                                <div className="admin-anamnesis-card__header">
+                                    <div>
+                                        <span>Saúde e cuidados</span>
+                                        <h3>Ficha de anamnese</h3>
+                                    </div>
+                                </div>
+
+                                {isLoadingClientAnamnesis ? (
+                                    <p className="admin-anamnesis-card__loading">
+                                        Carregando ficha...
+                                    </p>
+                                ) : (
+                                    <div className="admin-anamnesis-card__questions">
+                                        <label>
+                                            <span>1. Data de nascimento</span>
+                                            <input
+                                                type="date"
+                                                value={clientAnamnesis.birthDate}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "birthDate",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>2. Indicação</span>
+                                            <input
+                                                value={clientAnamnesis.referral}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "referral",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Digite a resposta"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>3. É gestante?</span>
+                                            <input
+                                                value={clientAnamnesis.pregnant}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "pregnant",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>4. Tem diabetes?</span>
+                                            <input
+                                                value={clientAnamnesis.diabetes}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "diabetes",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>5. É bariátrica?</span>
+                                            <input
+                                                value={clientAnamnesis.bariatric}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "bariatric",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>6. Faz quimioterapia?</span>
+                                            <input
+                                                value={clientAnamnesis.chemotherapy}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "chemotherapy",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>7. Tireoide</span>
+                                            <input
+                                                value={clientAnamnesis.thyroid}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "thyroid",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Digite a resposta"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>8. Tem o hábito de roer as unhas?</span>
+                                            <input
+                                                value={clientAnamnesis.nailBiting}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "nailBiting",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>9. Tem alergias?</span>
+                                            <input
+                                                value={clientAnamnesis.allergies}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "allergies",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Informe quais, se houver"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>10. Tem micose?</span>
+                                            <input
+                                                value={clientAnamnesis.mycosis}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "mycosis",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>11. Usa medicamentos contínuos?</span>
+                                            <input
+                                                value={clientAnamnesis.continuousMedication}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "continuousMedication",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Informe quais, se houver"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>12. Usa materiais de limpeza?</span>
+                                            <input
+                                                value={clientAnamnesis.cleaningProducts}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "cleaningProducts",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Ex.: Sim / Não"
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                            </section>
+
                             {clientEditError && <p className="admin-reschedule__message">{clientEditError}</p>}
                             <button className="admin-primary-button" type="button" disabled={isSavingClient} onClick={() => void saveClientChanges()}>{isSavingClient ? "Salvando..." : "Salvar cadastro"}</button>
                         </section>
