@@ -8319,6 +8319,27 @@ function AdminPanel() {
         adminBlocks,
     ]);
 
+    function formatBirthDateForDisplay(value: string | null | undefined) {
+        if (!value) return "";
+
+        const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!isoMatch) return value;
+
+        return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+    }
+
+    function formatBirthDateForDatabase(value: string) {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (brMatch) {
+            return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+        }
+
+        return trimmed;
+    }
+
     function updateClientAnamnesisField(
         field: keyof ClientAnamnesisForm,
         value: string,
@@ -8348,7 +8369,7 @@ function AdminPanel() {
         }
 
         setClientAnamnesis({
-            birthDate: data?.birth_date ?? "",
+            birthDate: formatBirthDateForDisplay(data?.birth_date),
             referral: data?.referral ?? "",
             pregnant: data?.pregnant ?? "",
             diabetes: data?.diabetes ?? "",
@@ -8455,7 +8476,9 @@ function AdminPanel() {
                     .upsert(
                         {
                             client_id: existingProfile.id,
-                            birth_date: clientAnamnesis.birthDate || null,
+                            birth_date: formatBirthDateForDatabase(
+                                clientAnamnesis.birthDate,
+                            ),
                             referral: clientAnamnesis.referral.trim() || null,
                             pregnant: clientAnamnesis.pregnant.trim() || null,
                             diabetes: clientAnamnesis.diabetes.trim() || null,
@@ -11154,7 +11177,8 @@ function AdminPanel() {
                                         <label>
                                             <span>1. Data de nascimento</span>
                                             <input
-                                                type="date"
+                                                type="text"
+                                                inputMode="numeric"
                                                 value={clientAnamnesis.birthDate}
                                                 onChange={(event) =>
                                                     updateClientAnamnesisField(
@@ -11162,6 +11186,8 @@ function AdminPanel() {
                                                         event.target.value,
                                                     )
                                                 }
+                                                placeholder="Ex.: 15/08/1990"
+                                                maxLength={10}
                                             />
                                         </label>
 
