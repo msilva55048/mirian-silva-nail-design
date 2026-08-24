@@ -1963,10 +1963,10 @@ function PublicSite() {
 
         window.setTimeout(() => {
             document.getElementById("client-account-appointments")?.scrollIntoView({
-                behavior: "smooth",
+                behavior: "auto",
                 block: "start",
             });
-        }, 80);
+        }, 0);
     }
 
 
@@ -2553,8 +2553,24 @@ function PublicSite() {
             <style>{`
                 @media (max-width: 700px) {
                     .home {
-                        min-height: 100dvh;
+                        min-height: 100%;
+                        width: 100%;
+                        max-width: 100%;
                         overflow-x: hidden;
+                    }
+
+                    html,
+                    body,
+                    #root {
+                        width: 100%;
+                        max-width: 100%;
+                        overflow-x: hidden;
+                    }
+
+                    .home,
+                    .home > * {
+                        max-width: 100%;
+                        box-sizing: border-box;
                     }
 
                     .home > .hero {
