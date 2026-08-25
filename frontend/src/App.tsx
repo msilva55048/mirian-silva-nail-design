@@ -275,10 +275,30 @@ const CLIENT_WEEKEND_START_MINUTES = [
     13 * 60,  // 13:00
 ] as const;
 
-const ADMIN_WEEKDAY_START_MINUTES = Array.from(
-    {length: 29},
-    (_, index) => 7 * 60 + index * 30,
-); // 07:00 até 21:00, direto, de 30 em 30 minutos.
+const ADMIN_WEEKDAY_START_MINUTES = [
+    7 * 60,        // 07:00
+    7 * 60 + 30,   // 07:30
+    8 * 60,        // 08:00
+    8 * 60 + 30,   // 08:30
+    9 * 60,        // 09:00
+    9 * 60 + 30,   // 09:30
+    10 * 60,       // 10:00
+    10 * 60 + 30,  // 10:30
+    11 * 60,       // 11:00
+    11 * 60 + 30,  // 11:30
+    12 * 60,       // 12:00
+    12 * 60 + 30,  // 12:30
+    13 * 60,       // 13:00
+    17 * 60,       // 17:00
+    17 * 60 + 30,  // 17:30
+    18 * 60,       // 18:00
+    18 * 60 + 30,  // 18:30
+    19 * 60,       // 19:00
+    19 * 60 + 30,  // 19:30
+    20 * 60,       // 20:00
+    20 * 60 + 30,  // 20:30
+    21 * 60,       // 21:00
+] as const;
 
 const ADMIN_WEEKEND_START_MINUTES = [
     7 * 60,        // 07:00
@@ -9798,101 +9818,46 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        /*
-         * Grade fixa e exclusiva do Novo agendamento ADM:
-         * - segunda a sexta: 07:00 até 21:00 direto, de 30 em 30;
-         * - sábado e domingo: 07:00 até 13:00, de 30 em 30.
-         *
-         * Esta grade não usa os horários configurados da área da cliente.
-         */
         const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
 
-        /*
-         * Para testar se um NOVO horário é seguro, usamos a duração
-         * do serviço mais demorado cadastrado.
-         *
-         * Já os agendamentos existentes usam a duração REAL gravada
-         * em cada registro da tabela appointments.
-         *
-         * Com isso:
-         * - horários ANTES de um agendamento somem se o maior serviço
-         *   iniciado ali invadir o atendimento já marcado;
-         * - horários DURANTE um atendimento existente também somem;
-         * - horários APÓS o término real do atendimento voltam a aparecer.
-         */
-        const longestServiceDurationMinutes = Math.max(
-            30,
-            ...adminServices
-                .map((service) => Number(service.duration_minutes))
-                .filter((duration) => Number.isFinite(duration) && duration > 0),
-        );
+        const occupied: TimeInterval[] = [
+            ...appointments
+                .filter((appointment) =>
+                    appointment.appointment_date === manualDate &&
+                    appointment.status !== "cancelled" &&
+                    appointment.status !== "no-show",
+                )
+                .map((appointment) => {
+                    const start = getMinutesFromTime(appointment.start_time);
+                    return {start, end: start + appointment.duration_minutes};
+                }),
+            ...adminBlocks
+                .filter((block) => block.block_date === manualDate)
+                .map((block) => ({
+                    start: getMinutesFromTime(block.start_time),
+                    end: getMinutesFromTime(block.end_time),
+                })),
+        ];
 
-        const appointmentsForDate: TimeInterval[] = appointments
-            .filter((appointment) =>
-                appointment.appointment_date === manualDate &&
-                appointment.status !== "cancelled" &&
-                appointment.status !== "no-show",
-            )
-            .map((appointment) => {
-                const appointmentStart =
-                    getMinutesFromTime(appointment.start_time);
-
-                const appointmentDuration =
-                    Number(appointment.duration_minutes) > 0
-                        ? Number(appointment.duration_minutes)
-                        : longestServiceDurationMinutes;
-
-                return {
-                    start: appointmentStart,
-                    end: appointmentStart + appointmentDuration,
-                };
-            });
-
-        const blocksForDate: TimeInterval[] = adminBlocks
-            .filter((block) => block.block_date === manualDate)
-            .map((block) => ({
-                start: getMinutesFromTime(block.start_time),
-                end: getMinutesFromTime(block.end_time),
-            }));
-
+        const merged = mergeIntervals(occupied);
         const now = new Date();
         const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         return candidateStarts
-            .filter((candidateStart) => {
-                const candidateEnd =
-                    candidateStart + longestServiceDurationMinutes;
-
-                const isPastToday =
-                    manualDate === today &&
-                    candidateStart <= currentMinutes;
-
-                const conflictsWithAppointment =
-                    appointmentsForDate.some((appointmentInterval) =>
-                        intervalsOverlap(
-                            candidateStart,
-                            candidateEnd,
-                            appointmentInterval.start,
-                            appointmentInterval.end,
-                        ),
-                    );
-
-                const conflictsWithBlock =
-                    blocksForDate.some((blockInterval) =>
-                        intervalsOverlap(
-                            candidateStart,
-                            candidateEnd,
-                            blockInterval.start,
-                            blockInterval.end,
-                        ),
-                    );
-
-                return (
-                    !isPastToday &&
-                    !conflictsWithAppointment &&
-                    !conflictsWithBlock
+            .filter((start) => {
+                const end = start + manualSelectedService.duration_minutes;
+                const isPastToday = manualDate === today && start <= currentMinutes;
+                const hasConflict = merged.some((occupiedInterval) =>
+                    intervalsOverlap(
+                        start,
+                        end,
+                        occupiedInterval.start,
+                        occupiedInterval.end,
+                    ),
                 );
+
+                return !isPastToday && !hasConflict;
             })
             .map(minutesToTime);
     }, [
@@ -9900,7 +9865,6 @@ function AdminPanel() {
         manualSelectedService,
         appointments,
         adminBlocks,
-        adminServices,
     ]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
