@@ -51,6 +51,29 @@ import {
     adminStyles,
 } from "./styles";
 
+function getAdminNewAppointmentStartMinutes(date: string) {
+    if (!date) return [] as number[];
+
+    const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    const morning = Array.from(
+        {length: 13},
+        (_, index) => 7 * 60 + index * 30,
+    ); // 07:00 até 13:00
+
+    if (isWeekend) {
+        return morning;
+    }
+
+    const evening = Array.from(
+        {length: 9},
+        (_, index) => 17 * 60 + index * 30,
+    ); // 17:00 até 21:00
+
+    return [...morning, ...evening];
+}
+
 export default function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [adminNow, setAdminNow] = useState(() => new Date());
@@ -1614,8 +1637,9 @@ export default function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        const candidateStarts = getFixedAdminManualStartMinutes(manualDate)
-            .filter((start) => start <= 19 * 60);
+        // Grade exclusiva do Novo agendamento ADM.
+        // Não usa horários/configurações do painel da cliente.
+        const candidateStarts = getAdminNewAppointmentStartMinutes(manualDate);
 
         const occupied: TimeInterval[] = [
             ...appointments
