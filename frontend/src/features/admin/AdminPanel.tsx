@@ -1,10 +1,7 @@
 import {useEffect, useMemo, useState} from "react";
 import {supabase} from "../../lib/supabase";
 import {
-    type Appointment,
-    type ScheduleBlock,
     type ScheduleTimeOverride,
-    type Service,
     type TimeInterval,
     fallbackServices,
     formatBrazilianPhone,
