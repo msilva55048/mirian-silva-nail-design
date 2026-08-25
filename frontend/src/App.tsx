@@ -8762,9 +8762,11 @@ function AdminPanel() {
         time: string,
         selectedServiceDurationMinutes: number,
     ) {
-        const start = getMinutesFromTime(time);
-        const safeDuration =
+        const candidateStart = getMinutesFromTime(time);
+        const safeSelectedDuration =
             Math.max(1, Number(selectedServiceDurationMinutes) || 1);
+        const candidateEnd =
+            candidateStart + safeSelectedDuration;
 
         return appointments.some((appointment) => {
             if (
@@ -8778,10 +8780,22 @@ function AdminPanel() {
             const existingStart =
                 getMinutesFromTime(appointment.start_time);
 
-            const protectedStart = existingStart - safeDuration;
-            const protectedEnd = existingStart + safeDuration;
+            const existingDuration =
+                Math.max(
+                    1,
+                    Number(appointment.duration_minutes) ||
+                    safeSelectedDuration,
+                );
 
-            return start >= protectedStart && start < protectedEnd;
+            const existingEnd =
+                existingStart + existingDuration;
+
+            return intervalsOverlap(
+                candidateStart,
+                candidateEnd,
+                existingStart,
+                existingEnd,
+            );
         });
     }
 
@@ -9928,42 +9942,33 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        /*
-         * NOVO AGENDAMENTO ADM
-         *
-         * Grade:
-         * - segunda a sexta: 07:00 até 21:00 direto, de 30 em 30;
-         * - sábado e domingo: 07:00 até 13:00, de 30 em 30.
-         *
-         * Os bloqueios criados pela ADM para a agenda da cliente NÃO
-         * removem horários desta tela.
-         *
-         * Para cada agendamento real já existente, usamos a duração do
-         * SERVIÇO ESCOLHIDO agora no Novo agendamento como margem antes
-         * e depois do horário marcado.
-         *
-         * Exemplo:
-         * agendamento existente às 07:00
-         * serviço escolhido = 120 min
-         * faixa indisponível para um novo início:
-         * 05:00 <= horário < 09:00
-         *
-         * Portanto 07:30, 08:00 e 08:30 ficam indisponíveis.
-         * 09:00 volta a poder ser escolhido.
-         */
         const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
+
         const selectedServiceDurationMinutes =
             Math.max(1, Number(manualSelectedService.duration_minutes) || 1);
 
-        const appointmentStartMinutes = appointments
+        const appointmentsForDate: TimeInterval[] = appointments
             .filter((appointment) =>
                 appointment.appointment_date === manualDate &&
                 appointment.status !== "cancelled" &&
                 appointment.status !== "no-show",
             )
-            .map((appointment) =>
-                getMinutesFromTime(appointment.start_time),
-            );
+            .map((appointment) => {
+                const existingStart =
+                    getMinutesFromTime(appointment.start_time);
+
+                const existingDuration =
+                    Math.max(
+                        1,
+                        Number(appointment.duration_minutes) ||
+                        selectedServiceDurationMinutes,
+                    );
+
+                return {
+                    start: existingStart,
+                    end: existingStart + existingDuration,
+                };
+            });
 
         const now = new Date();
         const today = formatDateForInput(now);
@@ -9971,22 +9976,22 @@ function AdminPanel() {
 
         return candidateStarts
             .filter((candidateStart) => {
+                const candidateEnd =
+                    candidateStart + selectedServiceDurationMinutes;
+
                 const isPastToday =
                     manualDate === today &&
                     candidateStart <= currentMinutes;
 
                 const conflictsWithAppointment =
-                    appointmentStartMinutes.some((existingStart) => {
-                        const protectedStart =
-                            existingStart - selectedServiceDurationMinutes;
-                        const protectedEnd =
-                            existingStart + selectedServiceDurationMinutes;
-
-                        return (
-                            candidateStart >= protectedStart &&
-                            candidateStart < protectedEnd
-                        );
-                    });
+                    appointmentsForDate.some((existingInterval) =>
+                        intervalsOverlap(
+                            candidateStart,
+                            candidateEnd,
+                            existingInterval.start,
+                            existingInterval.end,
+                        ),
+                    );
 
                 return !isPastToday && !conflictsWithAppointment;
             })
@@ -11155,7 +11160,9 @@ function AdminPanel() {
                     </div>
 
                     <span className={`admin-status admin-status--${appointment.status}`}>
-                        {getAppointmentStatusLabel(appointment.status)}
+                        {appointment.status === "confirmed"
+                            ? "Agendado"
+                            : getAppointmentStatusLabel(appointment.status)}
                     </span>
                 </div>
 
