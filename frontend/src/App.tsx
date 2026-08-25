@@ -9799,26 +9799,26 @@ function AdminPanel() {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
         /*
-         * NOVO AGENDAMENTO — grade exclusiva do ADM.
+         * Grade fixa e exclusiva do Novo agendamento ADM:
+         * - segunda a sexta: 07:00 até 21:00 direto, de 30 em 30;
+         * - sábado e domingo: 07:00 até 13:00, de 30 em 30.
          *
-         * Segunda a sexta:
-         * 07:00 até 21:00 direto, de 30 em 30 minutos.
-         *
-         * Sábado e domingo:
-         * 07:00 até 13:00, de 30 em 30 minutos.
-         *
-         * A grade acima vem somente de getFixedAdminManualStartMinutes().
-         * Não usa a configuração de horários da área da cliente.
+         * Esta grade não usa os horários configurados da área da cliente.
          */
         const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
 
         /*
-         * Usa o maior tempo de serviço cadastrado como margem de segurança.
-         * Ex.: maior serviço = 120 min e existe agendamento às 21:00.
-         * Um início às 20:30 terminaria às 22:30, portanto entra em conflito
-         * com a janela protegida do agendamento das 21:00 e não aparece.
+         * Para testar se um NOVO horário é seguro, usamos a duração
+         * do serviço mais demorado cadastrado.
          *
-         * O mesmo cálculo protege os horários DEPOIS do início já agendado.
+         * Já os agendamentos existentes usam a duração REAL gravada
+         * em cada registro da tabela appointments.
+         *
+         * Com isso:
+         * - horários ANTES de um agendamento somem se o maior serviço
+         *   iniciado ali invadir o atendimento já marcado;
+         * - horários DURANTE um atendimento existente também somem;
+         * - horários APÓS o término real do atendimento voltam a aparecer.
          */
         const longestServiceDurationMinutes = Math.max(
             30,
@@ -9827,12 +9827,7 @@ function AdminPanel() {
                 .filter((duration) => Number.isFinite(duration) && duration > 0),
         );
 
-        /*
-         * `appointments` é carregado diretamente da tabela public.appointments
-         * no loadAdminData e atualizado em tempo real pelo canal do Supabase.
-         * Consideramos todos os agendamentos ativos da data selecionada.
-         */
-        const appointmentSafetyIntervals: TimeInterval[] = appointments
+        const appointmentsForDate: TimeInterval[] = appointments
             .filter((appointment) =>
                 appointment.appointment_date === manualDate &&
                 appointment.status !== "cancelled" &&
@@ -9842,11 +9837,14 @@ function AdminPanel() {
                 const appointmentStart =
                     getMinutesFromTime(appointment.start_time);
 
+                const appointmentDuration =
+                    Number(appointment.duration_minutes) > 0
+                        ? Number(appointment.duration_minutes)
+                        : longestServiceDurationMinutes;
+
                 return {
                     start: appointmentStart,
-                    end:
-                        appointmentStart +
-                        longestServiceDurationMinutes,
+                    end: appointmentStart + appointmentDuration,
                 };
             });
 
@@ -9863,21 +9861,15 @@ function AdminPanel() {
 
         return candidateStarts
             .filter((candidateStart) => {
-                /*
-                 * Também tratamos cada novo horário como se pudesse receber
-                 * o serviço mais demorado. Isso elimina corretamente os
-                 * horários anteriores a um agendamento existente.
-                 */
                 const candidateEnd =
-                    candidateStart +
-                    longestServiceDurationMinutes;
+                    candidateStart + longestServiceDurationMinutes;
 
                 const isPastToday =
                     manualDate === today &&
                     candidateStart <= currentMinutes;
 
                 const conflictsWithAppointment =
-                    appointmentSafetyIntervals.some((appointmentInterval) =>
+                    appointmentsForDate.some((appointmentInterval) =>
                         intervalsOverlap(
                             candidateStart,
                             candidateEnd,
