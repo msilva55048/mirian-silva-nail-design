@@ -275,30 +275,10 @@ const CLIENT_WEEKEND_START_MINUTES = [
     13 * 60,  // 13:00
 ] as const;
 
-const ADMIN_WEEKDAY_START_MINUTES = [
-    7 * 60,        // 07:00
-    7 * 60 + 30,   // 07:30
-    8 * 60,        // 08:00
-    8 * 60 + 30,   // 08:30
-    9 * 60,        // 09:00
-    9 * 60 + 30,   // 09:30
-    10 * 60,       // 10:00
-    10 * 60 + 30,  // 10:30
-    11 * 60,       // 11:00
-    11 * 60 + 30,  // 11:30
-    12 * 60,       // 12:00
-    12 * 60 + 30,  // 12:30
-    13 * 60,       // 13:00
-    17 * 60,       // 17:00
-    17 * 60 + 30,  // 17:30
-    18 * 60,       // 18:00
-    18 * 60 + 30,  // 18:30
-    19 * 60,       // 19:00
-    19 * 60 + 30,  // 19:30
-    20 * 60,       // 20:00
-    20 * 60 + 30,  // 20:30
-    21 * 60,       // 21:00
-] as const;
+const ADMIN_WEEKDAY_START_MINUTES = Array.from(
+    {length: 29},
+    (_, index) => 7 * 60 + index * 30,
+); // 07:00 até 21:00, direto, de 30 em 30 minutos.
 
 const ADMIN_WEEKEND_START_MINUTES = [
     7 * 60,        // 07:00
@@ -8427,7 +8407,7 @@ function AdminPanel() {
                     (appointment.status === "confirmed" ||
                         appointment.status === "pending") &&
                     getAppointmentEndDateTime(appointment).getTime() <=
-                        adminNow.getTime(),
+                    adminNow.getTime(),
             )
             .map((appointment) => appointment.id);
 
@@ -9041,11 +9021,11 @@ function AdminPanel() {
             setSelectedClient((current) =>
                 current
                     ? {
-                          ...current,
-                          appointments: current.appointments.filter(
-                              (item) => item.id !== appointment.id,
-                          ),
-                      }
+                        ...current,
+                        appointments: current.appointments.filter(
+                            (item) => item.id !== appointment.id,
+                        ),
+                    }
                     : current,
             );
         } catch (error) {
@@ -9095,15 +9075,15 @@ function AdminPanel() {
             setSelectedClient((current) =>
                 current
                     ? {
-                          ...current,
-                          appointments: current.appointments.filter(
-                              (item) => item.id !== appointment.id,
-                          ),
-                          nextAppointment:
-                              current.nextAppointment?.id === appointment.id
-                                  ? null
-                                  : current.nextAppointment,
-                      }
+                        ...current,
+                        appointments: current.appointments.filter(
+                            (item) => item.id !== appointment.id,
+                        ),
+                        nextAppointment:
+                            current.nextAppointment?.id === appointment.id
+                                ? null
+                                : current.nextAppointment,
+                    }
                     : current,
             );
         } catch (error) {
@@ -9615,7 +9595,7 @@ function AdminPanel() {
                         (
                             item.status === "completed" ||
                             getAppointmentEndDateTime(item).getTime() <=
-                                adminNow.getTime()
+                            adminNow.getTime()
                         ),
                 );
 
@@ -9626,7 +9606,7 @@ function AdminPanel() {
                             item.status !== "no-show" &&
                             item.status !== "completed" &&
                             getAppointmentEndDateTime(item).getTime() >
-                                adminNow.getTime(),
+                            adminNow.getTime(),
                     )
                     .sort(
                         (a, b) =>
@@ -9818,46 +9798,109 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
+        /*
+         * NOVO AGENDAMENTO — grade exclusiva do ADM.
+         *
+         * Segunda a sexta:
+         * 07:00 até 21:00 direto, de 30 em 30 minutos.
+         *
+         * Sábado e domingo:
+         * 07:00 até 13:00, de 30 em 30 minutos.
+         *
+         * A grade acima vem somente de getFixedAdminManualStartMinutes().
+         * Não usa a configuração de horários da área da cliente.
+         */
         const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
 
-        const occupied: TimeInterval[] = [
-            ...appointments
-                .filter((appointment) =>
-                    appointment.appointment_date === manualDate &&
-                    appointment.status !== "cancelled" &&
-                    appointment.status !== "no-show",
-                )
-                .map((appointment) => {
-                    const start = getMinutesFromTime(appointment.start_time);
-                    return {start, end: start + appointment.duration_minutes};
-                }),
-            ...adminBlocks
-                .filter((block) => block.block_date === manualDate)
-                .map((block) => ({
-                    start: getMinutesFromTime(block.start_time),
-                    end: getMinutesFromTime(block.end_time),
-                })),
-        ];
+        /*
+         * Usa o maior tempo de serviço cadastrado como margem de segurança.
+         * Ex.: maior serviço = 120 min e existe agendamento às 21:00.
+         * Um início às 20:30 terminaria às 22:30, portanto entra em conflito
+         * com a janela protegida do agendamento das 21:00 e não aparece.
+         *
+         * O mesmo cálculo protege os horários DEPOIS do início já agendado.
+         */
+        const longestServiceDurationMinutes = Math.max(
+            30,
+            ...adminServices
+                .map((service) => Number(service.duration_minutes))
+                .filter((duration) => Number.isFinite(duration) && duration > 0),
+        );
 
-        const merged = mergeIntervals(occupied);
+        /*
+         * `appointments` é carregado diretamente da tabela public.appointments
+         * no loadAdminData e atualizado em tempo real pelo canal do Supabase.
+         * Consideramos todos os agendamentos ativos da data selecionada.
+         */
+        const appointmentSafetyIntervals: TimeInterval[] = appointments
+            .filter((appointment) =>
+                appointment.appointment_date === manualDate &&
+                appointment.status !== "cancelled" &&
+                appointment.status !== "no-show",
+            )
+            .map((appointment) => {
+                const appointmentStart =
+                    getMinutesFromTime(appointment.start_time);
+
+                return {
+                    start: appointmentStart,
+                    end:
+                        appointmentStart +
+                        longestServiceDurationMinutes,
+                };
+            });
+
+        const blocksForDate: TimeInterval[] = adminBlocks
+            .filter((block) => block.block_date === manualDate)
+            .map((block) => ({
+                start: getMinutesFromTime(block.start_time),
+                end: getMinutesFromTime(block.end_time),
+            }));
+
         const now = new Date();
         const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         return candidateStarts
-            .filter((start) => {
-                const end = start + manualSelectedService.duration_minutes;
-                const isPastToday = manualDate === today && start <= currentMinutes;
-                const hasConflict = merged.some((occupiedInterval) =>
-                    intervalsOverlap(
-                        start,
-                        end,
-                        occupiedInterval.start,
-                        occupiedInterval.end,
-                    ),
-                );
+            .filter((candidateStart) => {
+                /*
+                 * Também tratamos cada novo horário como se pudesse receber
+                 * o serviço mais demorado. Isso elimina corretamente os
+                 * horários anteriores a um agendamento existente.
+                 */
+                const candidateEnd =
+                    candidateStart +
+                    longestServiceDurationMinutes;
 
-                return !isPastToday && !hasConflict;
+                const isPastToday =
+                    manualDate === today &&
+                    candidateStart <= currentMinutes;
+
+                const conflictsWithAppointment =
+                    appointmentSafetyIntervals.some((appointmentInterval) =>
+                        intervalsOverlap(
+                            candidateStart,
+                            candidateEnd,
+                            appointmentInterval.start,
+                            appointmentInterval.end,
+                        ),
+                    );
+
+                const conflictsWithBlock =
+                    blocksForDate.some((blockInterval) =>
+                        intervalsOverlap(
+                            candidateStart,
+                            candidateEnd,
+                            blockInterval.start,
+                            blockInterval.end,
+                        ),
+                    );
+
+                return (
+                    !isPastToday &&
+                    !conflictsWithAppointment &&
+                    !conflictsWithBlock
+                );
             })
             .map(minutesToTime);
     }, [
@@ -9865,6 +9908,7 @@ function AdminPanel() {
         manualSelectedService,
         appointments,
         adminBlocks,
+        adminServices,
     ]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
@@ -11194,10 +11238,10 @@ function AdminPanel() {
                                                 {adminView === "agenda"
                                                     ? formatAdminDate(agendaDate)
                                                     : `${formatAdminDate(
-                                                          weekDates[0],
-                                                      )} até ${formatAdminDate(
-                                                          weekDates[6],
-                                                      )}`}
+                                                        weekDates[0],
+                                                    )} até ${formatAdminDate(
+                                                        weekDates[6],
+                                                    )}`}
                                             </strong>
                                         </span>
 
@@ -12190,7 +12234,7 @@ function AdminPanel() {
                                         (
                                             item.status === "completed" ||
                                             getAppointmentEndDateTime(item).getTime() <=
-                                                adminNow.getTime()
+                                            adminNow.getTime()
                                         ),
                                 ).length;
 
@@ -12200,7 +12244,7 @@ function AdminPanel() {
                                         item.status !== "no-show" &&
                                         item.status !== "completed" &&
                                         getAppointmentEndDateTime(item).getTime() >
-                                            adminNow.getTime(),
+                                        adminNow.getTime(),
                                 ).length;
 
                                 const cancelled = client.appointments.filter(
@@ -12502,7 +12546,7 @@ function AdminPanel() {
                             )}
                         </section>
 
-                        
+
                     </section>
                 ) : adminView === "blocks" ? (
                     <section className="admin-content-section">
@@ -12935,7 +12979,7 @@ function AdminPanel() {
                                                                                 new Date(
                                                                                     current.getFullYear(),
                                                                                     current.getMonth() -
-                                                                                        1,
+                                                                                    1,
                                                                                     1,
                                                                                 ),
                                                                         )
@@ -12962,7 +13006,7 @@ function AdminPanel() {
                                                                                 new Date(
                                                                                     current.getFullYear(),
                                                                                     current.getMonth() +
-                                                                                        1,
+                                                                                    1,
                                                                                     1,
                                                                                 ),
                                                                         )
