@@ -1638,17 +1638,27 @@ export default function AdminPanel() {
         // Não usa horários/configurações do painel da cliente.
         const candidateStarts = getAdminNewAppointmentStartMinutes(manualDate);
 
-        const occupiedAppointmentStarts = new Set(
-            appointments
-                .filter((appointment) =>
-                    appointment.appointment_date === manualDate &&
-                    appointment.status !== "cancelled" &&
-                    appointment.status !== "no-show",
-                )
-                .map((appointment) =>
-                    getMinutesFromTime(appointment.start_time),
-                ),
+        const longestServiceDurationMinutes = Math.max(
+            30,
+            ...adminServices.map((service) => service.duration_minutes),
         );
+
+        const appointmentsForDate = appointments
+            .filter((appointment) =>
+                appointment.appointment_date === manualDate &&
+                appointment.status !== "cancelled" &&
+                appointment.status !== "no-show",
+            )
+            .map((appointment) => {
+                const start = getMinutesFromTime(appointment.start_time);
+
+                return {
+                    start,
+                    // Por segurança, qualquer agendamento existente reserva
+                    // o tempo do procedimento mais demorado cadastrado.
+                    end: start + longestServiceDurationMinutes,
+                };
+            });
 
         const blocksForDate = adminBlocks
             .filter((block) => block.block_date === manualDate)
@@ -1663,20 +1673,38 @@ export default function AdminPanel() {
 
         return candidateStarts
             .filter((start) => {
+                const candidateEnd =
+                    start + longestServiceDurationMinutes;
+
                 const isPastToday =
                     manualDate === today &&
                     start <= currentMinutes;
 
-                const isAlreadyScheduled =
-                    occupiedAppointmentStarts.has(start);
+                const conflictsWithAppointment =
+                    appointmentsForDate.some((appointmentInterval) =>
+                        intervalsOverlap(
+                            start,
+                            candidateEnd,
+                            appointmentInterval.start,
+                            appointmentInterval.end,
+                        ),
+                    );
 
-                const isBlocked = blocksForDate.some(
-                    (block) =>
-                        start >= block.start &&
-                        start < block.end,
+                const conflictsWithBlock =
+                    blocksForDate.some((block) =>
+                        intervalsOverlap(
+                            start,
+                            candidateEnd,
+                            block.start,
+                            block.end,
+                        ),
+                    );
+
+                return (
+                    !isPastToday &&
+                    !conflictsWithAppointment &&
+                    !conflictsWithBlock
                 );
-
-                return !isPastToday && !isAlreadyScheduled && !isBlocked;
             })
             .map(minutesToTime);
     }, [
@@ -1684,6 +1712,7 @@ export default function AdminPanel() {
         manualSelectedService,
         appointments,
         adminBlocks,
+        adminServices,
     ]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
