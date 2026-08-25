@@ -8008,6 +8008,101 @@ const adminClientScheduledMetricStyles = `
         font-size: .9rem;
     }
 }
+
+/* Cards compactos expansíveis — Agenda do dia/semana/mês e Clientes */
+.admin-booking-card--collapsible,
+.admin-client-card--collapsible {
+    cursor: pointer;
+}
+
+.admin-booking-card--collapsible:focus-visible,
+.admin-client-card--collapsible:focus-visible {
+    outline: 3px solid rgba(154, 83, 104, .18);
+    outline-offset: 2px;
+}
+
+.admin-booking-card__compact-date,
+.admin-client-card__compact-date {
+    margin-top: 12px;
+    padding: 11px 13px;
+    border-radius: 12px;
+    background: #faf5f7;
+}
+
+.admin-booking-card__compact-date span,
+.admin-client-card__compact-date span {
+    display: block;
+    color: #8a7078;
+    font-size: .7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.admin-booking-card__compact-date strong,
+.admin-client-card__compact-date strong {
+    display: block;
+    margin-top: 4px;
+    color: #4d363e;
+    font-size: .88rem;
+}
+
+.admin-booking-card__details--expanded {
+    margin-top: 12px;
+}
+
+.admin-client-card__compact-summary {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-client-card__compact-main {
+    min-width: 0;
+}
+
+.admin-client-card__compact-main h3 {
+    margin: 4px 0 0;
+    color: #35272c;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+}
+
+.admin-client-card__compact-time {
+    display: block;
+    color: #8f3f58;
+    font-size: 1.05rem;
+    font-weight: 900;
+}
+
+.admin-client-card--collapsible:not(.is-expanded) {
+    padding: 14px 16px;
+}
+
+.admin-client-card--collapsible.is-expanded {
+    cursor: default;
+}
+
+@media (max-width: 620px) {
+    .admin-booking-card--collapsible:not(.is-expanded),
+    .admin-client-card--collapsible:not(.is-expanded) {
+        padding: 14px;
+    }
+
+    .admin-booking-card__top {
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .admin-booking-card__compact-date,
+    .admin-client-card__compact-date {
+        margin-top: 10px;
+        padding: 10px 12px;
+    }
+
+    .admin-client-card__compact-summary {
+        gap: 10px;
+    }
+}
+
 `;
 
 const adminEditDateTimeStyles = `
@@ -8298,6 +8393,8 @@ function AdminPanel() {
     const [isSavingManualAppointment, setIsSavingManualAppointment] = useState(false);
 
     const [selectedAdminAppointment, setSelectedAdminAppointment] = useState<AdminAppointment | null>(null);
+    const [expandedAppointmentCardId, setExpandedAppointmentCardId] = useState<string | null>(null);
+    const [expandedClientCardKey, setExpandedClientCardKey] = useState<string | null>(null);
     const [editAppointmentName, setEditAppointmentName] = useState("");
     const [editAppointmentPhone, setEditAppointmentPhone] = useState("");
     const [editAppointmentEmail, setEditAppointmentEmail] = useState("");
@@ -11026,56 +11123,110 @@ function AdminPanel() {
 
     const renderAppointmentCard = (appointment: AdminAppointment) => {
         const dueTypes = getDueNotificationTypes(appointment);
+        const isExpanded = expandedAppointmentCardId === appointment.id;
+
+        function toggleAppointmentCard() {
+            setExpandedAppointmentCardId((current) =>
+                current === appointment.id ? null : appointment.id,
+            );
+        }
 
         return (
             <article
                 key={appointment.id}
-                className={`admin-booking-card${appointment.status === "cancelled" ? " is-cancelled" : ""}`}
-                onClick={() => openAppointmentDetails(appointment)}
+                className={`admin-booking-card admin-booking-card--collapsible${isExpanded ? " is-expanded" : ""}${appointment.status === "cancelled" ? " is-cancelled" : ""}`}
+                onClick={toggleAppointmentCard}
                 role="button"
                 tabIndex={0}
+                aria-expanded={isExpanded}
                 onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") openAppointmentDetails(appointment);
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleAppointmentCard();
+                    }
                 }}
             >
                 <div className="admin-booking-card__top">
                     <div>
-                        <span className="admin-booking-card__time">{String(appointment.start_time).slice(0, 5)}</span>
+                        <span className="admin-booking-card__time">
+                            {String(appointment.start_time).slice(0, 5)}
+                        </span>
                         <h3>{appointment.client_name}</h3>
                     </div>
-                    <span className={`admin-status admin-status--${appointment.status}`}>{getAppointmentStatusLabel(appointment.status)}</span>
-                </div>
-                <div className="admin-booking-card__details">
-                    <div><span>Data</span><strong>{formatAdminDate(appointment.appointment_date)}</strong></div>
-                    <div><span>Serviço</span><strong>{appointment.service_name}</strong></div>
-                    <div><span>Duração</span><strong>{appointment.duration_minutes} min</strong></div>
-                    <div><span>Telefone</span><strong>{appointment.client_phone}</strong></div>
-                    <div className="admin-booking-card__music">
-                        <span>Gosto musical</span>
-                        <strong>{appointment.musical_taste?.trim() || "Não informado"}</strong>
-                    </div>
-                </div>
-                <div className="admin-booking-card__footer" onClick={(event) => event.stopPropagation()}>
-                    <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar detalhes</button>
-                    <button type="button" onClick={() => void cancelAppointment(appointment)}>Cancelar</button>
-                    {dueTypes.map((type) => {
-                        const key = getNotificationKey(appointment.id, type);
-                        const wasOpened = Boolean(openedWhatsAppNotifications[key]);
 
-                        return (
-                            <a
-                                key={type}
-                                className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
-                                href={getWhatsAppUrl(appointment, type)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => markWhatsAppNotificationOpened(appointment, type)}
-                            >
-                                {wasOpened ? "Abrir novamente" : getWhatsAppNotificationLabel(type)}
-                            </a>
-                        );
-                    })}
+                    <span className={`admin-status admin-status--${appointment.status}`}>
+                        {getAppointmentStatusLabel(appointment.status)}
+                    </span>
                 </div>
+
+                <div className="admin-booking-card__compact-date">
+                    <span>Data</span>
+                    <strong>{formatAdminDate(appointment.appointment_date)}</strong>
+                </div>
+
+                {isExpanded && (
+                    <>
+                        <div className="admin-booking-card__details admin-booking-card__details--expanded">
+                            <div>
+                                <span>Serviço</span>
+                                <strong>{appointment.service_name}</strong>
+                            </div>
+                            <div>
+                                <span>Duração</span>
+                                <strong>{appointment.duration_minutes} min</strong>
+                            </div>
+                            <div>
+                                <span>Telefone</span>
+                                <strong>{appointment.client_phone}</strong>
+                            </div>
+                            <div className="admin-booking-card__music">
+                                <span>Gosto musical</span>
+                                <strong>{appointment.musical_taste?.trim() || "Não informado"}</strong>
+                            </div>
+                        </div>
+
+                        <div
+                            className="admin-booking-card__footer"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => openAppointmentDetails(appointment)}
+                            >
+                                Editar detalhes
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => void cancelAppointment(appointment)}
+                            >
+                                Cancelar
+                            </button>
+
+                            {dueTypes.map((type) => {
+                                const key = getNotificationKey(appointment.id, type);
+                                const wasOpened = Boolean(openedWhatsAppNotifications[key]);
+
+                                return (
+                                    <a
+                                        key={type}
+                                        className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
+                                        href={getWhatsAppUrl(appointment, type)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() =>
+                                            markWhatsAppNotificationOpened(appointment, type)
+                                        }
+                                    >
+                                        {wasOpened
+                                            ? "Abrir novamente"
+                                            : getWhatsAppNotificationLabel(type)}
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </article>
         );
     };
@@ -12240,30 +12391,168 @@ function AdminPanel() {
                                     (item) => item.status === "cancelled",
                                 ).length;
 
+                                const isExpandedClient =
+                                    expandedClientCardKey === client.key;
+                                const compactAppointment =
+                                    client.nextAppointment ?? client.lastAppointment;
+
                                 return (
-                                    <article className="admin-client-card" key={client.key}>
-                                        <div className="admin-client-card__top"><div className="admin-client-card__avatar">{client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div><div><h3>{client.name}</h3><a href={`https://wa.me/${normalizePhoneForWhatsApp(client.phone)}`} target="_blank" rel="noopener noreferrer">{client.phone}</a><span>{client.email || "E-mail não informado"}</span></div></div>
-                                        <div className="admin-client-card__metrics">
-                                            <div>
-                                                <span>Atendimentos realizados</span>
-                                                <strong>{realized}</strong>
+                                    <article
+                                        className={`admin-client-card admin-client-card--collapsible${isExpandedClient ? " is-expanded" : ""}`}
+                                        key={client.key}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-expanded={isExpandedClient}
+                                        onClick={() =>
+                                            setExpandedClientCardKey((current) =>
+                                                current === client.key ? null : client.key,
+                                            )
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                setExpandedClientCardKey((current) =>
+                                                    current === client.key ? null : client.key,
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        {!isExpandedClient ? (
+                                            <div className="admin-client-card__compact-summary">
+                                                <div className="admin-client-card__compact-main">
+                                                    {compactAppointment && (
+                                                        <span className="admin-client-card__compact-time">
+                                                            {String(compactAppointment.start_time).slice(0, 5)}
+                                                        </span>
+                                                    )}
+                                                    <h3>{client.name}</h3>
+                                                </div>
+
+                                                {compactAppointment ? (
+                                                    <>
+                                                        <span
+                                                            className={`admin-status admin-status--${compactAppointment.status}`}
+                                                        >
+                                                            {getAppointmentStatusLabel(
+                                                                compactAppointment.status,
+                                                            )}
+                                                        </span>
+
+                                                        <div className="admin-client-card__compact-date">
+                                                            <span>Data</span>
+                                                            <strong>
+                                                                {formatAdminDate(
+                                                                    compactAppointment.appointment_date,
+                                                                )}
+                                                            </strong>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="admin-client-card__compact-date">
+                                                        <span>Agenda</span>
+                                                        <strong>Sem agendamento registrado</strong>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div>
-                                                <span>Atendimentos agendados</span>
-                                                <strong>{scheduled}</strong>
-                                            </div>
-                                            <div>
-                                                <span>Atendimentos cancelados</span>
-                                                <strong>{cancelled}</strong>
-                                            </div>
-                                        </div>
-                                        {client.nextAppointment && <div className="admin-client-card__next"><span>Próximo</span><strong>{formatAdminDate(client.nextAppointment.appointment_date)} às {String(client.nextAppointment.start_time).slice(0, 5)}</strong></div>}
-                                        <div className="admin-client-card__actions">
-                                            <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
-                                            <button type="button" className="is-nail-record" onClick={() => openNailRecordForClient(client)}>📷 Registrar estado da unha</button>
-                                            <button type="button" className="is-secondary" onClick={() => openClientEditor(client)}>Editar cadastro</button>
-                                            <button type="button" className="is-danger" disabled={deletingClientKey === client.key} onClick={() => void deleteClient(client)}>{deletingClientKey === client.key ? "Excluindo..." : "Remover da lista"}</button>
-                                        </div>
+                                        ) : (
+                                            <>
+                                                <div className="admin-client-card__top">
+                                                    <div className="admin-client-card__avatar">
+                                                        {client.name
+                                                            .split(/\s+/)
+                                                            .slice(0, 2)
+                                                            .map((part) => part[0])
+                                                            .join("")
+                                                            .toUpperCase()}
+                                                    </div>
+
+                                                    <div>
+                                                        <h3>{client.name}</h3>
+                                                        <a
+                                                            href={`https://wa.me/${normalizePhoneForWhatsApp(client.phone)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(event) => event.stopPropagation()}
+                                                        >
+                                                            {client.phone}
+                                                        </a>
+                                                        <span>
+                                                            {client.email || "E-mail não informado"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="admin-client-card__metrics">
+                                                    <div>
+                                                        <span>Atendimentos realizados</span>
+                                                        <strong>{realized}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Atendimentos agendados</span>
+                                                        <strong>{scheduled}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Atendimentos cancelados</span>
+                                                        <strong>{cancelled}</strong>
+                                                    </div>
+                                                </div>
+
+                                                {client.nextAppointment && (
+                                                    <div className="admin-client-card__next">
+                                                        <span>Próximo</span>
+                                                        <strong>
+                                                            {formatAdminDate(
+                                                                client.nextAppointment.appointment_date,
+                                                            )}{" "}
+                                                            às{" "}
+                                                            {String(
+                                                                client.nextAppointment.start_time,
+                                                            ).slice(0, 5)}
+                                                        </strong>
+                                                    </div>
+                                                )}
+
+                                                <div
+                                                    className="admin-client-card__actions"
+                                                    onClick={(event) => event.stopPropagation()}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openClientHistory(client)}
+                                                    >
+                                                        Ver histórico
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="is-nail-record"
+                                                        onClick={() =>
+                                                            openNailRecordForClient(client)
+                                                        }
+                                                    >
+                                                        📷 Registrar estado da unha
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="is-secondary"
+                                                        onClick={() => openClientEditor(client)}
+                                                    >
+                                                        Editar cadastro
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="is-danger"
+                                                        disabled={
+                                                            deletingClientKey === client.key
+                                                        }
+                                                        onClick={() => void deleteClient(client)}
+                                                    >
+                                                        {deletingClientKey === client.key
+                                                            ? "Excluindo..."
+                                                            : "Remover da lista"}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </article>
                                 );
                             })}
