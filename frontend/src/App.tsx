@@ -8635,16 +8635,6 @@ function AdminPanel() {
         });
     }
 
-    const longestAdminServiceDurationMinutes = useMemo(() => {
-        const validDurations = adminServices
-            .map((service) => Number(service.duration_minutes))
-            .filter((duration) => Number.isFinite(duration) && duration > 0);
-
-        return validDurations.length
-            ? Math.max(...validDurations)
-            : 30;
-    }, [adminServices]);
-
     function appointmentConflicts(
         appointmentId: string,
         date: string,
@@ -8673,9 +8663,11 @@ function AdminPanel() {
     function manualAppointmentConflicts(
         date: string,
         time: string,
+        selectedServiceDurationMinutes: number,
     ) {
         const start = getMinutesFromTime(time);
-        const end = start + longestAdminServiceDurationMinutes;
+        const safeDuration =
+            Math.max(1, Number(selectedServiceDurationMinutes) || 1);
 
         return appointments.some((appointment) => {
             if (
@@ -8689,17 +8681,10 @@ function AdminPanel() {
             const existingStart =
                 getMinutesFromTime(appointment.start_time);
 
-            const existingDuration =
-                Number(appointment.duration_minutes) > 0
-                    ? Number(appointment.duration_minutes)
-                    : longestAdminServiceDurationMinutes;
+            const protectedStart = existingStart - safeDuration;
+            const protectedEnd = existingStart + safeDuration;
 
-            return intervalsOverlap(
-                start,
-                end,
-                existingStart,
-                existingStart + existingDuration,
-            );
+            return start >= protectedStart && start < protectedEnd;
         });
     }
 
@@ -8733,7 +8718,7 @@ function AdminPanel() {
             return;
         }
 
-        if (manualAppointmentConflicts(manualDate, manualTime)) {
+        if (manualAppointmentConflicts(manualDate, manualTime, service.duration_minutes)) {
             setManualError("Este período entra em conflito com outro agendamento já existente.");
             return;
         }
@@ -9846,28 +9831,42 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
+        /*
+         * NOVO AGENDAMENTO ADM
+         *
+         * Grade:
+         * - segunda a sexta: 07:00 até 21:00 direto, de 30 em 30;
+         * - sábado e domingo: 07:00 até 13:00, de 30 em 30.
+         *
+         * Os bloqueios criados pela ADM para a agenda da cliente NÃO
+         * removem horários desta tela.
+         *
+         * Para cada agendamento real já existente, usamos a duração do
+         * SERVIÇO ESCOLHIDO agora no Novo agendamento como margem antes
+         * e depois do horário marcado.
+         *
+         * Exemplo:
+         * agendamento existente às 07:00
+         * serviço escolhido = 120 min
+         * faixa indisponível para um novo início:
+         * 05:00 <= horário < 09:00
+         *
+         * Portanto 07:30, 08:00 e 08:30 ficam indisponíveis.
+         * 09:00 volta a poder ser escolhido.
+         */
         const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
+        const selectedServiceDurationMinutes =
+            Math.max(1, Number(manualSelectedService.duration_minutes) || 1);
 
-        const appointmentsForDate: TimeInterval[] = appointments
+        const appointmentStartMinutes = appointments
             .filter((appointment) =>
                 appointment.appointment_date === manualDate &&
                 appointment.status !== "cancelled" &&
                 appointment.status !== "no-show",
             )
-            .map((appointment) => {
-                const appointmentStart =
-                    getMinutesFromTime(appointment.start_time);
-
-                const appointmentDuration =
-                    Number(appointment.duration_minutes) > 0
-                        ? Number(appointment.duration_minutes)
-                        : longestAdminServiceDurationMinutes;
-
-                return {
-                    start: appointmentStart,
-                    end: appointmentStart + appointmentDuration,
-                };
-            });
+            .map((appointment) =>
+                getMinutesFromTime(appointment.start_time),
+            );
 
         const now = new Date();
         const today = formatDateForInput(now);
@@ -9875,22 +9874,22 @@ function AdminPanel() {
 
         return candidateStarts
             .filter((candidateStart) => {
-                const candidateEnd =
-                    candidateStart + longestAdminServiceDurationMinutes;
-
                 const isPastToday =
                     manualDate === today &&
                     candidateStart <= currentMinutes;
 
                 const conflictsWithAppointment =
-                    appointmentsForDate.some((appointmentInterval) =>
-                        intervalsOverlap(
-                            candidateStart,
-                            candidateEnd,
-                            appointmentInterval.start,
-                            appointmentInterval.end,
-                        ),
-                    );
+                    appointmentStartMinutes.some((existingStart) => {
+                        const protectedStart =
+                            existingStart - selectedServiceDurationMinutes;
+                        const protectedEnd =
+                            existingStart + selectedServiceDurationMinutes;
+
+                        return (
+                            candidateStart >= protectedStart &&
+                            candidateStart < protectedEnd
+                        );
+                    });
 
                 return !isPastToday && !conflictsWithAppointment;
             })
@@ -9899,7 +9898,6 @@ function AdminPanel() {
         manualDate,
         manualSelectedService,
         appointments,
-        longestAdminServiceDurationMinutes,
     ]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
