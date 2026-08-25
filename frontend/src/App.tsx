@@ -296,6 +296,11 @@ const ADMIN_WEEKEND_START_MINUTES = [
     13 * 60,       // 13:00
 ] as const;
 
+const ADMIN_NEW_APPOINTMENT_WEEKEND_START_MINUTES = Array.from(
+    {length: 25},
+    (_, index) => 7 * 60 + index * 30,
+); // Novo agendamento ADM: 07:00 até 19:00, de 30 em 30 minutos.
+
 function isWeekendDate(date: string) {
     const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
     return dayOfWeek === 0 || dayOfWeek === 6;
@@ -317,6 +322,16 @@ function getFixedAdminManualStartMinutes(date: string) {
     // Grade exclusiva do painel ADM para criar/editar agendamentos.
     return isWeekendDate(date)
         ? [...ADMIN_WEEKEND_START_MINUTES]
+        : [...ADMIN_WEEKDAY_START_MINUTES];
+}
+
+function getFixedAdminNewAppointmentStartMinutes(date: string) {
+    if (!date) return [] as number[];
+
+    // Grade exclusiva do "Novo agendamento" do ADM.
+    // Dias úteis: 07:00-21:00. Sábado/domingo: 07:00-19:00.
+    return isWeekendDate(date)
+        ? [...ADMIN_NEW_APPOINTMENT_WEEKEND_START_MINUTES]
         : [...ADMIN_WEEKDAY_START_MINUTES];
 }
 
@@ -1443,7 +1458,23 @@ function PublicSite() {
 
             if (!mounted) return;
 
+            const sessionEmail =
+                session?.user?.email?.trim().toLowerCase() ?? "";
+
+            if (
+                session?.user &&
+                sessionEmail === MIRIAN_ADMIN_EMAIL &&
+                getMirianLastAccessMode() === "admin"
+            ) {
+                window.location.replace("/admin");
+                return;
+            }
+
             if (session?.user) {
+                if (sessionEmail === MIRIAN_ADMIN_EMAIL) {
+                    setMirianLastAccessMode("client");
+                }
+
                 await loadAuthenticatedClient(session.user);
             } else {
                 setClientUserId(null);
@@ -1475,6 +1506,13 @@ function PublicSite() {
                 if (!mounted) return;
 
                 if (session?.user) {
+                    const sessionEmail =
+                        session.user.email?.trim().toLowerCase() ?? "";
+
+                    if (sessionEmail === MIRIAN_ADMIN_EMAIL) {
+                        setMirianLastAccessMode("client");
+                    }
+
                     void loadAuthenticatedClient(session.user);
                 } else {
                     setClientUserId(null);
@@ -2005,6 +2043,7 @@ function PublicSite() {
     }
 
     async function logoutClient() {
+        clearMirianLastAccessMode();
         await supabase.auth.signOut();
         setShowClientAccount(false);
         setShowClientProfileEditor(false);
@@ -7466,6 +7505,34 @@ const adminEnhancementStyles = `
 
 
 const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
+const MIRIAN_LAST_MODE_KEY = "mirian-last-access-mode";
+type MirianAccessMode = "admin" | "client";
+
+function getMirianLastAccessMode(): MirianAccessMode | null {
+    try {
+        const value = window.localStorage.getItem(MIRIAN_LAST_MODE_KEY);
+        return value === "admin" || value === "client" ? value : null;
+    } catch {
+        return null;
+    }
+}
+
+function setMirianLastAccessMode(mode: MirianAccessMode) {
+    try {
+        window.localStorage.setItem(MIRIAN_LAST_MODE_KEY, mode);
+    } catch {
+        // Navegadores em modo privado podem bloquear localStorage.
+    }
+}
+
+function clearMirianLastAccessMode() {
+    try {
+        window.localStorage.removeItem(MIRIAN_LAST_MODE_KEY);
+    } catch {
+        // Navegadores em modo privado podem bloquear localStorage.
+    }
+}
+
 
 
 const adminServiceManagerStyles = `
@@ -8579,14 +8646,26 @@ function AdminPanel() {
 
         async function checkSession() {
             const {data: {session}} = await supabase.auth.getSession();
-            setIsAuthenticated(sessionIsMirianAdmin(session));
+            const isMirianAdminSession = sessionIsMirianAdmin(session);
+
+            if (isMirianAdminSession) {
+                setMirianLastAccessMode("admin");
+            }
+
+            setIsAuthenticated(isMirianAdminSession);
             setIsCheckingSession(false);
         }
 
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
-            setIsAuthenticated(sessionIsMirianAdmin(session));
+            const isMirianAdminSession = sessionIsMirianAdmin(session);
+
+            if (isMirianAdminSession) {
+                setMirianLastAccessMode("admin");
+            }
+
+            setIsAuthenticated(isMirianAdminSession);
             setIsCheckingSession(false);
         });
 
@@ -8716,12 +8795,14 @@ function AdminPanel() {
             return;
         }
 
+        setMirianLastAccessMode("admin");
         setPassword("");
         setIsAuthenticated(true);
         setIsLoggingIn(false);
     }
 
     async function handleLogout() {
+        clearMirianLastAccessMode();
         await supabase.auth.signOut();
     }
 
@@ -9942,7 +10023,7 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
+        const candidateStarts = getFixedAdminNewAppointmentStartMinutes(manualDate);
 
         const selectedServiceDurationMinutes =
             Math.max(1, Number(manualSelectedService.duration_minutes) || 1);
