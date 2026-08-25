@@ -280,26 +280,10 @@ const ADMIN_WEEKDAY_START_MINUTES = Array.from(
     (_, index) => 7 * 60 + index * 30,
 ); // 07:00 até 21:00 direto, de 30 em 30 minutos.
 
-const ADMIN_WEEKEND_START_MINUTES = [
-    7 * 60,        // 07:00
-    7 * 60 + 30,   // 07:30
-    8 * 60,        // 08:00
-    8 * 60 + 30,   // 08:30
-    9 * 60,        // 09:00
-    9 * 60 + 30,   // 09:30
-    10 * 60,       // 10:00
-    10 * 60 + 30,  // 10:30
-    11 * 60,       // 11:00
-    11 * 60 + 30,  // 11:30
-    12 * 60,       // 12:00
-    12 * 60 + 30,  // 12:30
-    13 * 60,       // 13:00
-] as const;
-
-const ADMIN_NEW_APPOINTMENT_WEEKEND_START_MINUTES = Array.from(
+const ADMIN_WEEKEND_START_MINUTES = Array.from(
     {length: 25},
     (_, index) => 7 * 60 + index * 30,
-); // Novo agendamento ADM: 07:00 até 19:00, de 30 em 30 minutos.
+); // ADM sábado e domingo: 07:00 até 19:00, de 30 em 30 minutos.
 
 function isWeekendDate(date: string) {
     const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
@@ -328,11 +312,9 @@ function getFixedAdminManualStartMinutes(date: string) {
 function getFixedAdminNewAppointmentStartMinutes(date: string) {
     if (!date) return [] as number[];
 
-    // Grade exclusiva do "Novo agendamento" do ADM.
-    // Dias úteis: 07:00-21:00. Sábado/domingo: 07:00-19:00.
-    return isWeekendDate(date)
-        ? [...ADMIN_NEW_APPOINTMENT_WEEKEND_START_MINUTES]
-        : [...ADMIN_WEEKDAY_START_MINUTES];
+    // Novo agendamento ADM:
+    // dias úteis 07:00-21:00 e sábado/domingo 07:00-19:00.
+    return getFixedAdminManualStartMinutes(date);
 }
 
 function getConfiguredClientStartMinutes(
