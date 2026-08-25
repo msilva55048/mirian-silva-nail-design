@@ -1614,7 +1614,8 @@ export default function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
+        const candidateStarts = getFixedAdminManualStartMinutes(manualDate)
+            .filter((start) => start <= 19 * 60);
 
         const occupied: TimeInterval[] = [
             ...appointments
