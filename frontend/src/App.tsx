@@ -289,6 +289,13 @@ const ADMIN_WEEKDAY_START_MINUTES = [
     12 * 60,       // 12:00
     12 * 60 + 30,  // 12:30
     13 * 60,       // 13:00
+    13 * 60 + 30,  // 13:30
+    14 * 60,       // 14:00
+    14 * 60 + 30,  // 14:30
+    15 * 60,       // 15:00
+    15 * 60 + 30,  // 15:30
+    16 * 60,       // 16:00
+    16 * 60 + 30,  // 16:30
     17 * 60,       // 17:00
     17 * 60 + 30,  // 17:30
     18 * 60,       // 18:00
@@ -8655,6 +8662,16 @@ function AdminPanel() {
         });
     }
 
+    const longestAdminServiceDurationMinutes = useMemo(() => {
+        const validDurations = adminServices
+            .map((service) => Number(service.duration_minutes))
+            .filter((duration) => Number.isFinite(duration) && duration > 0);
+
+        return validDurations.length
+            ? Math.max(...validDurations)
+            : 30;
+    }, [adminServices]);
+
     function appointmentConflicts(
         appointmentId: string,
         date: string,
@@ -8664,7 +8681,12 @@ function AdminPanel() {
         const start = getMinutesFromTime(time);
         const end = start + durationMinutes;
         const conflictsAppointment = appointments.some((appointment) => {
-            if (appointment.id === appointmentId || appointment.status === "cancelled" || appointment.appointment_date !== date) return false;
+            if (
+                appointment.id === appointmentId ||
+                appointment.status === "cancelled" ||
+                appointment.status === "no-show" ||
+                appointment.appointment_date !== date
+            ) return false;
             const existingStart = getMinutesFromTime(appointment.start_time);
             return intervalsOverlap(start, end, existingStart, existingStart + appointment.duration_minutes);
         });
@@ -8705,7 +8727,7 @@ function AdminPanel() {
             return;
         }
 
-        if (appointmentConflicts("", manualDate, manualTime, service.duration_minutes)) {
+        if (appointmentConflicts("", manualDate, manualTime, longestAdminServiceDurationMinutes)) {
             setManualError("Este período entra em conflito com outro agendamento ou bloqueio.");
             return;
         }
@@ -9818,8 +9840,12 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
+        // Grade exclusiva do Novo agendamento ADM.
+        // Segunda a sexta: 07:00 até 21:00 direto, de 30 em 30 minutos.
+        // Sábado e domingo: 07:00 até 13:00, de 30 em 30 minutos.
         const candidateStarts = getFixedAdminManualStartMinutes(manualDate);
 
+        // Cada agendamento existente usa a duração REAL salva no banco.
         const occupied: TimeInterval[] = [
             ...appointments
                 .filter((appointment) =>
@@ -9829,7 +9855,16 @@ function AdminPanel() {
                 )
                 .map((appointment) => {
                     const start = getMinutesFromTime(appointment.start_time);
-                    return {start, end: start + appointment.duration_minutes};
+                    const duration = Number(appointment.duration_minutes);
+
+                    return {
+                        start,
+                        end:
+                            start +
+                            (Number.isFinite(duration) && duration > 0
+                                ? duration
+                                : longestAdminServiceDurationMinutes),
+                    };
                 }),
             ...adminBlocks
                 .filter((block) => block.block_date === manualDate)
@@ -9846,7 +9881,9 @@ function AdminPanel() {
 
         return candidateStarts
             .filter((start) => {
-                const end = start + manualSelectedService.duration_minutes;
+                // Todo novo horário é testado como se pudesse receber
+                // o serviço mais demorado cadastrado.
+                const end = start + longestAdminServiceDurationMinutes;
                 const isPastToday = manualDate === today && start <= currentMinutes;
                 const hasConflict = merged.some((occupiedInterval) =>
                     intervalsOverlap(
@@ -9865,6 +9902,7 @@ function AdminPanel() {
         manualSelectedService,
         appointments,
         adminBlocks,
+        longestAdminServiceDurationMinutes,
     ]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
@@ -12242,7 +12280,7 @@ function AdminPanel() {
                             <div className="admin-new-appointment__header">
                                 <div>
                                     <h2>Novo agendamento</h2>
-                                    <p>Busque a cliente cadastrada e escolha serviço, dia e horário no mesmo padrão do agendamento da cliente.</p>
+                                    <p>Busque a cliente cadastrada e escolha serviço, dia e horário pela agenda exclusiva do painel ADM.</p>
                                 </div>
                                 <button
                                     className="admin-new-appointment__toggle"
