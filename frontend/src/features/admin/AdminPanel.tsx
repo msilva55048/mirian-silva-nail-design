@@ -1638,44 +1638,45 @@ export default function AdminPanel() {
         // Não usa horários/configurações do painel da cliente.
         const candidateStarts = getAdminNewAppointmentStartMinutes(manualDate);
 
-        const occupied: TimeInterval[] = [
-            ...appointments
+        const occupiedAppointmentStarts = new Set(
+            appointments
                 .filter((appointment) =>
                     appointment.appointment_date === manualDate &&
                     appointment.status !== "cancelled" &&
                     appointment.status !== "no-show",
                 )
-                .map((appointment) => {
-                    const start = getMinutesFromTime(appointment.start_time);
-                    return {start, end: start + appointment.duration_minutes};
-                }),
-            ...adminBlocks
-                .filter((block) => block.block_date === manualDate)
-                .map((block) => ({
-                    start: getMinutesFromTime(block.start_time),
-                    end: getMinutesFromTime(block.end_time),
-                })),
-        ];
+                .map((appointment) =>
+                    getMinutesFromTime(appointment.start_time),
+                ),
+        );
 
-        const merged = mergeIntervals(occupied);
+        const blocksForDate = adminBlocks
+            .filter((block) => block.block_date === manualDate)
+            .map((block) => ({
+                start: getMinutesFromTime(block.start_time),
+                end: getMinutesFromTime(block.end_time),
+            }));
+
         const now = new Date();
         const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         return candidateStarts
             .filter((start) => {
-                const end = start + manualSelectedService.duration_minutes;
-                const isPastToday = manualDate === today && start <= currentMinutes;
-                const hasConflict = merged.some((occupiedInterval) =>
-                    intervalsOverlap(
-                        start,
-                        end,
-                        occupiedInterval.start,
-                        occupiedInterval.end,
-                    ),
+                const isPastToday =
+                    manualDate === today &&
+                    start <= currentMinutes;
+
+                const isAlreadyScheduled =
+                    occupiedAppointmentStarts.has(start);
+
+                const isBlocked = blocksForDate.some(
+                    (block) =>
+                        start >= block.start &&
+                        start < block.end,
                 );
 
-                return !isPastToday && !hasConflict;
+                return !isPastToday && !isAlreadyScheduled && !isBlocked;
             })
             .map(minutesToTime);
     }, [
