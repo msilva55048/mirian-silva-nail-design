@@ -9251,7 +9251,10 @@ function AdminPanel() {
     async function deleteConfirmedAppointmentFromHistory(
         appointment: AdminAppointment,
     ) {
-        if (appointment.status !== "confirmed") return;
+        if (
+            appointment.status !== "confirmed" &&
+            appointment.status !== "pending"
+        ) return;
 
         const confirmed = window.confirm(
             `Excluir definitivamente o agendamento confirmado de ${formatAdminDate(
@@ -9268,8 +9271,7 @@ function AdminPanel() {
             const {error} = await supabase
                 .from("appointments")
                 .delete()
-                .eq("id", appointment.id)
-                .eq("status", "confirmed");
+                .eq("id", appointment.id);
 
             if (error) {
                 throw error;
@@ -13577,7 +13579,8 @@ function AdminPanel() {
                                     <div className="admin-edit-actions">
                                         <button className="save" type="button" disabled={isSavingAppointment} onClick={() => void saveAppointmentChanges()}>{isSavingAppointment ? "Salvando..." : "Salvar alterações"}</button>
                                         <button className="cancel" type="button" onClick={() => void cancelAppointment(selectedAdminAppointment)}>Cancelar agendamento</button>
-                                        {selectedAdminAppointment.status === "confirmed" && (
+                                        {(selectedAdminAppointment.status === "confirmed" ||
+                                            selectedAdminAppointment.status === "pending") && (
                                             <button
                                                 className="cancel"
                                                 type="button"
@@ -13780,8 +13783,9 @@ function AdminPanel() {
                                     {selectedClient.appointments.map((appointment) => {
                                         const canClearCancelled =
                                             appointment.status === "cancelled";
-                                        const canEditConfirmed =
-                                            appointment.status === "confirmed";
+                                        const canEditAppointment =
+                                            appointment.status === "confirmed" ||
+                                            appointment.status === "pending";
 
                                         const isClearing =
                                             clearingCancelledAppointmentId ===
@@ -13789,7 +13793,7 @@ function AdminPanel() {
 
                                         const isInteractive =
                                             canClearCancelled ||
-                                            canEditConfirmed;
+                                            canEditAppointment;
 
                                         return (
                                             <article
@@ -13798,7 +13802,7 @@ function AdminPanel() {
                                                     canClearCancelled
                                                         ? "is-cancelled-cleanable"
                                                         : "",
-                                                    canEditConfirmed
+                                                    canEditAppointment
                                                         ? "is-confirmed-deletable"
                                                         : "",
                                                     isClearing
@@ -13825,7 +13829,7 @@ function AdminPanel() {
                                                         return;
                                                     }
 
-                                                    if (canEditConfirmed) {
+                                                    if (canEditAppointment) {
                                                         openAppointmentFromClientHistory(
                                                             appointment,
                                                         );
@@ -13849,7 +13853,7 @@ function AdminPanel() {
                                                         return;
                                                     }
 
-                                                    if (canEditConfirmed) {
+                                                    if (canEditAppointment) {
                                                         openAppointmentFromClientHistory(
                                                             appointment,
                                                         );
@@ -13884,13 +13888,13 @@ function AdminPanel() {
                                                             Toque para limpar
                                                         </small>
                                                     </div>
-                                                ) : canEditConfirmed ? (
+                                                ) : canEditAppointment ? (
                                                     <div className="admin-client-history__confirmed-action">
                                                         <strong>
                                                             {getAdminAppointmentDisplayStatusLabel(appointment)}
                                                         </strong>
                                                         <small>
-                                                            Toque para editar agendamento
+                                                            Editar agendamento
                                                         </small>
                                                     </div>
                                                 ) : (
