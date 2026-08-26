@@ -4190,6 +4190,97 @@ const adminAgendaMonthSameSizeStyles = `
 }
 `;
 
+
+const adminMatchedCalendarAndWeekStyles = `
+/* Agendamentos e Novo agendamento: calendário mensal exatamente do mesmo tamanho. */
+.admin-month-calendar--same-size {
+    width: min(320px, calc(100vw - 92px)) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 12px auto 0 !important;
+    box-sizing: border-box !important;
+}
+
+.admin-month-calendar--same-size .admin-manual-month-calendar__header,
+.admin-month-calendar--same-size .admin-manual-month-calendar__weekdays,
+.admin-month-calendar--same-size .admin-manual-month-calendar__grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.admin-month-calendar--same-size .admin-manual-month-calendar__weekdays,
+.admin-month-calendar--same-size .admin-manual-month-calendar__grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+}
+
+.admin-month-calendar--same-size .admin-manual-month-calendar__grid button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    aspect-ratio: 1 / 1 !important;
+    box-sizing: border-box !important;
+}
+
+/* Os 7 dias ficam abaixo do calendário e um pouco maiores, como no formato anterior. */
+.admin-manual-week-days--seven {
+    width: 100% !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    margin-top: 14px !important;
+}
+
+.admin-manual-week-days--seven .admin-manual-week-day {
+    min-width: 0 !important;
+    min-height: 76px !important;
+    padding: 9px 2px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+}
+
+.admin-manual-week-days--seven .admin-manual-week-day span {
+    font-size: .60rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+}
+
+.admin-manual-week-days--seven .admin-manual-week-day strong {
+    margin-top: 6px !important;
+    font-size: .78rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+}
+
+@media (max-width: 390px) {
+    .admin-month-calendar--same-size {
+        width: min(300px, calc(100vw - 84px)) !important;
+    }
+
+    .admin-manual-week-days--seven {
+        gap: 3px !important;
+    }
+
+    .admin-manual-week-days--seven .admin-manual-week-day {
+        min-height: 70px !important;
+        padding: 8px 1px !important;
+    }
+
+    .admin-manual-week-days--seven .admin-manual-week-day span {
+        font-size: .56rem !important;
+    }
+
+    .admin-manual-week-days--seven .admin-manual-week-day strong {
+        font-size: .72rem !important;
+    }
+}
+`;
+
 const adminStyles = `
 .admin-page {
     min-height: 100vh;
@@ -11581,13 +11672,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -11605,7 +11696,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -11770,7 +11861,7 @@ function AdminPanel() {
                                                 </div>
 
                                                 {showAgendaMonthCalendar && (
-                                                    <div className="admin-manual-month-calendar">
+                                                    <div className="admin-manual-month-calendar admin-month-calendar--same-size">
                                                         <div className="admin-manual-month-calendar__header">
                                                             <button
                                                                 type="button"
@@ -13014,7 +13105,7 @@ function AdminPanel() {
                                                 </div>
 
                                                 {showManualMonthCalendar && (
-                                                    <div className="admin-manual-month-calendar">
+                                                    <div className="admin-manual-month-calendar admin-month-calendar--same-size">
                                                         <div className="admin-manual-month-calendar__header">
                                                             <button type="button" onClick={() => setManualCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button>
                                                             <strong>{manualCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
