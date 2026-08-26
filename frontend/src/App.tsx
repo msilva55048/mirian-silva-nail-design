@@ -2690,7 +2690,7 @@ function PublicSite() {
 
     return (
         <main className="home">
-            <style>{clientAccountStyles + weekSevenDaysStyles}</style>
+            <style>{clientAccountStyles}</style>
             <style>{`
                 @media (max-width: 700px) {
                     .home {
@@ -4054,86 +4054,83 @@ type NailRecord = {
 
 
 
-const weekSevenDaysStyles = `
-/* Semana compacta: os 7 dias ficam na mesma linha. */
-.client-week-days {
+
+
+
+const adminSevenDaysOnlyStyles = `
+/* Apenas ADM > Agendamentos */
+.admin-agenda-date-picker__week-days--seven {
     display: grid !important;
     grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     gap: 3px !important;
-    width: 100%;
+    width: 100% !important;
 }
 
-.client-week-days > .client-week-days__row {
-    display: contents !important;
-}
-
-.client-week-days .client-week-day {
-    width: 100%;
-    min-width: 0;
+.admin-agenda-date-picker__week-days--seven .client-week-day {
+    width: 100% !important;
+    min-width: 0 !important;
     padding: 6px 1px !important;
-    border-radius: 10px;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
 }
 
-.client-week-days .client-week-day span {
+.admin-agenda-date-picker__week-days--seven .client-week-day span {
     font-size: .54rem !important;
     white-space: nowrap;
 }
 
-.client-week-days .client-week-day strong {
+.admin-agenda-date-picker__week-days--seven .client-week-day strong {
     margin-top: 2px !important;
     font-size: .66rem !important;
     white-space: nowrap;
 }
 
-/* Somente o seletor semanal do Novo agendamento do ADM. */
-.admin-manual-booking .admin-manual-week-days {
+/* Apenas ADM > Novo agendamento */
+.admin-manual-week-days--seven {
     display: grid !important;
     grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     gap: 3px !important;
-    width: 100%;
+    width: 100% !important;
 }
 
-.admin-manual-booking .admin-manual-week-days > .admin-manual-week-days__row {
-    display: contents !important;
-}
-
-.admin-manual-booking .admin-manual-week-day {
-    width: 100%;
-    min-width: 0;
+.admin-manual-week-days--seven .admin-manual-week-day {
+    width: 100% !important;
+    min-width: 0 !important;
     padding: 6px 1px !important;
-    border-radius: 10px;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
 }
 
-.admin-manual-booking .admin-manual-week-day span {
+.admin-manual-week-days--seven .admin-manual-week-day span {
     font-size: .54rem !important;
     white-space: nowrap;
 }
 
-.admin-manual-booking .admin-manual-week-day strong {
+.admin-manual-week-days--seven .admin-manual-week-day strong {
     margin-top: 2px !important;
     font-size: .68rem !important;
     white-space: nowrap;
 }
 
 @media (max-width: 420px) {
-    .client-week-days,
-    .admin-manual-booking .admin-manual-week-days {
+    .admin-agenda-date-picker__week-days--seven,
+    .admin-manual-week-days--seven {
         gap: 2px !important;
     }
 
-    .client-week-days .client-week-day,
-    .admin-manual-booking .admin-manual-week-day {
+    .admin-agenda-date-picker__week-days--seven .client-week-day,
+    .admin-manual-week-days--seven .admin-manual-week-day {
         padding: 5px 0 !important;
     }
 
-    .client-week-days .client-week-day span,
-    .admin-manual-booking .admin-manual-week-day span {
-        font-size: .50rem !important;
+    .admin-agenda-date-picker__week-days--seven .client-week-day span,
+    .admin-manual-week-days--seven .admin-manual-week-day span {
+        font-size: .49rem !important;
     }
 
-    .client-week-days .client-week-day strong,
-    .admin-manual-booking .admin-manual-week-day strong {
-        font-size: .61rem !important;
+    .admin-agenda-date-picker__week-days--seven .client-week-day strong,
+    .admin-manual-week-days--seven .admin-manual-week-day strong {
+        font-size: .60rem !important;
     }
 }
 `;
@@ -11518,13 +11515,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + weekSevenDaysStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + weekSevenDaysStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -11542,7 +11539,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + weekSevenDaysStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -11801,80 +11798,29 @@ function AdminPanel() {
                                                 </div>
                                             )}
 
-                                            <div className="client-week-days admin-agenda-date-picker__week-days">
-                                                {[
-                                                    {
-                                                        dates: agendaVisibleWeekDates.slice(
-                                                            0,
-                                                            4,
-                                                        ),
-                                                        rowClass:
-                                                            "client-week-days__row--four",
-                                                    },
-                                                    {
-                                                        dates: agendaVisibleWeekDates.slice(
-                                                            4,
-                                                            7,
-                                                        ),
-                                                        rowClass:
-                                                            "client-week-days__row--three",
-                                                    },
-                                                ].map((row, rowIndex) => (
-                                                    <div
-                                                        className={`client-week-days__row ${row.rowClass}`}
-                                                        key={`agenda-week-row-${rowIndex}`}
-                                                    >
-                                                        {row.dates.map((date) => {
-                                                            const parsed = new Date(
-                                                                `${date}T12:00:00`,
-                                                            );
+                                            <div className="client-week-days admin-agenda-date-picker__week-days admin-agenda-date-picker__week-days--seven">
+                                                {agendaVisibleWeekDates.map((date) => {
+                                                    const parsed = new Date(`${date}T12:00:00`);
 
-                                                            return (
-                                                                <button
-                                                                    key={date}
-                                                                    type="button"
-                                                                    className={[
-                                                                        "client-week-day",
-                                                                        date === agendaDate
-                                                                            ? "is-selected"
-                                                                            : "",
-                                                                    ]
-                                                                        .filter(Boolean)
-                                                                        .join(" ")}
-                                                                    onClick={() =>
-                                                                        selectAgendaPickerDate(
-                                                                            date,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <span>
-                                                                        {parsed
-                                                                            .toLocaleDateString(
-                                                                                "pt-BR",
-                                                                                {
-                                                                                    weekday:
-                                                                                        "short",
-                                                                                },
-                                                                            )
-                                                                            .replace(
-                                                                                ".",
-                                                                                "",
-                                                                            )}
-                                                                    </span>
-                                                                    <strong>
-                                                                        {parsed.toLocaleDateString(
-                                                                            "pt-BR",
-                                                                            {
-                                                                                day: "2-digit",
-                                                                                month: "2-digit",
-                                                                            },
-                                                                        )}
-                                                                    </strong>
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                ))}
+                                                    return (
+                                                        <button
+                                                            key={date}
+                                                            type="button"
+                                                            className={[
+                                                                "client-week-day",
+                                                                date === agendaDate ? "is-selected" : "",
+                                                            ].filter(Boolean).join(" ")}
+                                                            onClick={() => selectAgendaPickerDate(date)}
+                                                        >
+                                                            <span>
+                                                                {parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}
+                                                            </span>
+                                                            <strong>
+                                                                {parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}
+                                                            </strong>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -13029,44 +12975,24 @@ function AdminPanel() {
                                                     </div>
                                                 </div>
 
-                                                <div className="admin-manual-week-days">
-                                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--four">
-                                                        {manualVisibleWeekDates.slice(0, 4).map((date) => {
-                                                            const parsed = new Date(`${date}T12:00:00`);
-                                                            const isPast = date < formatDateForInput(new Date());
-                                                            return (
-                                                                <button
-                                                                    key={date}
-                                                                    type="button"
-                                                                    disabled={isPast}
-                                                                    className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
-                                                                    onClick={() => selectManualBookingDate(date)}
-                                                                >
-                                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
-                                                                    <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
+                                                <div className="admin-manual-week-days admin-manual-week-days--seven">
+                                                    {manualVisibleWeekDates.map((date) => {
+                                                        const parsed = new Date(`${date}T12:00:00`);
+                                                        const isPast = date < formatDateForInput(new Date());
 
-                                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--three">
-                                                        {manualVisibleWeekDates.slice(4).map((date) => {
-                                                            const parsed = new Date(`${date}T12:00:00`);
-                                                            const isPast = date < formatDateForInput(new Date());
-                                                            return (
-                                                                <button
-                                                                    key={date}
-                                                                    type="button"
-                                                                    disabled={isPast}
-                                                                    className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
-                                                                    onClick={() => selectManualBookingDate(date)}
-                                                                >
-                                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
-                                                                    <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
+                                                        return (
+                                                            <button
+                                                                key={date}
+                                                                type="button"
+                                                                disabled={isPast}
+                                                                className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                                onClick={() => selectManualBookingDate(date)}
+                                                            >
+                                                                <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                                <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
 
                                                 {showManualMonthCalendar && (
