@@ -10567,6 +10567,23 @@ function AdminPanel() {
         return `${appointmentId}:${type}`;
     }
 
+    function getAdminAppointmentDisplayStatusLabel(
+        appointment: AdminAppointment,
+    ) {
+        if (appointment.status !== "confirmed") {
+            return getAppointmentStatusLabel(appointment.status);
+        }
+
+        const confirmationKey = getNotificationKey(
+            appointment.id,
+            "attendance-confirmation",
+        );
+
+        return openedWhatsAppNotifications[confirmationKey]
+            ? "Confirmado"
+            : "Agendado";
+    }
+
     function markWhatsAppNotificationOpened(
         appointment: AdminAppointment,
         type: WhatsAppNotificationType,
@@ -11223,9 +11240,7 @@ function AdminPanel() {
                     </div>
 
                     <span className={`admin-status admin-status--${appointment.status}`}>
-                        {appointment.status === "confirmed"
-                            ? "Agendado"
-                            : getAppointmentStatusLabel(appointment.status)}
+                        {getAdminAppointmentDisplayStatusLabel(appointment)}
                     </span>
                 </div>
 
@@ -12503,8 +12518,8 @@ function AdminPanel() {
                                                         <span
                                                             className={`admin-status admin-status--${compactAppointment.status}`}
                                                         >
-                                                            {getAppointmentStatusLabel(
-                                                                compactAppointment.status,
+                                                            {getAdminAppointmentDisplayStatusLabel(
+                                                                compactAppointment,
                                                             )}
                                                         </span>
 
