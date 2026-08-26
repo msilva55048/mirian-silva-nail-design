@@ -6058,6 +6058,28 @@ const adminEnhancementStyles = `
     }
 }
 
+/* Na tela Agendamentos o calendário faz parte do fluxo da página.
+   Isso evita que ele fique por cima dos horários disponíveis. */
+.admin-agenda-date-picker.is-inline {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 100%;
+    box-sizing: border-box;
+}
+
+.admin-agenda-date-picker.is-inline .admin-agenda-date-picker__panel {
+    position: static;
+    top: auto;
+    left: auto;
+    z-index: auto;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+
 .admin-card-list {
     display: grid;
     gap: 13px;
@@ -11493,7 +11515,11 @@ function AdminPanel() {
                                     </button>
                                 )}
 
-                                <div className="admin-agenda-date-picker">
+                                <div
+                                    className={`admin-agenda-date-picker${
+                                        adminView === "agenda" ? " is-inline" : ""
+                                    }`}
+                                >
                                     {adminView === "week" && (
                                         <button
                                             type="button"
