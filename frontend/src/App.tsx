@@ -4066,19 +4066,19 @@ const adminSevenDaysOnlyStyles = `
 .admin-agenda-date-picker__week-days--seven .client-week-day {
     width: 100% !important;
     min-width: 0 !important;
-    padding: 6px 1px !important;
+    padding: 8px 2px !important;
     border-radius: 10px !important;
     box-sizing: border-box !important;
 }
 
 .admin-agenda-date-picker__week-days--seven .client-week-day span {
-    font-size: .54rem !important;
+    font-size: .68rem !important;
     white-space: nowrap;
 }
 
 .admin-agenda-date-picker__week-days--seven .client-week-day strong {
     margin-top: 2px !important;
-    font-size: .66rem !important;
+    font-size: .74rem !important;
     white-space: nowrap;
 }
 
@@ -4107,19 +4107,19 @@ const adminSevenDaysOnlyStyles = `
 .admin-manual-week-days--seven .admin-manual-week-day {
     width: 100% !important;
     min-width: 0 !important;
-    padding: 6px 1px !important;
+    padding: 8px 2px !important;
     border-radius: 10px !important;
     box-sizing: border-box !important;
 }
 
 .admin-manual-week-days--seven .admin-manual-week-day span {
-    font-size: .54rem !important;
+    font-size: .68rem !important;
     white-space: nowrap;
 }
 
 .admin-manual-week-days--seven .admin-manual-week-day strong {
     margin-top: 2px !important;
-    font-size: .68rem !important;
+    font-size: .76rem !important;
     white-space: nowrap;
 }
 
@@ -4131,17 +4131,17 @@ const adminSevenDaysOnlyStyles = `
 
     .admin-agenda-date-picker__week-days--seven .client-week-day,
     .admin-manual-week-days--seven .admin-manual-week-day {
-        padding: 5px 0 !important;
+        padding: 7px 1px !important;
     }
 
     .admin-agenda-date-picker__week-days--seven .client-week-day span,
     .admin-manual-week-days--seven .admin-manual-week-day span {
-        font-size: .49rem !important;
+        font-size: .55rem !important;
     }
 
     .admin-agenda-date-picker__week-days--seven .client-week-day strong,
     .admin-manual-week-days--seven .admin-manual-week-day strong {
-        font-size: .60rem !important;
+        font-size: .68rem !important;
     }
 }
 `;
@@ -11769,24 +11769,6 @@ function AdminPanel() {
                                                     </div>
                                                 </div>
 
-                                                <div className="admin-manual-week-days admin-manual-week-days--seven">
-                                                    {agendaVisibleWeekDates.map((date) => {
-                                                        const parsed = new Date(`${date}T12:00:00`);
-
-                                                        return (
-                                                            <button
-                                                                key={date}
-                                                                type="button"
-                                                                className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}`}
-                                                                onClick={() => selectAgendaPickerDate(date)}
-                                                            >
-                                                                <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
-                                                                <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-
                                                 {showAgendaMonthCalendar && (
                                                     <div className="admin-manual-month-calendar">
                                                         <div className="admin-manual-month-calendar__header">
@@ -11858,7 +11840,25 @@ function AdminPanel() {
                                                             })}
                                                         </div>
                                                     </div>
-                                                )}
+                                                )}<div className="admin-manual-week-days admin-manual-week-days--seven">
+                                                {agendaVisibleWeekDates.map((date) => {
+                                                    const parsed = new Date(`${date}T12:00:00`);
+
+                                                    return (
+                                                        <button
+                                                            key={date}
+                                                            type="button"
+                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}`}
+                                                            onClick={() => selectAgendaPickerDate(date)}
+                                                        >
+                                                            <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                            <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+
                                             </div>
                                         </div>
                                     )}
@@ -13013,26 +13013,6 @@ function AdminPanel() {
                                                     </div>
                                                 </div>
 
-                                                <div className="admin-manual-week-days admin-manual-week-days--seven">
-                                                    {manualVisibleWeekDates.map((date) => {
-                                                        const parsed = new Date(`${date}T12:00:00`);
-                                                        const isPast = date < formatDateForInput(new Date());
-
-                                                        return (
-                                                            <button
-                                                                key={date}
-                                                                type="button"
-                                                                disabled={isPast}
-                                                                className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
-                                                                onClick={() => selectManualBookingDate(date)}
-                                                            >
-                                                                <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
-                                                                <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-
                                                 {showManualMonthCalendar && (
                                                     <div className="admin-manual-month-calendar">
                                                         <div className="admin-manual-month-calendar__header">
@@ -13063,7 +13043,27 @@ function AdminPanel() {
                                                             })}
                                                         </div>
                                                     </div>
-                                                )}
+                                                )}<div className="admin-manual-week-days admin-manual-week-days--seven">
+                                                {manualVisibleWeekDates.map((date) => {
+                                                    const parsed = new Date(`${date}T12:00:00`);
+                                                    const isPast = date < formatDateForInput(new Date());
+
+                                                    return (
+                                                        <button
+                                                            key={date}
+                                                            type="button"
+                                                            disabled={isPast}
+                                                            className={`admin-manual-week-day${manualDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                            onClick={() => selectManualBookingDate(date)}
+                                                        >
+                                                            <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                            <strong>{String(parsed.getDate()).padStart(2, "0")}</strong>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+
                                             </div>
                                         </div>
                                     </section>
