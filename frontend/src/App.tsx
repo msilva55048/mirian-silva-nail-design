@@ -2690,7 +2690,7 @@ function PublicSite() {
 
     return (
         <main className="home">
-            <style>{clientAccountStyles}</style>
+            <style>{clientAccountStyles + weekSevenDaysStyles}</style>
             <style>{`
                 @media (max-width: 700px) {
                     .home {
@@ -4052,6 +4052,91 @@ type NailRecord = {
     photos: NailRecordPhoto[];
 };
 
+
+
+const weekSevenDaysStyles = `
+/* Semana compacta: os 7 dias ficam na mesma linha. */
+.client-week-days {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+    width: 100%;
+}
+
+.client-week-days > .client-week-days__row {
+    display: contents !important;
+}
+
+.client-week-days .client-week-day {
+    width: 100%;
+    min-width: 0;
+    padding: 6px 1px !important;
+    border-radius: 10px;
+}
+
+.client-week-days .client-week-day span {
+    font-size: .54rem !important;
+    white-space: nowrap;
+}
+
+.client-week-days .client-week-day strong {
+    margin-top: 2px !important;
+    font-size: .66rem !important;
+    white-space: nowrap;
+}
+
+/* Somente o seletor semanal do Novo agendamento do ADM. */
+.admin-manual-booking .admin-manual-week-days {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+    width: 100%;
+}
+
+.admin-manual-booking .admin-manual-week-days > .admin-manual-week-days__row {
+    display: contents !important;
+}
+
+.admin-manual-booking .admin-manual-week-day {
+    width: 100%;
+    min-width: 0;
+    padding: 6px 1px !important;
+    border-radius: 10px;
+}
+
+.admin-manual-booking .admin-manual-week-day span {
+    font-size: .54rem !important;
+    white-space: nowrap;
+}
+
+.admin-manual-booking .admin-manual-week-day strong {
+    margin-top: 2px !important;
+    font-size: .68rem !important;
+    white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+    .client-week-days,
+    .admin-manual-booking .admin-manual-week-days {
+        gap: 2px !important;
+    }
+
+    .client-week-days .client-week-day,
+    .admin-manual-booking .admin-manual-week-day {
+        padding: 5px 0 !important;
+    }
+
+    .client-week-days .client-week-day span,
+    .admin-manual-booking .admin-manual-week-day span {
+        font-size: .50rem !important;
+    }
+
+    .client-week-days .client-week-day strong,
+    .admin-manual-booking .admin-manual-week-day strong {
+        font-size: .61rem !important;
+    }
+}
+`;
 
 const adminStyles = `
 .admin-page {
@@ -11401,13 +11486,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + weekSevenDaysStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + weekSevenDaysStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -11425,7 +11510,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + weekSevenDaysStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
