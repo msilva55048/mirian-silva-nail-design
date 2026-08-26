@@ -8154,37 +8154,6 @@ const adminClientScheduledMetricStyles = `
 
 `;
 
-
-const adminUnifiedAgendaStyles = `
-.admin-agenda-date-picker--always-open {
-    position: static;
-    min-width: 0;
-    width: 100%;
-}
-
-.admin-agenda-date-picker--always-open .admin-agenda-date-picker__panel {
-    position: static;
-    top: auto;
-    left: auto;
-    width: 100%;
-    max-width: none;
-    box-sizing: border-box;
-}
-
-.admin-agenda-available-times {
-    width: 100%;
-    min-width: 0;
-}
-
-.admin-agenda-available-times .admin-manual-times {
-    margin-top: 12px;
-}
-
-.admin-agenda-available-times .admin-manual-times button {
-    cursor: default;
-}
-`;
-
 const adminEditDateTimeStyles = `
 .admin-edit-date-time {
     display: grid;
@@ -9324,6 +9293,10 @@ function AdminPanel() {
                     }
                     : current,
             );
+
+            setSelectedAdminAppointment((current) =>
+                current?.id === appointment.id ? null : current,
+            );
         } catch (error) {
             console.error(
                 "Erro ao excluir agendamento confirmado pelo ADM:",
@@ -9353,6 +9326,11 @@ function AdminPanel() {
         resetNailRecordForm();
         setNailRecords([]);
         setSelectedClient(client);
+    }
+
+    function openAppointmentFromClientHistory(appointment: AdminAppointment) {
+        closeClientHistory();
+        openAppointmentDetails(appointment);
     }
 
     function openNailRecordForClient(client: AdminClient) {
@@ -10439,10 +10417,7 @@ function AdminPanel() {
             )
             .map((appointment) => {
                 const start = getMinutesFromTime(appointment.start_time);
-                const duration = Math.max(
-                    1,
-                    Number(appointment.duration_minutes) || 1,
-                );
+                const duration = Math.max(1, Number(appointment.duration_minutes) || 1);
 
                 return {
                     start,
@@ -11402,13 +11377,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminUnifiedAgendaStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminUnifiedAgendaStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -11426,7 +11401,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminUnifiedAgendaStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -11434,14 +11409,7 @@ function AdminPanel() {
                 </header>
 
                 <div className="admin-dashboard-cards">
-                    <button
-                        className={`admin-dashboard-card${adminView === "agenda" ? " is-active" : ""}`}
-                        type="button"
-                        onClick={() => openAdminDashboardView("agenda")}
-                    >
-                        <strong>Agendamentos</strong>
-                        <span>Veja os atendimentos e horários disponíveis.</span>
-                    </button>
+                    <button className={`admin-dashboard-card${adminView === "agenda" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("agenda")}><strong>Agendamentos</strong><span>Veja os atendimentos e horários disponíveis.</span></button>
                     <button
                         className={`admin-dashboard-card${adminView === "new" ? " is-active" : ""}`}
                         type="button"
@@ -11496,266 +11464,348 @@ function AdminPanel() {
                     aria-hidden="true"
                 />
 
-                {adminView === "agenda" && (
+                {(adminView === "agenda" || adminView === "week") && (
                     <section className="admin-top-agenda">
                         <div className="admin-top-agenda__header">
                             <div>
-                                <span>Atendimentos do dia</span>
-                                <strong>{formatAdminDate(agendaDate)}</strong>
+                                <span>{adminView === "agenda" ? "Atendimentos do dia" : "Atendimentos da semana"}</span>
+                                <strong>
+                                    {adminView === "agenda"
+                                        ? formatAdminDate(agendaDate)
+                                        : `${formatAdminDate(weekDates[0])} até ${formatAdminDate(weekDates[6])}`}
+                                </strong>
                             </div>
-                        </div>
-
-                        <div className="admin-agenda-date-picker admin-agenda-date-picker--always-open">
-                            <div className="admin-agenda-date-picker__panel">
-                                <div className="admin-agenda-date-picker__panel-header">
-                                    <div className="admin-agenda-date-picker__month">
-                                        <strong>{agendaPickerMonthLabel}</strong>
-
-                                        <button
-                                            type="button"
-                                            onClick={openAgendaMonthCalendar}
-                                            aria-label="Abrir calendário do mês"
-                                        >
-                                            📅
-                                        </button>
-                                    </div>
-
-                                    <div className="admin-agenda-date-picker__panel-navs">
-                                        <button
-                                            type="button"
-                                            onClick={() => moveAgendaPickerWeek(-1)}
-                                            aria-label="Semana anterior"
-                                        >
-                                            ‹
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const today = formatDateForInput(new Date());
-                                                setAgendaDate(today);
-                                                setAgendaWeekReferenceDate(today);
-                                                setShowAgendaMonthCalendar(false);
-                                            }}
-                                            aria-label="Hoje"
-                                        >
-                                            Hoje
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => moveAgendaPickerWeek(1)}
-                                            aria-label="Próxima semana"
-                                        >
-                                            ›
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {showAgendaMonthCalendar && (
-                                    <div className="client-month-calendar">
-                                        <div className="client-month-calendar__header">
-                                            <button
-                                                className="client-week-picker__nav"
-                                                type="button"
-                                                onClick={() =>
-                                                    setAgendaCalendarMonth(
-                                                        (current) =>
-                                                            new Date(
-                                                                current.getFullYear(),
-                                                                current.getMonth() - 1,
-                                                                1,
-                                                            ),
-                                                    )
-                                                }
-                                                aria-label="Mês anterior"
-                                            >
-                                                ‹
-                                            </button>
-
-                                            <strong>
-                                                {agendaCalendarMonth.toLocaleDateString(
-                                                    "pt-BR",
-                                                    {
-                                                        month: "long",
-                                                        year: "numeric",
-                                                    },
-                                                )}
-                                            </strong>
-
-                                            <button
-                                                className="client-week-picker__nav"
-                                                type="button"
-                                                onClick={() =>
-                                                    setAgendaCalendarMonth(
-                                                        (current) =>
-                                                            new Date(
-                                                                current.getFullYear(),
-                                                                current.getMonth() + 1,
-                                                                1,
-                                                            ),
-                                                    )
-                                                }
-                                                aria-label="Próximo mês"
-                                            >
-                                                ›
-                                            </button>
-                                        </div>
-
-                                        <div className="client-month-calendar__weekdays">
-                                            {["D", "S", "T", "Q", "Q", "S", "S"].map(
-                                                (weekday, index) => (
-                                                    <span
-                                                        key={`agenda-calendar-weekday-${index}`}
-                                                    >
-                                                        {weekday}
-                                                    </span>
-                                                ),
-                                            )}
-                                        </div>
-
-                                        <div className="client-month-calendar__grid">
-                                            {agendaMonthCalendarDays.map(
-                                                (date, index) => {
-                                                    if (!date) {
-                                                        return (
-                                                            <span
-                                                                className="client-month-calendar__empty"
-                                                                key={`agenda-calendar-empty-${index}`}
-                                                            />
-                                                        );
-                                                    }
-
-                                                    return (
-                                                        <button
-                                                            key={date}
-                                                            type="button"
-                                                            className={
-                                                                date === agendaDate
-                                                                    ? "is-selected"
-                                                                    : ""
-                                                            }
-                                                            onClick={() => {
-                                                                setAgendaDate(date);
-                                                                setAgendaWeekReferenceDate(date);
-                                                                setShowAgendaMonthCalendar(false);
-                                                            }}
-                                                        >
-                                                            {new Date(
-                                                                `${date}T12:00:00`,
-                                                            ).getDate()}
-                                                        </button>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
-                                    </div>
+                            <div className="admin-section-date-controls admin-section-date-controls--agenda">
+                                {adminView === "week" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextDate = addDaysToInputDate(agendaDate, -7);
+                                            setAgendaDate(nextDate);
+                                            setAgendaWeekReferenceDate(nextDate);
+                                            setShowAgendaDatePicker(false);
+                                            setShowAgendaMonthCalendar(false);
+                                        }}
+                                    >
+                                        ←
+                                    </button>
                                 )}
 
-                                <div className="client-week-days admin-agenda-date-picker__week-days">
-                                    {[
-                                        {
-                                            dates: agendaVisibleWeekDates.slice(0, 4),
-                                            rowClass:
-                                                "client-week-days__row--four",
-                                        },
-                                        {
-                                            dates: agendaVisibleWeekDates.slice(4, 7),
-                                            rowClass:
-                                                "client-week-days__row--three",
-                                        },
-                                    ].map((row, rowIndex) => (
-                                        <div
-                                            className={`client-week-days__row ${row.rowClass}`}
-                                            key={`agenda-week-row-${rowIndex}`}
-                                        >
-                                            {row.dates.map((date) => {
-                                                const parsed = new Date(
-                                                    `${date}T12:00:00`,
-                                                );
+                                <div className="admin-agenda-date-picker">
+                                    {adminView === "week" && (
+                                        <button
+                                            type="button"
+                                            className={`admin-agenda-date-picker__trigger${
+                                                showAgendaDatePicker ? " is-open" : ""
+                                            }`}
+                                            onClick={() =>
+                                                setShowAgendaDatePicker((current) => {
+                                                    const nextValue = !current;
 
-                                                return (
+                                                    if (nextValue) {
+                                                        setAgendaWeekReferenceDate(agendaDate);
+                                                        setShowAgendaMonthCalendar(false);
+                                                    }
+
+                                                    return nextValue;
+                                                })
+                                            }
+                                        >
+                                            <span className="admin-agenda-date-picker__trigger-text">
+                                                <small>Semana selecionada</small>
+                                                <strong>
+                                                    {`${formatAdminDate(
+                                                        weekDates[0],
+                                                    )} até ${formatAdminDate(
+                                                        weekDates[6],
+                                                    )}`}
+                                                </strong>
+                                            </span>
+
+                                            <span className="admin-agenda-date-picker__chevron">
+                                                {showAgendaDatePicker ? "⌃" : "⌄"}
+                                            </span>
+                                        </button>
+                                    )}
+
+                                    {(adminView === "agenda" || showAgendaDatePicker) && (
+                                        <div className="admin-agenda-date-picker__panel">
+                                            <div className="admin-agenda-date-picker__panel-header">
+                                                <div className="admin-agenda-date-picker__month">
+                                                    <strong>{agendaPickerMonthLabel}</strong>
+
                                                     <button
-                                                        key={date}
                                                         type="button"
-                                                        className={[
-                                                            "client-week-day",
-                                                            date === agendaDate
-                                                                ? "is-selected"
-                                                                : "",
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(" ")}
-                                                        onClick={() =>
-                                                            selectAgendaPickerDate(date)
-                                                        }
+                                                        onClick={openAgendaMonthCalendar}
+                                                        aria-label="Abrir calendário do mês"
                                                     >
-                                                        <span>
-                                                            {parsed
-                                                                .toLocaleDateString(
-                                                                    "pt-BR",
-                                                                    {
-                                                                        weekday:
-                                                                            "short",
-                                                                    },
+                                                        📅
+                                                    </button>
+                                                </div>
+
+                                                <div className="admin-agenda-date-picker__panel-navs">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveAgendaPickerWeek(-1)}
+                                                        aria-label="Semana anterior"
+                                                    >
+                                                        ‹
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveAgendaPickerWeek(1)}
+                                                        aria-label="Próxima semana"
+                                                    >
+                                                        ›
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {showAgendaMonthCalendar && (
+                                                <div className="client-month-calendar">
+                                                    <div className="client-month-calendar__header">
+                                                        <button
+                                                            className="client-week-picker__nav"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setAgendaCalendarMonth(
+                                                                    (current) =>
+                                                                        new Date(
+                                                                            current.getFullYear(),
+                                                                            current.getMonth() - 1,
+                                                                            1,
+                                                                        ),
                                                                 )
-                                                                .replace(".", "")}
-                                                        </span>
+                                                            }
+                                                            aria-label="Mês anterior"
+                                                        >
+                                                            ‹
+                                                        </button>
                                                         <strong>
-                                                            {parsed.toLocaleDateString(
+                                                            {agendaCalendarMonth.toLocaleDateString(
                                                                 "pt-BR",
                                                                 {
-                                                                    day: "2-digit",
-                                                                    month: "2-digit",
+                                                                    month: "long",
+                                                                    year: "numeric",
                                                                 },
                                                             )}
                                                         </strong>
-                                                    </button>
-                                                );
-                                            })}
+                                                        <button
+                                                            className="client-week-picker__nav"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setAgendaCalendarMonth(
+                                                                    (current) =>
+                                                                        new Date(
+                                                                            current.getFullYear(),
+                                                                            current.getMonth() + 1,
+                                                                            1,
+                                                                        ),
+                                                                )
+                                                            }
+                                                            aria-label="Próximo mês"
+                                                        >
+                                                            ›
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="client-month-calendar__weekdays">
+                                                        {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day) => (
+                                                            <span key={day}>{day}</span>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="client-month-calendar__grid">
+                                                        {getAgendaMonthCalendarCells().map(
+                                                            (date, index) => {
+                                                                if (!date) {
+                                                                    return (
+                                                                        <span
+                                                                            className="client-month-calendar__day is-empty"
+                                                                            key={`agenda-empty-${index}`}
+                                                                        />
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <button
+                                                                        key={date}
+                                                                        type="button"
+                                                                        className={[
+                                                                            "client-month-calendar__day",
+                                                                            date === agendaDate
+                                                                                ? "is-selected"
+                                                                                : "",
+                                                                        ]
+                                                                            .filter(Boolean)
+                                                                            .join(" ")}
+                                                                        onClick={() =>
+                                                                            selectAgendaPickerDate(
+                                                                                date,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {new Date(
+                                                                            `${date}T12:00:00`,
+                                                                        ).getDate()}
+                                                                    </button>
+                                                                );
+                                                            },
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="client-week-days admin-agenda-date-picker__week-days">
+                                                {[
+                                                    {
+                                                        dates: agendaVisibleWeekDates.slice(
+                                                            0,
+                                                            4,
+                                                        ),
+                                                        rowClass:
+                                                            "client-week-days__row--four",
+                                                    },
+                                                    {
+                                                        dates: agendaVisibleWeekDates.slice(
+                                                            4,
+                                                            7,
+                                                        ),
+                                                        rowClass:
+                                                            "client-week-days__row--three",
+                                                    },
+                                                ].map((row, rowIndex) => (
+                                                    <div
+                                                        className={`client-week-days__row ${row.rowClass}`}
+                                                        key={`agenda-week-row-${rowIndex}`}
+                                                    >
+                                                        {row.dates.map((date) => {
+                                                            const parsed = new Date(
+                                                                `${date}T12:00:00`,
+                                                            );
+
+                                                            return (
+                                                                <button
+                                                                    key={date}
+                                                                    type="button"
+                                                                    className={[
+                                                                        "client-week-day",
+                                                                        date === agendaDate
+                                                                            ? "is-selected"
+                                                                            : "",
+                                                                    ]
+                                                                        .filter(Boolean)
+                                                                        .join(" ")}
+                                                                    onClick={() =>
+                                                                        selectAgendaPickerDate(
+                                                                            date,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <span>
+                                                                        {parsed
+                                                                            .toLocaleDateString(
+                                                                                "pt-BR",
+                                                                                {
+                                                                                    weekday:
+                                                                                        "short",
+                                                                                },
+                                                                            )
+                                                                            .replace(
+                                                                                ".",
+                                                                                "",
+                                                                            )}
+                                                                    </span>
+                                                                    <strong>
+                                                                        {parsed.toLocaleDateString(
+                                                                            "pt-BR",
+                                                                            {
+                                                                                day: "2-digit",
+                                                                                month: "2-digit",
+                                                                            },
+                                                                        )}
+                                                                    </strong>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    ))}
+                                    )}
+                                </div>
+
+                                {adminView === "week" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextDate = addDaysToInputDate(agendaDate, 7);
+                                            setAgendaDate(nextDate);
+                                            setAgendaWeekReferenceDate(nextDate);
+                                            setShowAgendaDatePicker(false);
+                                            setShowAgendaMonthCalendar(false);
+                                        }}
+                                    >
+                                        →
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const today = formatDateForInput(new Date());
+                                        setAgendaDate(today);
+                                        setAgendaWeekReferenceDate(today);
+                                        setShowAgendaDatePicker(adminView === "agenda");
+                                        setShowAgendaMonthCalendar(false);
+                                    }}
+                                >
+                                    Hoje
+                                </button>
+                            </div>
+                        </div>
+
+                        {adminView === "agenda" && (
+                            <div className="admin-top-agenda__header">
+                                <div style={{width: "100%"}}>
+                                    <span>Horários disponíveis</span>
+                                    <strong>{formatAdminDate(agendaDate)}</strong>
+
+                                    {agendaAvailableTimes.length ? (
+                                        <div className="admin-manual-times">
+                                            {agendaAvailableTimes.map((time) => (
+                                                <button
+                                                    key={time}
+                                                    type="button"
+                                                    tabIndex={-1}
+                                                    aria-label={`Horário disponível ${time}`}
+                                                >
+                                                    {time}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="admin-empty admin-empty--top">
+                                            Nenhum horário disponível nesta data.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="admin-top-agenda__header">
-                            <div className="admin-agenda-available-times">
-                                <span>Horários disponíveis</span>
-                                <strong>{formatAdminDate(agendaDate)}</strong>
-
-                                {agendaAvailableTimes.length ? (
-                                    <div className="admin-manual-times">
-                                        {agendaAvailableTimes.map((time) => (
-                                            <button
-                                                key={time}
-                                                type="button"
-                                                tabIndex={-1}
-                                                aria-label={`Horário disponível ${time}`}
-                                            >
-                                                {time}
-                                            </button>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="admin-manual-times__empty">
-                                        Nenhum horário disponível nesta data.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        )}
 
                         {isLoading ? (
                             <div className="admin-loading">Carregando...</div>
-                        ) : (
+                        ) : adminView === "agenda" ? (
                             <div className="admin-card-list">
                                 {agendaAppointments.length
                                     ? agendaAppointments.map(renderAppointmentCard)
-                                    : (
-                                        <div className="admin-empty admin-empty--top">
-                                            Nenhum agendamento nesta data.
-                                        </div>
-                                    )}
+                                    : <div className="admin-empty admin-empty--top">Nenhum agendamento nesta data.</div>}
+                            </div>
+                        ) : (
+                            <div className="admin-card-list">
+                                {weeklyAppointments.length
+                                    ? weeklyAppointments.map(renderAppointmentCard)
+                                    : <div className="admin-empty admin-empty--top">Nenhum agendamento nesta semana.</div>}
                             </div>
                         )}
                     </section>
@@ -11763,7 +11813,917 @@ function AdminPanel() {
 
                 {panelError && <p className="admin-panel__error">{panelError}</p>}
 
-                {adminView === "new" ? (
+                {adminView === "month" ? (
+                    <section className="admin-month-agenda">
+                        <div className="admin-month-agenda__header">
+                            <div>
+                                <span>Agenda mensal</span>
+                                <strong>{monthlyAgendaMonthLabel}</strong>
+                            </div>
+
+                            <div className="admin-month-agenda__nav">
+                                <button
+                                    type="button"
+                                    aria-label="Mês anterior"
+                                    onClick={() =>
+                                        setMonthlyAgendaMonth((current) =>
+                                            addMonthsToAgendaMonth(current, -1),
+                                        )
+                                    }
+                                >
+                                    ←
+                                </button>
+
+                                <button
+                                    className="admin-month-agenda__today"
+                                    type="button"
+                                    onClick={() =>
+                                        setMonthlyAgendaMonth(
+                                            formatDateForInput(new Date()).slice(0, 7),
+                                        )
+                                    }
+                                >
+                                    Mês atual
+                                </button>
+
+                                <button
+                                    type="button"
+                                    aria-label="Próximo mês"
+                                    onClick={() =>
+                                        setMonthlyAgendaMonth((current) =>
+                                            addMonthsToAgendaMonth(current, 1),
+                                        )
+                                    }
+                                >
+                                    →
+                                </button>
+                            </div>
+                        </div>
+
+                        {isLoading ? (
+                            <div className="admin-loading">Carregando...</div>
+                        ) : monthlyAgendaDates.length ? (
+                            <div className="admin-month-agenda__days">
+                                {monthlyAgendaDates.map((date) => (
+                                    <section className="admin-month-agenda__day" key={date}>
+                                        <div className="admin-month-agenda__day-header">
+                                            <strong>{formatAdminDate(date)}</strong>
+                                        </div>
+
+                                        <div className="admin-card-list">
+                                            {monthlyAgendaAppointments
+                                                .filter(
+                                                    (appointment) =>
+                                                        appointment.appointment_date === date,
+                                                )
+                                                .map(renderAppointmentCard)}
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="admin-empty">
+                                Nenhum agendamento ativo neste mês.
+                            </div>
+                        )}
+                    </section>
+                ) : adminView === "finance" ? (
+                    <section className="admin-finance">
+                        <div className="admin-finance__header">
+                            <div>
+                                <span className="admin-finance__eyebrow">Controle financeiro</span>
+                                <h2>Financeiro mensal</h2>
+                                <p>Valores calculados automaticamente a partir dos agendamentos do mês.</p>
+                            </div>
+
+                            <div className="admin-finance-month-picker">
+                                <div className="admin-finance-month-picker__quick">
+                                    <button
+                                        type="button"
+                                        aria-label="Mês anterior"
+                                        onClick={() =>
+                                            setFinanceMonth((current) =>
+                                                addMonthsToFinanceMonth(current, -1)
+                                            )
+                                        }
+                                    >
+                                        ←
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className={`admin-finance-month-picker__selected${
+                                            showFinanceMonthPicker ? " is-open" : ""
+                                        }`}
+                                        onClick={openFinanceMonthPicker}
+                                    >
+                                        <span className="admin-finance-month-picker__icon">📅</span>
+
+                                        <span className="admin-finance-month-picker__selected-text">
+                                            <small>Mês selecionado</small>
+                                            <strong>{financeMonthLabel}</strong>
+                                        </span>
+
+                                        <span className="admin-finance-month-picker__chevron">
+                                            {showFinanceMonthPicker ? "⌃" : "⌄"}
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        aria-label="Próximo mês"
+                                        onClick={() =>
+                                            setFinanceMonth((current) =>
+                                                addMonthsToFinanceMonth(current, 1)
+                                            )
+                                        }
+                                    >
+                                        →
+                                    </button>
+                                </div>
+
+                                {showFinanceMonthPicker && (
+                                    <div className="admin-finance-month-panel">
+                                        <div className="admin-finance-month-panel__header">
+                                            <button
+                                                type="button"
+                                                aria-label="Ano anterior"
+                                                onClick={() =>
+                                                    setFinancePickerYear((current) => current - 1)
+                                                }
+                                            >
+                                                ‹
+                                            </button>
+
+                                            <strong>{financePickerYear}</strong>
+
+                                            <button
+                                                type="button"
+                                                aria-label="Próximo ano"
+                                                onClick={() =>
+                                                    setFinancePickerYear((current) => current + 1)
+                                                }
+                                            >
+                                                ›
+                                            </button>
+                                        </div>
+
+                                        <div className="admin-finance-month-panel__grid">
+                                            {financeMonthOptions.map((monthName, index) => {
+                                                const monthValue =
+                                                    `${financePickerYear}-${String(index + 1).padStart(2, "0")}`;
+
+                                                const selected =
+                                                    financeMonth === monthValue;
+
+                                                return (
+                                                    <button
+                                                        key={monthName}
+                                                        type="button"
+                                                        className={selected ? "is-selected" : ""}
+                                                        onClick={() => selectFinanceMonth(index)}
+                                                    >
+                                                        <span>{monthName.slice(0, 3)}</span>
+                                                        <strong>{monthName}</strong>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            className="admin-finance-month-panel__current"
+                                            onClick={selectCurrentFinanceMonth}
+                                        >
+                                            Ir para o mês atual
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="admin-finance__period">
+                            <span>Resumo de</span>
+                            <strong>{financeMonthLabel}</strong>
+                        </div>
+
+                        <section className="admin-finance__services">
+                            <div className="admin-finance__services-header">
+                                <div>
+                                    <h3>Resumo por serviço</h3>
+                                    <p>Quantidade e valores de cada serviço no mês selecionado.</p>
+                                </div>
+                            </div>
+
+                            {financeServiceSummary.length ? (
+                                <div className="admin-finance-service-cards">
+                                    {financeServiceSummary.map((service) => (
+                                        <article
+                                            className="admin-finance-service-card"
+                                            key={service.serviceName}
+                                        >
+                                            <div className="admin-finance-service-card__row admin-finance-service-card__row--service">
+                                                <span>Serviço</span>
+                                                <strong>{service.serviceName}</strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Atendimentos realizados</span>
+                                                <strong>{service.completedCount}</strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Valor realizado</span>
+                                                <strong>
+                                                    {formatCurrency(service.completedCents)}
+                                                </strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Atendimentos agendados</span>
+                                                <strong>{service.scheduledCount}</strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row">
+                                                <span>Valor agendado</span>
+                                                <strong>
+                                                    {formatCurrency(service.scheduledCents)}
+                                                </strong>
+                                            </div>
+
+                                            <div className="admin-finance-service-card__row admin-finance-service-card__row--total">
+                                                <span>Total previsto</span>
+                                                <strong>
+                                                    {formatCurrency(
+                                                        service.completedCents +
+                                                        service.scheduledCents,
+                                                    )}
+                                                </strong>
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="admin-finance__empty">
+                                    <strong>Nenhum valor para este mês.</strong>
+                                    <span>Os agendamentos confirmados e concluídos aparecerão aqui automaticamente.</span>
+                                </div>
+                            )}
+                        </section>
+
+                        <p className="admin-finance__note">
+                            Ao chegar o horário, o agendamento é considerado realizado automaticamente. Cancelados e não comparecimentos não entram nos valores financeiros.
+                        </p>
+                    </section>
+                ) : adminView === "schedule" ? (
+                    <section className="admin-settings admin-service-manager">
+                        <div className="admin-settings__intro">
+                            <div>
+                                <span className="admin-settings__eyebrow">Configurações do site</span>
+                                <h2>Configuração de horários</h2>
+                                <p>Adicione, altere ou exclua horários somente na data escolhida.</p>
+                            </div>
+                        </div>
+
+                        <section className="admin-service-form-card admin-schedule-config-card">
+                            <div className="admin-service-form-card__heading">
+                                <div>
+                                    <span>CONFIGURAÇÃO DE HORÁRIOS</span>
+                                    <h3>Horários de uma data específica</h3>
+                                    <p>
+                                        Selecione o dia abaixo. Depois adicione um novo horário ou toque em um horário disponível para alterar ou excluir somente nessa data.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="admin-manual-week-picker admin-schedule-config-panel">
+                                <div className="admin-manual-week-picker__top">
+                                    <div className="admin-manual-week-picker__month">
+                                        <strong>
+                                            {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
+                                                month: "long",
+                                                year: "numeric",
+                                            })}
+                                        </strong>
+                                    </div>
+
+                                    <div className="admin-manual-week-picker__navs">
+                                        <button
+                                            type="button"
+                                            aria-label="Semana anterior"
+                                            onClick={() => moveScheduleConfigWeek(-1)}
+                                        >
+                                            ‹
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label="Próxima semana"
+                                            onClick={() => moveScheduleConfigWeek(1)}
+                                        >
+                                            ›
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-manual-week-days">
+                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--four">
+                                        {scheduleConfigVisibleWeekDates.slice(0, 4).map((date) => {
+                                            const parsed = new Date(`${date}T12:00:00`);
+                                            const isPast = date < formatDateForInput(new Date());
+
+                                            return (
+                                                <button
+                                                    key={date}
+                                                    type="button"
+                                                    disabled={isPast}
+                                                    className={`admin-manual-week-day${date === scheduleConfigDate ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                    onClick={() => selectScheduleConfigDate(date)}
+                                                >
+                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                    <strong>{parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}</strong>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="admin-manual-week-days__row admin-manual-week-days__row--three">
+                                        {scheduleConfigVisibleWeekDates.slice(4).map((date) => {
+                                            const parsed = new Date(`${date}T12:00:00`);
+                                            const isPast = date < formatDateForInput(new Date());
+
+                                            return (
+                                                <button
+                                                    key={date}
+                                                    type="button"
+                                                    disabled={isPast}
+                                                    className={`admin-manual-week-day${date === scheduleConfigDate ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                    onClick={() => selectScheduleConfigDate(date)}
+                                                >
+                                                    <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
+                                                    <strong>{parsed.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}</strong>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <section className="admin-manual-booking__section admin-schedule-config-manual-section">
+                                <span className="admin-manual-booking__step">4</span>
+
+                                <div className="admin-manual-booking__content">
+                                    <h3>Horário disponível</h3>
+                                    <p>
+                                        Adicione um novo horário abaixo. Depois ele entra automaticamente na lista de horários disponíveis dessa data.
+                                    </p>
+
+                                    <div className="admin-schedule-config-add-inline">
+                                        <label>
+                                            <span>ADD NOVO HORÁRIO</span>
+                                            <input
+                                                type="time"
+                                                value={scheduleConfigNewTime}
+                                                onChange={(event) => setScheduleConfigNewTime(event.target.value)}
+                                            />
+                                        </label>
+
+                                        <button
+                                            type="button"
+                                            disabled={isSavingScheduleConfig || !scheduleConfigNewTime}
+                                            onClick={() => void addScheduleConfigTime()}
+                                        >
+                                            {isSavingScheduleConfig ? "Salvando..." : "Salvar horário"}
+                                        </button>
+                                    </div>
+
+                                    {scheduleConfigError && (
+                                        <p className="admin-settings__message admin-settings__message--error">
+                                            {scheduleConfigError}
+                                        </p>
+                                    )}
+
+                                    {scheduleConfigSuccess && (
+                                        <p className="admin-settings__message admin-settings__message--success">
+                                            {scheduleConfigSuccess}
+                                        </p>
+                                    )}
+
+                                    <div className="admin-schedule-config-current-date">
+                                        <span>DATA SELECIONADA</span>
+                                        <strong>
+                                            {new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {
+                                                weekday: "short",
+                                                day: "2-digit",
+                                                month: "2-digit",
+                                                year: "numeric",
+                                            })}
+                                        </strong>
+                                    </div>
+
+                                    {scheduleConfigTimes.length ? (
+                                        <div className="admin-manual-times admin-schedule-config-times-grid">
+                                            {scheduleConfigTimes.map((time) => (
+                                                <button
+                                                    key={time}
+                                                    type="button"
+                                                    className={scheduleConfigEditingTime === time ? "is-selected" : ""}
+                                                    onClick={() => beginEditScheduleConfigTime(time)}
+                                                >
+                                                    {time}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="admin-manual-times__empty">
+                                            Nenhum horário disponível nessa data.
+                                        </div>
+                                    )}
+
+                                    {scheduleConfigEditingTime && (
+                                        <div className="admin-schedule-config-editor">
+                                            <div className="admin-schedule-config-editor__header">
+                                                <span>HORÁRIO SELECIONADO</span>
+                                                <strong>{scheduleConfigEditingTime}</strong>
+                                            </div>
+
+                                            <div className="admin-schedule-config-editor__actions">
+                                                <label>
+                                                    <span>NOVO HORÁRIO</span>
+                                                    <input
+                                                        type="time"
+                                                        value={scheduleConfigEditedTime}
+                                                        onChange={(event) => setScheduleConfigEditedTime(event.target.value)}
+                                                    />
+                                                </label>
+
+                                                <button
+                                                    type="button"
+                                                    disabled={isSavingScheduleConfig}
+                                                    onClick={() => void saveEditedScheduleConfigTime()}
+                                                >
+                                                    Salvar alteração
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className="is-danger"
+                                                    disabled={isSavingScheduleConfig}
+                                                    onClick={() => void removeScheduleConfigTime(scheduleConfigEditingTime)}
+                                                >
+                                                    Excluir horário
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className="is-secondary"
+                                                    disabled={isSavingScheduleConfig}
+                                                    onClick={() => {
+                                                        setScheduleConfigEditingTime(null);
+                                                        setScheduleConfigEditedTime("");
+                                                        setScheduleConfigError("");
+                                                    }}
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                ) : adminView === "settings" ? (
+                    <section className="admin-settings admin-service-manager">
+                        <div className="admin-settings__intro">
+                            <div>
+                                <span className="admin-settings__eyebrow">Configurações do site</span>
+                                <h2>Configuração de serviços</h2>
+                                <p>Cadastre, edite ou exclua os serviços. A lista é organizada do maior para o menor valor.</p>
+                            </div>
+                        </div>
+
+                        {settingsError && (
+                            <p className="admin-settings__message admin-settings__message--error">
+                                {settingsError}
+                            </p>
+                        )}
+
+                        {settingsSuccess && (
+                            <p className="admin-settings__message admin-settings__message--success">
+                                {settingsSuccess}
+                            </p>
+                        )}
+
+
+                        <section
+                            id="admin-service-form"
+                            className="admin-service-form-card"
+                        >
+                            <div className="admin-service-form-card__heading">
+                                <div>
+                                    <span>
+                                        {editingServiceId !== null
+                                            ? "EDITAR SERVIÇO"
+                                            : "NOVO SERVIÇO"}
+                                    </span>
+                                    <h3>
+                                        {editingServiceId !== null
+                                            ? "Atualize as informações"
+                                            : "Adicionar serviço"}
+                                    </h3>
+                                </div>
+
+                                {editingServiceId !== null && (
+                                    <button
+                                        type="button"
+                                        className="admin-service-form-card__cancel"
+                                        onClick={resetServiceForm}
+                                    >
+                                        Cancelar edição
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="admin-service-form-fields">
+                                <label>
+                                    <span>NOME DO SERVIÇO</span>
+                                    <input
+                                        type="text"
+                                        value={serviceFormName}
+                                        onChange={(event) =>
+                                            setServiceFormName(event.target.value)
+                                        }
+                                        placeholder="Ex.: Esmaltação em Gel"
+                                    />
+                                </label>
+
+                                <label>
+                                    <span>VALOR DO SERVIÇO</span>
+                                    <div className="admin-service-price-field">
+                                        <span>R$</span>
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={serviceFormPrice}
+                                            onChange={(event) =>
+                                                setServiceFormPrice(
+                                                    event.target.value.replace(
+                                                        /[^0-9,.]/g,
+                                                        "",
+                                                    ),
+                                                )
+                                            }
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                </label>
+
+                                <label>
+                                    <span>DURAÇÃO DO SERVIÇO</span>
+                                    <div className="admin-service-duration-field">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={serviceFormDuration}
+                                            onChange={(event) =>
+                                                setServiceFormDuration(event.target.value)
+                                            }
+                                            placeholder="90"
+                                        />
+                                        <span>minutos</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="admin-service-form-card__save"
+                                disabled={savingServiceId !== null}
+                                onClick={() => void saveServiceFromForm()}
+                            >
+                                {savingServiceId !== null
+                                    ? "Salvando..."
+                                    : editingServiceId !== null
+                                        ? "Salvar alterações"
+                                        : "Salvar serviço"}
+                            </button>
+                        </section>
+
+                        <section className="admin-service-list-section">
+                            <div className="admin-service-list-section__heading">
+                                <div>
+                                    <span>SERVIÇOS CADASTRADOS</span>
+                                    <h3>Serviços disponíveis</h3>
+                                </div>
+                                <strong>{adminServices.length}</strong>
+                            </div>
+
+                            <div className="admin-service-cards">
+                                {adminServices.map((service) => {
+                                    const isExpanded =
+                                        expandedServiceId === service.id;
+
+                                    return (
+                                        <article
+                                            className={`admin-service-summary-card${
+                                                isExpanded ? " is-expanded" : ""
+                                            }`}
+                                            key={service.id}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() =>
+                                                setExpandedServiceId((current) =>
+                                                    current === service.id
+                                                        ? null
+                                                        : service.id,
+                                                )
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" ||
+                                                    event.key === " "
+                                                ) {
+                                                    event.preventDefault();
+                                                    setExpandedServiceId((current) =>
+                                                        current === service.id
+                                                            ? null
+                                                            : service.id,
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <div className="admin-service-summary-card__main">
+                                                <div className="admin-service-summary-card__icon">
+                                                    ✦
+                                                </div>
+
+                                                <div className="admin-service-summary-card__content">
+                                                    <strong>{service.name}</strong>
+
+                                                    <div className="admin-service-summary-card__details">
+                                                        <span>
+                                                            <small>Valor</small>
+                                                            <b>
+                                                                {formatCurrency(
+                                                                    service.price_cents,
+                                                                )}
+                                                            </b>
+                                                        </span>
+
+                                                        <span>
+                                                            <small>Duração</small>
+                                                            <b>
+                                                                {formatDuration(
+                                                                    service.duration_minutes,
+                                                                )}
+                                                            </b>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <span className="admin-service-summary-card__chevron">
+                                                    {isExpanded ? "⌃" : "⌄"}
+                                                </span>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div
+                                                    className="admin-service-summary-card__actions"
+                                                    onClick={(event) =>
+                                                        event.stopPropagation()
+                                                    }
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        className="edit"
+                                                        onClick={() =>
+                                                            openServiceEditor(service)
+                                                        }
+                                                    >
+                                                        Editar serviço
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className="delete"
+                                                        disabled={
+                                                            deletingServiceId === service.id
+                                                        }
+                                                        onClick={() =>
+                                                            void deleteAdminService(service)
+                                                        }
+                                                    >
+                                                        {deletingServiceId === service.id
+                                                            ? "Excluindo..."
+                                                            : "Excluir serviço"}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    </section>
+                ) : adminView === "clients" ? (
+                    <section className="admin-clients">
+                        <div className="admin-clients__header"><div><span className="admin-clients__eyebrow">Clientes</span><h2>Cadastros das clientes</h2><p>Consulte histórico, edite ou exclua um cadastro.</p></div><div className="admin-clients__count"><strong>{clients.length}</strong><span>clientes cadastradas</span></div></div>
+                        <div className="admin-clients__search"><label>Buscar cliente<input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Nome ou telefone"/></label></div>
+                        <div className="admin-clients__grid">
+                            {filteredClients.map((client) => {
+                                const realized = client.appointments.filter(
+                                    (item) =>
+                                        item.status !== "cancelled" &&
+                                        item.status !== "no-show" &&
+                                        (
+                                            item.status === "completed" ||
+                                            getAppointmentEndDateTime(item).getTime() <=
+                                            adminNow.getTime()
+                                        ),
+                                ).length;
+
+                                const scheduled = client.appointments.filter(
+                                    (item) =>
+                                        item.status !== "cancelled" &&
+                                        item.status !== "no-show" &&
+                                        item.status !== "completed" &&
+                                        getAppointmentEndDateTime(item).getTime() >
+                                        adminNow.getTime(),
+                                ).length;
+
+                                const cancelled = client.appointments.filter(
+                                    (item) => item.status === "cancelled",
+                                ).length;
+
+                                const isExpandedClient =
+                                    expandedClientCardKey === client.key;
+                                const compactAppointment =
+                                    client.nextAppointment ?? client.lastAppointment;
+
+                                return (
+                                    <article
+                                        className={`admin-client-card admin-client-card--collapsible${isExpandedClient ? " is-expanded" : ""}`}
+                                        key={client.key}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-expanded={isExpandedClient}
+                                        onClick={() =>
+                                            setExpandedClientCardKey((current) =>
+                                                current === client.key ? null : client.key,
+                                            )
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                setExpandedClientCardKey((current) =>
+                                                    current === client.key ? null : client.key,
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        {!isExpandedClient ? (
+                                            <div className="admin-client-card__compact-summary">
+                                                <div className="admin-client-card__compact-main">
+                                                    {compactAppointment && (
+                                                        <span className="admin-client-card__compact-time">
+                                                            {String(compactAppointment.start_time).slice(0, 5)}
+                                                        </span>
+                                                    )}
+                                                    <h3>{client.name}</h3>
+                                                </div>
+
+                                                {compactAppointment ? (
+                                                    <>
+                                                        <span
+                                                            className={`admin-status admin-status--${compactAppointment.status}`}
+                                                        >
+                                                            {getAdminAppointmentDisplayStatusLabel(
+                                                                compactAppointment,
+                                                            )}
+                                                        </span>
+
+                                                        <div className="admin-client-card__compact-date">
+                                                            <span>Data</span>
+                                                            <strong>
+                                                                {formatAdminDate(
+                                                                    compactAppointment.appointment_date,
+                                                                )}
+                                                            </strong>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="admin-client-card__compact-date">
+                                                        <span>Agenda</span>
+                                                        <strong>Sem agendamento registrado</strong>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="admin-client-card__top">
+                                                    <div className="admin-client-card__avatar">
+                                                        {client.name
+                                                            .split(/\s+/)
+                                                            .slice(0, 2)
+                                                            .map((part) => part[0])
+                                                            .join("")
+                                                            .toUpperCase()}
+                                                    </div>
+
+                                                    <div>
+                                                        <h3>{client.name}</h3>
+                                                        <a
+                                                            href={`https://wa.me/${normalizePhoneForWhatsApp(client.phone)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(event) => event.stopPropagation()}
+                                                        >
+                                                            {client.phone}
+                                                        </a>
+                                                        <span>
+                                                            {client.email || "E-mail não informado"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="admin-client-card__metrics">
+                                                    <div>
+                                                        <span>Atendimentos realizados</span>
+                                                        <strong>{realized}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Atendimentos agendados</span>
+                                                        <strong>{scheduled}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Atendimentos cancelados</span>
+                                                        <strong>{cancelled}</strong>
+                                                    </div>
+                                                </div>
+
+                                                {client.nextAppointment && (
+                                                    <div className="admin-client-card__next">
+                                                        <span>Próximo</span>
+                                                        <strong>
+                                                            {formatAdminDate(
+                                                                client.nextAppointment.appointment_date,
+                                                            )}{" "}
+                                                            às{" "}
+                                                            {String(
+                                                                client.nextAppointment.start_time,
+                                                            ).slice(0, 5)}
+                                                        </strong>
+                                                    </div>
+                                                )}
+
+                                                <div
+                                                    className="admin-client-card__actions"
+                                                    onClick={(event) => event.stopPropagation()}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openClientHistory(client)}
+                                                    >
+                                                        Ver histórico
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="is-nail-record"
+                                                        onClick={() =>
+                                                            openNailRecordForClient(client)
+                                                        }
+                                                    >
+                                                        📷 Registrar estado da unha
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="is-secondary"
+                                                        onClick={() => openClientEditor(client)}
+                                                    >
+                                                        Editar cadastro
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="is-danger"
+                                                        disabled={
+                                                            deletingClientKey === client.key
+                                                        }
+                                                        onClick={() => void deleteClient(client)}
+                                                    >
+                                                        {deletingClientKey === client.key
+                                                            ? "Excluindo..."
+                                                            : "Remover da lista"}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ) : adminView === "new" ? (
                     <section className="admin-content-section">
                         <section className="admin-new-appointment">
                             <div className="admin-new-appointment__header">
@@ -12617,6 +13577,16 @@ function AdminPanel() {
                                     <div className="admin-edit-actions">
                                         <button className="save" type="button" disabled={isSavingAppointment} onClick={() => void saveAppointmentChanges()}>{isSavingAppointment ? "Salvando..." : "Salvar alterações"}</button>
                                         <button className="cancel" type="button" onClick={() => void cancelAppointment(selectedAdminAppointment)}>Cancelar agendamento</button>
+                                        {selectedAdminAppointment.status === "confirmed" && (
+                                            <button
+                                                className="cancel"
+                                                type="button"
+                                                disabled={deletingConfirmedAppointmentId === selectedAdminAppointment.id}
+                                                onClick={() => void deleteConfirmedAppointmentFromHistory(selectedAdminAppointment)}
+                                            >
+                                                {deletingConfirmedAppointmentId === selectedAdminAppointment.id ? "Excluindo..." : "Excluir agendamento"}
+                                            </button>
+                                        )}
                                         <button className="close" type="button" onClick={() => setSelectedAdminAppointment(null)}>Fechar</button>
                                     </div>
                                 </div>
@@ -12810,19 +13780,16 @@ function AdminPanel() {
                                     {selectedClient.appointments.map((appointment) => {
                                         const canClearCancelled =
                                             appointment.status === "cancelled";
-                                        const canDeleteConfirmed =
+                                        const canEditConfirmed =
                                             appointment.status === "confirmed";
 
                                         const isClearing =
                                             clearingCancelledAppointmentId ===
                                             appointment.id;
-                                        const isDeletingConfirmed =
-                                            deletingConfirmedAppointmentId ===
-                                            appointment.id;
 
                                         const isInteractive =
                                             canClearCancelled ||
-                                            canDeleteConfirmed;
+                                            canEditConfirmed;
 
                                         return (
                                             <article
@@ -12831,11 +13798,10 @@ function AdminPanel() {
                                                     canClearCancelled
                                                         ? "is-cancelled-cleanable"
                                                         : "",
-                                                    canDeleteConfirmed
+                                                    canEditConfirmed
                                                         ? "is-confirmed-deletable"
                                                         : "",
-                                                    isClearing ||
-                                                    isDeletingConfirmed
+                                                    isClearing
                                                         ? "is-clearing"
                                                         : "",
                                                 ]
@@ -12859,8 +13825,8 @@ function AdminPanel() {
                                                         return;
                                                     }
 
-                                                    if (canDeleteConfirmed) {
-                                                        void deleteConfirmedAppointmentFromHistory(
+                                                    if (canEditConfirmed) {
+                                                        openAppointmentFromClientHistory(
                                                             appointment,
                                                         );
                                                     }
@@ -12883,8 +13849,8 @@ function AdminPanel() {
                                                         return;
                                                     }
 
-                                                    if (canDeleteConfirmed) {
-                                                        void deleteConfirmedAppointmentFromHistory(
+                                                    if (canEditConfirmed) {
+                                                        openAppointmentFromClientHistory(
                                                             appointment,
                                                         );
                                                     }
@@ -12918,15 +13884,13 @@ function AdminPanel() {
                                                             Toque para limpar
                                                         </small>
                                                     </div>
-                                                ) : canDeleteConfirmed ? (
+                                                ) : canEditConfirmed ? (
                                                     <div className="admin-client-history__confirmed-action">
                                                         <strong>
-                                                            {isDeletingConfirmed
-                                                                ? "Excluindo..."
-                                                                : "Confirmado"}
+                                                            {getAdminAppointmentDisplayStatusLabel(appointment)}
                                                         </strong>
                                                         <small>
-                                                            Toque para excluir
+                                                            Toque para editar agendamento
                                                         </small>
                                                     </div>
                                                 ) : (
