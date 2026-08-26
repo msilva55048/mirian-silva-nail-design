@@ -11726,10 +11726,9 @@ function AdminPanel() {
                                             </div>
 
                                             {showAgendaMonthCalendar && (
-                                                <div className="client-month-calendar">
-                                                    <div className="client-month-calendar__header">
+                                                <div className="admin-manual-month-calendar">
+                                                    <div className="admin-manual-month-calendar__header">
                                                         <button
-                                                            className="client-week-picker__nav"
                                                             type="button"
                                                             onClick={() =>
                                                                 setAgendaCalendarMonth(
@@ -11745,6 +11744,7 @@ function AdminPanel() {
                                                         >
                                                             ‹
                                                         </button>
+
                                                         <strong>
                                                             {agendaCalendarMonth.toLocaleDateString(
                                                                 "pt-BR",
@@ -11754,8 +11754,8 @@ function AdminPanel() {
                                                                 },
                                                             )}
                                                         </strong>
+
                                                         <button
-                                                            className="client-week-picker__nav"
                                                             type="button"
                                                             onClick={() =>
                                                                 setAgendaCalendarMonth(
@@ -11773,19 +11773,21 @@ function AdminPanel() {
                                                         </button>
                                                     </div>
 
-                                                    <div className="client-month-calendar__weekdays">
-                                                        {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day) => (
-                                                            <span key={day}>{day}</span>
-                                                        ))}
+                                                    <div className="admin-manual-month-calendar__weekdays">
+                                                        {["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"].map(
+                                                            (day) => (
+                                                                <span key={day}>{day}</span>
+                                                            ),
+                                                        )}
                                                     </div>
 
-                                                    <div className="client-month-calendar__grid">
+                                                    <div className="admin-manual-month-calendar__grid">
                                                         {getAgendaMonthCalendarCells().map(
                                                             (date, index) => {
                                                                 if (!date) {
                                                                     return (
                                                                         <span
-                                                                            className="client-month-calendar__day is-empty"
+                                                                            className="is-empty"
                                                                             key={`agenda-empty-${index}`}
                                                                         />
                                                                     );
@@ -11795,14 +11797,11 @@ function AdminPanel() {
                                                                     <button
                                                                         key={date}
                                                                         type="button"
-                                                                        className={[
-                                                                            "client-month-calendar__day",
+                                                                        className={
                                                                             date === agendaDate
                                                                                 ? "is-selected"
-                                                                                : "",
-                                                                        ]
-                                                                            .filter(Boolean)
-                                                                            .join(" ")}
+                                                                                : ""
+                                                                        }
                                                                         onClick={() =>
                                                                             selectAgendaPickerDate(
                                                                                 date,
