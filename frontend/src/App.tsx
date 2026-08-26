@@ -11375,6 +11375,38 @@ function AdminPanel() {
         }, 40);
     }
 
+    function openNewAppointmentFromAvailableTime(time: string) {
+        setManualDate(agendaDate);
+        setManualWeekReferenceDate(agendaDate);
+        setManualTime(time);
+
+        const selectedDate = new Date(`${agendaDate}T12:00:00`);
+        setManualCalendarMonth(
+            new Date(
+                selectedDate.getFullYear(),
+                selectedDate.getMonth(),
+                1,
+            ),
+        );
+
+        setSelectedManualClient(null);
+        setManualClientSearch("");
+        setManualError("");
+        setManualSuccess("");
+        setShowManualMonthCalendar(false);
+        setShowManualForm(true);
+        setAdminView("new");
+
+        window.setTimeout(() => {
+            document
+                .getElementById("admin-active-content")
+                ?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
+        }, 40);
+    }
+
     const renderAppointmentCard = (appointment: AdminAppointment) => {
         const dueTypes = getDueNotificationTypes(appointment);
         const isExpanded = expandedAppointmentCardId === appointment.id;
@@ -11890,8 +11922,11 @@ function AdminPanel() {
                                                 <button
                                                     key={time}
                                                     type="button"
-                                                    tabIndex={-1}
-                                                    aria-label={`Horário disponível ${time}`}
+                                                    aria-label={`Criar novo agendamento às ${time}`}
+                                                    title={`Novo agendamento às ${time}`}
+                                                    onClick={() =>
+                                                        openNewAppointmentFromAvailableTime(time)
+                                                    }
                                                 >
                                                     {time}
                                                 </button>
@@ -12935,9 +12970,34 @@ function AdminPanel() {
                                                 className="admin-manual-booking__service"
                                                 value={manualServiceName}
                                                 onChange={(event) => {
-                                                    setManualServiceName(event.target.value);
-                                                    setManualTime("");
+                                                    const nextServiceName =
+                                                        event.target.value;
+                                                    const nextService =
+                                                        adminServices.find(
+                                                            (service) =>
+                                                                service.name ===
+                                                                nextServiceName,
+                                                        );
+
+                                                    setManualServiceName(
+                                                        nextServiceName,
+                                                    );
                                                     setManualError("");
+
+                                                    if (
+                                                        manualTime &&
+                                                        nextService &&
+                                                        manualAppointmentConflicts(
+                                                            manualDate,
+                                                            manualTime,
+                                                            nextService.duration_minutes,
+                                                        )
+                                                    ) {
+                                                        setManualTime("");
+                                                        setManualError(
+                                                            "Esse horário não comporta a duração do serviço escolhido. Selecione outro horário.",
+                                                        );
+                                                    }
                                                 }}
                                             >
                                                 {adminServices.map((service) => (
