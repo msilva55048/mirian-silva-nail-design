@@ -4082,6 +4082,20 @@ const adminSevenDaysOnlyStyles = `
     white-space: nowrap;
 }
 
+/* Mesmo destaque visual usado no painel da cliente. */
+.admin-agenda-date-picker__week-days--seven .client-week-day.is-selected,
+.admin-manual-week-days--seven .admin-manual-week-day.is-selected {
+    border-color: #9a5368 !important;
+    background: #f7e9ed !important;
+    color: #6d3445 !important;
+    box-shadow: 0 0 0 2px rgba(154, 83, 104, .12) !important;
+}
+
+.admin-agenda-date-picker__week-days--seven .client-week-day.is-selected span,
+.admin-manual-week-days--seven .admin-manual-week-day.is-selected span {
+    color: #9a5368 !important;
+}
+
 /* Apenas ADM > Novo agendamento */
 .admin-manual-week-days--seven {
     display: grid !important;
@@ -10177,6 +10191,17 @@ function AdminPanel() {
         appointments,
     ]);
 
+    const manualDisplayedTimes = useMemo(() => {
+        if (!manualTime || manualAvailableTimes.includes(manualTime)) {
+            return manualAvailableTimes;
+        }
+
+        return [manualTime, ...manualAvailableTimes].sort(
+            (first, second) =>
+                getMinutesFromTime(first) - getMinutesFromTime(second),
+        );
+    }, [manualAvailableTimes, manualTime]);
+
     function formatBirthDateForDisplay(value: string | null | undefined) {
         if (!value) return "";
 
@@ -13034,7 +13059,7 @@ function AdminPanel() {
                                             <p>{manualSelectedService ? `Duração do serviço: ${manualSelectedService.duration_minutes} min.` : ""}</p>
 
                                             <div className="admin-manual-times">
-                                                {manualAvailableTimes.map((time) => (
+                                                {manualDisplayedTimes.map((time) => (
                                                     <button
                                                         key={time}
                                                         type="button"
@@ -13049,7 +13074,7 @@ function AdminPanel() {
                                                 ))}
                                             </div>
 
-                                            {!manualAvailableTimes.length && (
+                                            {!manualDisplayedTimes.length && (
                                                 <div className="admin-manual-times__empty">Nenhum horário disponível para este serviço neste dia.</div>
                                             )}
                                         </div>
