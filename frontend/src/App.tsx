@@ -10266,7 +10266,15 @@ function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        const candidateStarts = getFixedAdminNewAppointmentStartMinutes(manualDate);
+        const candidateStarts = Array.from(
+            new Set([
+                ...getFixedAdminNewAppointmentStartMinutes(manualDate),
+                ...getConfiguredClientStartMinutes(
+                    manualDate,
+                    adminTimeOverrides,
+                ),
+            ]),
+        ).sort((first, second) => first - second);
 
         const selectedServiceDurationMinutes =
             Math.max(1, Number(manualSelectedService.duration_minutes) || 1);
@@ -10324,6 +10332,7 @@ function AdminPanel() {
         manualDate,
         manualSelectedService,
         appointments,
+        adminTimeOverrides,
     ]);
 
     const manualDisplayedTimes = useMemo(() => {
@@ -10924,7 +10933,7 @@ function AdminPanel() {
         const hour = 60 * 60 * 1000;
         const types: WhatsAppNotificationType[] = [];
 
-        if (difference > 2 * hour && difference <= 24 * hour) {
+        if (difference > 2 * hour && difference <= 40 * hour) {
             types.push("attendance-confirmation");
         }
 
