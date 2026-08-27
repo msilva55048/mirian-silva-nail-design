@@ -10678,7 +10678,15 @@ function AdminPanel() {
     const agendaAvailableTimes = useMemo(() => {
         if (!agendaDate) return [] as string[];
 
-        const candidateStarts = getFixedAdminManualStartMinutes(agendaDate);
+        const candidateStarts = Array.from(
+            new Set([
+                ...getFixedAdminManualStartMinutes(agendaDate),
+                ...getConfiguredClientStartMinutes(
+                    agendaDate,
+                    adminTimeOverrides,
+                ),
+            ]),
+        ).sort((first, second) => first - second);
 
         const occupiedIntervals: TimeInterval[] = appointments
             .filter(
@@ -10716,7 +10724,7 @@ function AdminPanel() {
                 return !isPastToday && !isOccupied;
             })
             .map(minutesToTime);
-    }, [agendaDate, appointments]);
+    }, [agendaDate, appointments, adminTimeOverrides]);
 
     const weeklyAppointments = useMemo(() =>
             appointments
