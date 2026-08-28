@@ -7778,118 +7778,200 @@ function FriendlyTimePicker({
                                 onChange,
                                 disabled = false,
                             }: FriendlyTimePickerProps) {
-    const [selectedHour = "", selectedMinute = ""] = value
+    const [activePart, setActivePart] = useState<"hour" | "minute" | null>(null);
+
+    const [rawHour = "", rawMinute = ""] = value
         ? value.split(":")
         : ["", ""];
 
-    function normalizePart(nextValue: string, max: number) {
-        const digits = nextValue.replace(/\D/g, "").slice(0, 2);
+    const selectedHour = rawHour ?? "";
+    const selectedMinute = rawMinute ?? "";
 
-        if (!digits) return "";
-
-        const numericValue = Number(digits);
-
-        if (Number.isNaN(numericValue)) return "";
-        if (numericValue > max) return String(max).padStart(2, "0");
-
-        return digits;
+    function clampPart(valueToClamp: string, max: number) {
+        if (!valueToClamp) return "";
+        const numeric = Number(valueToClamp);
+        if (!Number.isFinite(numeric)) return "";
+        return String(Math.min(max, Math.max(0, numeric))).padStart(2, "0");
     }
 
-    function changeHour(nextValue: string) {
-        const nextHour = normalizePart(nextValue, 23);
-
-        if (!nextHour) {
+    function setParts(nextHour: string, nextMinute: string) {
+        if (!nextHour && !nextMinute) {
             onChange("");
             return;
         }
 
-        onChange(`${nextHour}:${selectedMinute || "00"}`);
+        onChange(`${nextHour}:${nextMinute}`);
     }
 
-    function changeMinute(nextValue: string) {
-        const nextMinute = normalizePart(nextValue, 59);
+    function appendDigit(digit: string) {
+        if (disabled || !activePart) return;
 
-        if (!nextMinute) {
-            if (selectedHour) {
-                onChange(`${selectedHour}:`);
-            } else {
-                onChange("");
+        if (activePart === "hour") {
+            const current = selectedHour.slice(0, 2);
+            const nextRaw = (current + digit).slice(-2);
+            const nextNumber = Number(nextRaw);
+
+            if (nextNumber > 23) {
+                setParts(digit, selectedMinute);
+                return;
             }
+
+            setParts(nextRaw, selectedMinute);
             return;
         }
 
-        onChange(`${selectedHour || "00"}:${nextMinute}`);
+        const current = selectedMinute.slice(0, 2);
+        const nextRaw = (current + digit).slice(-2);
+        const nextNumber = Number(nextRaw);
+
+        if (nextNumber > 59) {
+            setParts(selectedHour, digit);
+            return;
+        }
+
+        setParts(selectedHour, nextRaw);
     }
 
-    function finishHour() {
-        if (!selectedHour) return;
+    function backspace() {
+        if (disabled || !activePart) return;
 
-        const normalizedHour = String(
-            Math.min(23, Math.max(0, Number(selectedHour) || 0)),
-        ).padStart(2, "0");
-
-        onChange(`${normalizedHour}:${selectedMinute || "00"}`);
+        if (activePart === "hour") {
+            setParts(selectedHour.slice(0, -1), selectedMinute);
+        } else {
+            setParts(selectedHour, selectedMinute.slice(0, -1));
+        }
     }
 
-    function finishMinute() {
-        if (!selectedHour && !selectedMinute) return;
+    function clearActivePart() {
+        if (disabled || !activePart) return;
 
-        const normalizedHour = String(
-            Math.min(23, Math.max(0, Number(selectedHour) || 0)),
-        ).padStart(2, "0");
-
-        const normalizedMinute = String(
-            Math.min(59, Math.max(0, Number(selectedMinute) || 0)),
-        ).padStart(2, "0");
-
-        onChange(`${normalizedHour}:${normalizedMinute}`);
+        if (activePart === "hour") {
+            setParts("", selectedMinute);
+        } else {
+            setParts(selectedHour, "");
+        }
     }
+
+    function confirmActivePart() {
+        if (!activePart) return;
+
+        if (activePart === "hour") {
+            if (selectedHour) {
+                setParts(clampPart(selectedHour, 23), selectedMinute);
+            }
+            setActivePart("minute");
+            return;
+        }
+
+        const normalizedHour = selectedHour
+            ? clampPart(selectedHour, 23)
+            : "";
+
+        const normalizedMinute = selectedMinute
+            ? clampPart(selectedMinute, 59)
+            : "";
+
+        setParts(normalizedHour, normalizedMinute);
+        setActivePart(null);
+    }
+
+    const displayValue =
+        selectedHour && selectedMinute
+            ? `${selectedHour.padStart(2, "0")}:${selectedMinute.padStart(2, "0")}`
+            : selectedHour || selectedMinute
+                ? `${selectedHour || "--"}:${selectedMinute || "--"}`
+                : "--:--";
 
     return (
         <div className="admin-friendly-time-picker">
             <div className="admin-friendly-time-picker__display" aria-live="polite">
                 <span>HORÁRIO ESCOLHIDO</span>
-                <strong>{value && /^\d{1,2}:\d{1,2}$/.test(value) ? value : "--:--"}</strong>
+                <strong>{displayValue}</strong>
             </div>
 
             <div className="admin-friendly-time-picker__controls">
-                <label>
+                <button
+                    type="button"
+                    disabled={disabled}
+                    className={`admin-friendly-time-picker__part${activePart === "hour" ? " is-active" : ""}`}
+                    onClick={() => setActivePart("hour")}
+                >
                     <span>HORA</span>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={2}
-                        placeholder="00"
-                        value={selectedHour}
-                        disabled={disabled}
-                        onChange={(event) => changeHour(event.target.value)}
-                        onBlur={finishHour}
-                        aria-label="Digite a hora"
-                    />
-                </label>
+                    <strong>{selectedHour || "--"}</strong>
+                </button>
 
                 <span className="admin-friendly-time-picker__separator">:</span>
 
-                <label>
+                <button
+                    type="button"
+                    disabled={disabled}
+                    className={`admin-friendly-time-picker__part${activePart === "minute" ? " is-active" : ""}`}
+                    onClick={() => setActivePart("minute")}
+                >
                     <span>MINUTO</span>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={2}
-                        placeholder="00"
-                        value={selectedMinute}
-                        disabled={disabled}
-                        onChange={(event) => changeMinute(event.target.value)}
-                        onBlur={finishMinute}
-                        aria-label="Digite os minutos"
-                    />
-                </label>
+                    <strong>{selectedMinute || "--"}</strong>
+                </button>
             </div>
 
+            {activePart && (
+                <div className="admin-friendly-time-picker__keypad">
+                    <div className="admin-friendly-time-picker__keypad-title">
+                        Digite {activePart === "hour" ? "a hora" : "os minutos"}
+                    </div>
+
+                    <div className="admin-friendly-time-picker__keys">
+                        {["1","2","3","4","5","6","7","8","9"].map((digit) => (
+                            <button
+                                key={digit}
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => appendDigit(digit)}
+                            >
+                                {digit}
+                            </button>
+                        ))}
+
+                        <button
+                            type="button"
+                            className="is-secondary"
+                            disabled={disabled}
+                            onClick={clearActivePart}
+                        >
+                            Limpar
+                        </button>
+
+                        <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => appendDigit("0")}
+                        >
+                            0
+                        </button>
+
+                        <button
+                            type="button"
+                            className="is-secondary"
+                            disabled={disabled}
+                            onClick={backspace}
+                            aria-label="Apagar último número"
+                        >
+                            ⌫
+                        </button>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="admin-friendly-time-picker__confirm"
+                        disabled={disabled}
+                        onClick={confirmActivePart}
+                    >
+                        {activePart === "hour" ? "Próximo: minutos" : "Confirmar horário"}
+                    </button>
+                </div>
+            )}
+
             <small className="admin-friendly-time-picker__hint">
-                Digite a hora e os minutos. Ex.: 22 : 30
+                Toque em Hora ou Minuto e use o teclado abaixo.
             </small>
         </div>
     );
@@ -7986,28 +8068,90 @@ const adminServiceManagerStyles = `
     display: grid;
     gap: 6px;
 }
-.admin-friendly-time-picker__controls input {
+.admin-friendly-time-picker__part {
     width: 100%;
-    min-height: 46px;
+    min-height: 62px;
     box-sizing: border-box;
     border: 1px solid #dbc5cc;
     border-radius: 14px;
-    padding: 10px 13px;
+    padding: 9px 12px;
     background: #fff;
     color: #4f353e;
     font: inherit;
-    font-size: 1.1rem;
-    font-weight: 900;
+    cursor: pointer;
+    display: grid;
+    gap: 4px;
     text-align: center;
-    letter-spacing: .08em;
-    outline: none;
 }
-.admin-friendly-time-picker__controls input:focus {
+.admin-friendly-time-picker__part span {
+    color: #9a5d70;
+    font-size: .66rem;
+    font-weight: 900;
+    letter-spacing: .07em;
+}
+.admin-friendly-time-picker__part strong {
+    color: #5b3542;
+    font-size: 1.2rem;
+    letter-spacing: .08em;
+}
+.admin-friendly-time-picker__part.is-active {
     border-color: #a96679;
+    background: #f8eef1;
     box-shadow: 0 0 0 3px rgba(169, 102, 121, .13);
 }
-.admin-friendly-time-picker__controls input:disabled {
+.admin-friendly-time-picker__part:disabled {
     opacity: .58;
+    cursor: wait;
+}
+.admin-friendly-time-picker__keypad {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #eadde1;
+    border-radius: 16px;
+    background: #fffafb;
+}
+.admin-friendly-time-picker__keypad-title {
+    color: #6d4853;
+    font-size: .76rem;
+    font-weight: 900;
+    text-align: center;
+}
+.admin-friendly-time-picker__keys {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.admin-friendly-time-picker__keys button {
+    min-height: 48px;
+    border: 1px solid #dbc5cc;
+    border-radius: 13px;
+    background: #fff;
+    color: #5a3441;
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+.admin-friendly-time-picker__keys button:active {
+    transform: translateY(1px);
+    background: #f8eef1;
+}
+.admin-friendly-time-picker__keys button.is-secondary {
+    background: #f3e8eb;
+    color: #7a4a59;
+    font-size: .78rem;
+}
+.admin-friendly-time-picker__confirm {
+    min-height: 44px;
+    border: 0;
+    border-radius: 13px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #7c4356, #b2607d);
+    color: #fff;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
 }
 .admin-friendly-time-picker__hint {
     color: #927780;
