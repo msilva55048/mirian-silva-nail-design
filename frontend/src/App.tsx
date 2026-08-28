@@ -7767,6 +7767,92 @@ function clearMirianLastAccessMode() {
 
 
 
+type FriendlyTimePickerProps = {
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+};
+
+function FriendlyTimePicker({
+                                value,
+                                onChange,
+                                disabled = false,
+                            }: FriendlyTimePickerProps) {
+    const [selectedHour = "", selectedMinute = ""] = value
+        ? value.split(":")
+        : ["", ""];
+
+    function changeHour(nextHour: string) {
+        if (!nextHour) {
+            onChange("");
+            return;
+        }
+
+        onChange(`${nextHour}:${selectedMinute || "00"}`);
+    }
+
+    function changeMinute(nextMinute: string) {
+        if (!nextMinute) {
+            onChange("");
+            return;
+        }
+
+        onChange(`${selectedHour || "07"}:${nextMinute}`);
+    }
+
+    return (
+        <div className="admin-friendly-time-picker">
+            <div className="admin-friendly-time-picker__display" aria-live="polite">
+                <span>HORÁRIO ESCOLHIDO</span>
+                <strong>{value || "--:--"}</strong>
+            </div>
+
+            <div className="admin-friendly-time-picker__controls">
+                <label>
+                    <span>HORA</span>
+                    <select
+                        value={selectedHour}
+                        disabled={disabled}
+                        onChange={(event) => changeHour(event.target.value)}
+                    >
+                        <option value="">--</option>
+                        {Array.from({length: 24}, (_, hour) => {
+                            const option = String(hour).padStart(2, "0");
+                            return (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </label>
+
+                <span className="admin-friendly-time-picker__separator">:</span>
+
+                <label>
+                    <span>MINUTO</span>
+                    <select
+                        value={selectedMinute}
+                        disabled={disabled}
+                        onChange={(event) => changeMinute(event.target.value)}
+                    >
+                        <option value="">--</option>
+                        {Array.from({length: 60}, (_, minute) => {
+                            const option = String(minute).padStart(2, "0");
+                            return (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </label>
+            </div>
+        </div>
+    );
+}
+
+
 const adminServiceManagerStyles = `
 .admin-service-manager {
     display: grid;
@@ -7785,7 +7871,7 @@ const adminServiceManagerStyles = `
 }
 .admin-schedule-config-add-inline {
     display: grid;
-    grid-template-columns: minmax(0, 220px) auto;
+    grid-template-columns: minmax(0, 360px) auto;
     gap: 12px;
     align-items: end;
     margin-top: 8px;
@@ -7814,6 +7900,77 @@ const adminServiceManagerStyles = `
     background: #fff;
     color: #35272c;
     font: inherit;
+}
+
+.admin-friendly-time-picker {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #eadde1;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #fff, #fff8fa);
+    box-shadow: 0 8px 22px rgba(109, 52, 69, .07);
+}
+.admin-friendly-time-picker__display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 13px;
+    background: #f8eef1;
+}
+.admin-friendly-time-picker__display span,
+.admin-friendly-time-picker__controls label > span {
+    color: #9a5d70;
+    font-size: .68rem;
+    font-weight: 900;
+    letter-spacing: .07em;
+}
+.admin-friendly-time-picker__display strong {
+    color: #6d3445;
+    font-size: 1.35rem;
+    letter-spacing: .04em;
+}
+.admin-friendly-time-picker__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: end;
+}
+.admin-friendly-time-picker__controls label {
+    display: grid;
+    gap: 6px;
+}
+.admin-friendly-time-picker__controls select {
+    width: 100%;
+    min-height: 46px;
+    box-sizing: border-box;
+    border: 1px solid #dbc5cc;
+    border-radius: 14px;
+    padding: 10px 38px 10px 13px;
+    background: #fff;
+    color: #4f353e;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 800;
+    outline: none;
+    cursor: pointer;
+}
+.admin-friendly-time-picker__controls select:focus {
+    border-color: #a96679;
+    box-shadow: 0 0 0 3px rgba(169, 102, 121, .13);
+}
+.admin-friendly-time-picker__controls select:disabled {
+    opacity: .58;
+    cursor: wait;
+}
+.admin-friendly-time-picker__separator {
+    align-self: center;
+    padding-top: 18px;
+    color: #9a5368;
+    font-size: 1.45rem;
+    font-weight: 900;
 }
 .admin-schedule-config-add-inline button,
 .admin-schedule-config-editor__actions button {
@@ -7861,7 +8018,7 @@ const adminServiceManagerStyles = `
 }
 .admin-schedule-config-editor__actions {
     display: grid;
-    grid-template-columns: minmax(0, 220px) repeat(3, auto);
+    grid-template-columns: minmax(0, 360px) repeat(3, auto);
     gap: 10px;
     align-items: end;
 }
@@ -7877,6 +8034,12 @@ const adminServiceManagerStyles = `
     .admin-schedule-config-add-inline,
     .admin-schedule-config-editor__actions {
         grid-template-columns: 1fr;
+    }
+    .admin-friendly-time-picker {
+        padding: 12px;
+    }
+    .admin-friendly-time-picker__display strong {
+        font-size: 1.25rem;
     }
 }
 .admin-schedule-config-card .admin-service-form-card__heading p {
@@ -12420,10 +12583,10 @@ function AdminPanel() {
                                     <div className="admin-schedule-config-add-inline">
                                         <label>
                                             <span>ADD NOVO HORÁRIO</span>
-                                            <input
-                                                type="time"
+                                            <FriendlyTimePicker
                                                 value={scheduleConfigNewTime}
-                                                onChange={(event) => setScheduleConfigNewTime(event.target.value)}
+                                                onChange={setScheduleConfigNewTime}
+                                                disabled={isSavingScheduleConfig}
                                             />
                                         </label>
 
@@ -12489,10 +12652,10 @@ function AdminPanel() {
                                             <div className="admin-schedule-config-editor__actions">
                                                 <label>
                                                     <span>NOVO HORÁRIO</span>
-                                                    <input
-                                                        type="time"
+                                                    <FriendlyTimePicker
                                                         value={scheduleConfigEditedTime}
-                                                        onChange={(event) => setScheduleConfigEditedTime(event.target.value)}
+                                                        onChange={setScheduleConfigEditedTime}
+                                                        disabled={isSavingScheduleConfig}
                                                     />
                                                 </label>
 
