@@ -7782,7 +7782,22 @@ function FriendlyTimePicker({
         ? value.split(":")
         : ["", ""];
 
-    function changeHour(nextHour: string) {
+    function normalizePart(nextValue: string, max: number) {
+        const digits = nextValue.replace(/\D/g, "").slice(0, 2);
+
+        if (!digits) return "";
+
+        const numericValue = Number(digits);
+
+        if (Number.isNaN(numericValue)) return "";
+        if (numericValue > max) return String(max).padStart(2, "0");
+
+        return digits;
+    }
+
+    function changeHour(nextValue: string) {
+        const nextHour = normalizePart(nextValue, 23);
+
         if (!nextHour) {
             onChange("");
             return;
@@ -7791,66 +7806,95 @@ function FriendlyTimePicker({
         onChange(`${nextHour}:${selectedMinute || "00"}`);
     }
 
-    function changeMinute(nextMinute: string) {
+    function changeMinute(nextValue: string) {
+        const nextMinute = normalizePart(nextValue, 59);
+
         if (!nextMinute) {
-            onChange("");
+            if (selectedHour) {
+                onChange(`${selectedHour}:`);
+            } else {
+                onChange("");
+            }
             return;
         }
 
-        onChange(`${selectedHour || "07"}:${nextMinute}`);
+        onChange(`${selectedHour || "00"}:${nextMinute}`);
+    }
+
+    function finishHour() {
+        if (!selectedHour) return;
+
+        const normalizedHour = String(
+            Math.min(23, Math.max(0, Number(selectedHour) || 0)),
+        ).padStart(2, "0");
+
+        onChange(`${normalizedHour}:${selectedMinute || "00"}`);
+    }
+
+    function finishMinute() {
+        if (!selectedHour && !selectedMinute) return;
+
+        const normalizedHour = String(
+            Math.min(23, Math.max(0, Number(selectedHour) || 0)),
+        ).padStart(2, "0");
+
+        const normalizedMinute = String(
+            Math.min(59, Math.max(0, Number(selectedMinute) || 0)),
+        ).padStart(2, "0");
+
+        onChange(`${normalizedHour}:${normalizedMinute}`);
     }
 
     return (
         <div className="admin-friendly-time-picker">
             <div className="admin-friendly-time-picker__display" aria-live="polite">
                 <span>HORÁRIO ESCOLHIDO</span>
-                <strong>{value || "--:--"}</strong>
+                <strong>{value && /^\d{1,2}:\d{1,2}$/.test(value) ? value : "--:--"}</strong>
             </div>
 
             <div className="admin-friendly-time-picker__controls">
                 <label>
                     <span>HORA</span>
-                    <select
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={2}
+                        placeholder="00"
                         value={selectedHour}
                         disabled={disabled}
                         onChange={(event) => changeHour(event.target.value)}
-                    >
-                        <option value="">--</option>
-                        {Array.from({length: 24}, (_, hour) => {
-                            const option = String(hour).padStart(2, "0");
-                            return (
-                                <option key={option} value={option}>
-                                    {option}
-                                </option>
-                            );
-                        })}
-                    </select>
+                        onBlur={finishHour}
+                        aria-label="Digite a hora"
+                    />
                 </label>
 
                 <span className="admin-friendly-time-picker__separator">:</span>
 
                 <label>
                     <span>MINUTO</span>
-                    <select
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={2}
+                        placeholder="00"
                         value={selectedMinute}
                         disabled={disabled}
                         onChange={(event) => changeMinute(event.target.value)}
-                    >
-                        <option value="">--</option>
-                        {Array.from({length: 60}, (_, minute) => {
-                            const option = String(minute).padStart(2, "0");
-                            return (
-                                <option key={option} value={option}>
-                                    {option}
-                                </option>
-                            );
-                        })}
-                    </select>
+                        onBlur={finishMinute}
+                        aria-label="Digite os minutos"
+                    />
                 </label>
             </div>
+
+            <small className="admin-friendly-time-picker__hint">
+                Digite a hora e os minutos. Ex.: 22 : 30
+            </small>
         </div>
     );
 }
+
 
 
 const adminServiceManagerStyles = `
@@ -7942,28 +7986,33 @@ const adminServiceManagerStyles = `
     display: grid;
     gap: 6px;
 }
-.admin-friendly-time-picker__controls select {
+.admin-friendly-time-picker__controls input {
     width: 100%;
     min-height: 46px;
     box-sizing: border-box;
     border: 1px solid #dbc5cc;
     border-radius: 14px;
-    padding: 10px 38px 10px 13px;
+    padding: 10px 13px;
     background: #fff;
     color: #4f353e;
     font: inherit;
-    font-size: 1rem;
-    font-weight: 800;
+    font-size: 1.1rem;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: .08em;
     outline: none;
-    cursor: pointer;
 }
-.admin-friendly-time-picker__controls select:focus {
+.admin-friendly-time-picker__controls input:focus {
     border-color: #a96679;
     box-shadow: 0 0 0 3px rgba(169, 102, 121, .13);
 }
-.admin-friendly-time-picker__controls select:disabled {
+.admin-friendly-time-picker__controls input:disabled {
     opacity: .58;
-    cursor: wait;
+}
+.admin-friendly-time-picker__hint {
+    color: #927780;
+    font-size: .72rem;
+    font-weight: 700;
 }
 .admin-friendly-time-picker__separator {
     align-self: center;
