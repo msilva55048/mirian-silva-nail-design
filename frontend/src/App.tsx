@@ -309,14 +309,6 @@ function getFixedAdminManualStartMinutes(date: string) {
         : [...ADMIN_WEEKDAY_START_MINUTES];
 }
 
-function getFixedAdminNewAppointmentStartMinutes(date: string) {
-    if (!date) return [] as number[];
-
-    // Novo agendamento ADM:
-    // dias úteis 07:00-21:00 e sábado/domingo 07:00-19:00.
-    return getFixedAdminManualStartMinutes(date);
-}
-
 function getConfiguredClientStartMinutes(
     date: string,
     overrides: ScheduleTimeOverride[] = [],
@@ -385,6 +377,100 @@ function formatDuration(minutes: number) {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return remainingMinutes ? `${hours}h${String(remainingMinutes).padStart(2, "0")}` : `${hours}h`;
+}
+
+type OccupiedAppointmentRow = {
+    id: string;
+    appointment_date: string;
+    start_time: string;
+    duration_minutes: number;
+    status: string;
+};
+
+type ScheduleBlockRow = {
+    id: string;
+    block_date: string;
+    start_time: string;
+    end_time: string;
+    reason: string | null;
+};
+
+type ScheduleTimeOverrideRow = {
+    id: string;
+    override_date: string;
+    start_time: string;
+    is_available: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+
+function mapOccupiedAppointment(row: OccupiedAppointmentRow): Appointment {
+    return {
+        id: row.id,
+        clientName: "",
+        clientPhone: "",
+        clientEmail: "",
+        serviceName: "",
+        date: row.appointment_date,
+        startTime: String(row.start_time).slice(0, 5),
+        durationMinutes: row.duration_minutes,
+        status: row.status as Appointment["status"],
+    };
+}
+
+function mapScheduleBlock(row: ScheduleBlockRow): ScheduleBlock {
+    return {
+        id: row.id,
+        date: row.block_date,
+        startTime: String(row.start_time).slice(0, 5),
+        endTime: String(row.end_time).slice(0, 5),
+        reason: row.reason || "",
+    };
+}
+
+function mapScheduleTimeOverride(
+    row: ScheduleTimeOverrideRow,
+): ScheduleTimeOverride {
+    return {
+        id: row.id,
+        override_date: row.override_date,
+        start_time: String(row.start_time).slice(0, 5),
+        is_available: Boolean(row.is_available),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    };
+}
+
+function parseLocalDate(date: string) {
+    return new Date(`${date}T12:00:00`);
+}
+
+function getCalendarWeekDates(referenceDate: string) {
+    const reference = parseLocalDate(referenceDate);
+    const day = reference.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    reference.setDate(reference.getDate() + diffToMonday);
+
+    return Array.from({length: 7}, (_, index) => {
+        const date = new Date(reference);
+        date.setDate(reference.getDate() + index);
+        return formatDateForInput(date);
+    });
+}
+
+function getMonthCalendarDateCells(monthDate: Date) {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
+    const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    return [
+        ...Array.from({length: leadingEmpty}, () => null),
+        ...Array.from({length: daysInMonth}, (_, index) =>
+            formatDateForInput(new Date(year, month, index + 1)),
+        ),
+    ];
 }
 
 type PublicClientProfile = {
@@ -1291,6 +1377,7 @@ const clientAccountStyles = `
 `;
 
 function PublicSite() {
+    const [clientNow, setClientNow] = useState(() => Date.now());
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
@@ -1355,6 +1442,14 @@ function PublicSite() {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
     });
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            setClientNow(Date.now());
+        }, 60_000);
+
+        return () => window.clearInterval(timer);
+    }, []);
 
     function normalizeRpcRow<T>(data: T | T[] | null): T | null {
         if (!data) return null;
@@ -1512,6 +1607,9 @@ function PublicSite() {
             mounted = false;
             authListener.subscription.unsubscribe();
         };
+        // A sessao e assinada uma unica vez; alteracoes posteriores chegam
+        // pelo listener e usam sempre os dados atuais enviados pelo Supabase.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     function resetAuthMessages() {
@@ -2046,7 +2144,7 @@ function PublicSite() {
             `${appointment.appointment_date}T${String(appointment.start_time).slice(0, 5)}:00`,
         );
 
-        return appointmentMoment.getTime() > Date.now();
+        return appointmentMoment.getTime() > clientNow;
     }
 
     function openEditClientAppointment(appointment: PublicClientAppointment) {
@@ -2185,39 +2283,12 @@ function PublicSite() {
                 return;
             }
 
-            const loadedAppointments: Appointment[] = (
-                appointmentData ?? []
-            ).map((appointment) => ({
-                id: appointment.id,
-                clientName: "",
-                clientPhone: "",
-                clientEmail: "",
-                serviceName: "",
-                date: appointment.appointment_date,
-                startTime: String(appointment.start_time).slice(0, 5),
-                durationMinutes: appointment.duration_minutes,
-                status: appointment.status as Appointment["status"],
-            }));
-
-            const loadedBlocks: ScheduleBlock[] = (blockData ?? []).map(
-                (block) => ({
-                    id: block.id,
-                    date: block.block_date,
-                    startTime: String(block.start_time).slice(0, 5),
-                    endTime: String(block.end_time).slice(0, 5),
-                    reason: block.reason || "",
-                }),
+            const loadedAppointments = (appointmentData ?? []).map(
+                mapOccupiedAppointment,
             );
-
-            const loadedOverrides: ScheduleTimeOverride[] = (overrideData ?? []).map(
-                (item) => ({
-                    id: item.id,
-                    override_date: item.override_date,
-                    start_time: String(item.start_time).slice(0, 5),
-                    is_available: Boolean(item.is_available),
-                    created_at: item.created_at,
-                    updated_at: item.updated_at,
-                }),
+            const loadedBlocks = (blockData ?? []).map(mapScheduleBlock);
+            const loadedOverrides = (overrideData ?? []).map(
+                mapScheduleTimeOverride,
             );
 
             setAppointments(loadedAppointments);
@@ -2280,35 +2351,12 @@ function PublicSite() {
         };
     }, []);
 
-    const todayDate = new Date();
+    const todayDate = new Date(clientNow);
     const today = formatDateForInput(todayDate);
 
     const selectedServiceInformation = services.find(
         (service) => service.name === selectedService,
     );
-
-    function parseLocalDate(date: string) {
-        return new Date(`${date}T12:00:00`);
-    }
-
-    function addDays(date: Date, amount: number) {
-        const result = new Date(date);
-        result.setDate(result.getDate() + amount);
-        return result;
-    }
-
-    function startOfCalendarWeek(date: Date) {
-        const result = new Date(date);
-        const day = result.getDay();
-        const diffToMonday = day === 0 ? -6 : 1 - day;
-        result.setDate(result.getDate() + diffToMonday);
-        return result;
-    }
-
-    function getWeekDates(referenceDate: string) {
-        const start = startOfCalendarWeek(parseLocalDate(referenceDate));
-        return Array.from({length: 7}, (_, index) => formatDateForInput(addDays(start, index)));
-    }
 
     function selectBookingDate(date: string) {
         if (date < today) return;
@@ -2321,11 +2369,11 @@ function PublicSite() {
     }
 
     function moveBookingWeek(amount: number) {
-        const currentStart = startOfCalendarWeek(parseLocalDate(weekReferenceDate));
-        const nextReference = formatDateForInput(addDays(currentStart, amount * 7));
+        const currentStart = getCalendarWeekDates(weekReferenceDate)[0];
+        const nextReference = addDaysToInputDate(currentStart, amount * 7);
         setWeekReferenceDate(nextReference);
 
-        const nextWeek = getWeekDates(nextReference);
+        const nextWeek = getCalendarWeekDates(nextReference);
         const firstSelectable = nextWeek.find((date) => date >= today);
 
         if (firstSelectable) {
@@ -2347,34 +2395,25 @@ function PublicSite() {
     }
 
     function getMonthCalendarCells() {
-        const year = calendarMonth.getFullYear();
-        const month = calendarMonth.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        // Grade começa na segunda-feira.
-        const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-        return [
-            ...Array.from({length: leadingEmpty}, () => null),
-            ...Array.from({length: daysInMonth}, (_, index) => {
-                const date = new Date(year, month, index + 1);
-                return formatDateForInput(date);
-            }),
-        ];
+        return getMonthCalendarDateCells(calendarMonth);
     }
 
     const visibleWeekDates = useMemo(
-        () => getWeekDates(weekReferenceDate),
+        () => getCalendarWeekDates(weekReferenceDate),
         [weekReferenceDate],
     );
 
-    function getOccupiedIntervals(date: string) {
+    function getConfiguredPublicStartMinutes(date: string) {
+        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
+    }
+
+    const availableTimes = useMemo(() => {
+        if (!selectedServiceInformation || !selectedDate) return [];
+
         const appointmentIntervals = appointments
             .filter(
                 (appointment) =>
-                    appointment.date === date &&
+                    appointment.date === selectedDate &&
                     appointment.id !== editingClientAppointment?.id &&
                     appointment.status !== "cancelled" &&
                     appointment.status !== "no-show",
@@ -2385,53 +2424,36 @@ function PublicSite() {
             });
 
         const blockedIntervals = scheduleBlocks
-            .filter((block) => block.date === date)
+            .filter((block) => block.date === selectedDate)
             .map((block) => ({
                 start: timeToMinutes(block.startTime),
                 end: timeToMinutes(block.endTime),
             }));
 
-        return mergeIntervals([...appointmentIntervals, ...blockedIntervals]);
-    }
-
-    function isPastTime(date: string, startMinutes: number) {
-        if (date !== today) return false;
-
-        const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        return startMinutes <= currentMinutes;
-    }
-
-    function getConfiguredPublicStartMinutes(date: string) {
-        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
-    }
-
-    function getAvailableTimes(date: string, serviceDurationMinutes: number) {
-        if (!date) return [];
-
-        const occupiedIntervals = getOccupiedIntervals(date);
-        const generatedTimes = getConfiguredPublicStartMinutes(date);
+        const occupiedIntervals = mergeIntervals([
+            ...appointmentIntervals,
+            ...blockedIntervals,
+        ]);
+        const generatedTimes = getConfiguredClientStartMinutes(
+            selectedDate,
+            scheduleTimeOverrides,
+        );
+        const currentTime = new Date(clientNow);
+        const currentMinutes =
+            currentTime.getHours() * 60 + currentTime.getMinutes();
 
         return generatedTimes
             .filter((start) => {
-                const end = start + serviceDurationMinutes;
-
+                const end = start + selectedServiceInformation.durationMinutes;
                 const hasConflict = occupiedIntervals.some((interval) =>
                     intervalsOverlap(start, end, interval.start, interval.end),
                 );
+                const isPast =
+                    selectedDate === today && start <= currentMinutes;
 
-                return !hasConflict && !isPastTime(date, start);
+                return !hasConflict && !isPast;
             })
             .map(minutesToTime);
-    }
-
-    const availableTimes = useMemo(() => {
-        if (!selectedServiceInformation || !selectedDate) return [];
-
-        return getAvailableTimes(
-            selectedDate,
-            selectedServiceInformation.durationMinutes,
-        );
     }, [
         appointments,
         scheduleBlocks,
@@ -2439,6 +2461,8 @@ function PublicSite() {
         selectedDate,
         selectedServiceInformation,
         editingClientAppointment,
+        clientNow,
+        today,
     ]);
 
     function formatSelectedDate() {
@@ -2513,39 +2537,14 @@ function PublicSite() {
                 throw appointmentLoadError || blockLoadError;
             }
 
-            const appointmentsForSelectedDate: Appointment[] = (
-                latestAppointments ?? []
-            ).map((appointment) => ({
-                id: appointment.id,
-                clientName: "",
-                clientPhone: "",
-                clientEmail: "",
-                serviceName: "",
-                date: appointment.appointment_date,
-                startTime: String(appointment.start_time).slice(0, 5),
-                durationMinutes: appointment.duration_minutes,
-                status: appointment.status as Appointment["status"],
-            }));
-
-            const blocksForSelectedDate: ScheduleBlock[] = (
-                latestBlocks ?? []
-            ).map((block) => ({
-                id: block.id,
-                date: block.block_date,
-                startTime: String(block.start_time).slice(0, 5),
-                endTime: String(block.end_time).slice(0, 5),
-                reason: block.reason || "",
-            }));
-
-            const latestDateOverrides: ScheduleTimeOverride[] = (latestOverrides ?? []).map(
-                (item) => ({
-                    id: item.id,
-                    override_date: item.override_date,
-                    start_time: String(item.start_time).slice(0, 5),
-                    is_available: Boolean(item.is_available),
-                    created_at: item.created_at,
-                    updated_at: item.updated_at,
-                }),
+            const appointmentsForSelectedDate = (latestAppointments ?? []).map(
+                mapOccupiedAppointment,
+            );
+            const blocksForSelectedDate = (latestBlocks ?? []).map(
+                mapScheduleBlock,
+            );
+            const latestDateOverrides = (latestOverrides ?? []).map(
+                mapScheduleTimeOverride,
             );
 
             if (!overrideLoadError) {
@@ -3954,6 +3953,21 @@ type AdminAppointment = {
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
 };
+
+function shouldShowAppointmentInAdminAgenda(
+    appointment: AdminAppointment,
+    now: Date,
+) {
+    if (
+        appointment.status === "cancelled" ||
+        appointment.status === "completed" ||
+        appointment.status === "no-show"
+    ) {
+        return false;
+    }
+
+    return getAppointmentDateTime(appointment).getTime() > now.getTime();
+}
 
 type AdminScheduleBlock = {
     id: string;
@@ -6011,6 +6025,28 @@ function getAppointmentEndDateTime(appointment: AdminAppointment) {
 
 
 type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
+
+function getDueNotificationTypes(
+    appointment: AdminAppointment,
+    notificationClock: number,
+) {
+    if (appointment.status === "cancelled") {
+        return [] as WhatsAppNotificationType[];
+    }
+
+    const appointmentTime = getAppointmentDateTime(appointment).getTime();
+    const difference = appointmentTime - notificationClock;
+    const hour = 60 * 60 * 1000;
+    const types: WhatsAppNotificationType[] = [];
+
+    if (difference > 2 * hour && difference <= 40 * hour) {
+        types.push("attendance-confirmation");
+    }
+
+    // A segunda mensagem automática, que aparecia quando faltavam
+    // até 2 horas para o atendimento, permanece desativada.
+    return types;
+}
 
 function formatAppointmentDateForMessage(date: string) {
     return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
@@ -9110,40 +9146,37 @@ function AdminPanel() {
             return session?.user?.email?.trim().toLowerCase() === MIRIAN_ADMIN_EMAIL;
         }
 
-        async function checkSession() {
-            const {data: {session}} = await supabase.auth.getSession();
+        function applyAdminSession(session: {user?: {email?: string | null}} | null) {
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 
             if (isMirianAdminSession) {
                 setMirianLastAccessMode("admin");
+            } else {
+                setAppointments([]);
+                setAdminClientProfiles([]);
+                setNailRecords([]);
             }
 
             setIsAuthenticated(isMirianAdminSession);
             setIsCheckingSession(false);
         }
 
+        async function checkSession() {
+            const {data: {session}} = await supabase.auth.getSession();
+            applyAdminSession(session);
+        }
+
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
-            const isMirianAdminSession = sessionIsMirianAdmin(session);
-
-            if (isMirianAdminSession) {
-                setMirianLastAccessMode("admin");
-            }
-
-            setIsAuthenticated(isMirianAdminSession);
-            setIsCheckingSession(false);
+            applyAdminSession(session);
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            setAppointments([]);
-            setAdminClientProfiles([]);
-            return;
-        }
+        if (!isAuthenticated) return;
 
         async function loadAdminData() {
             setIsLoading(true);
@@ -9487,7 +9520,7 @@ function AdminPanel() {
     }
 
     const editVisibleWeekDates = useMemo(
-        () => getManualWeekDates(editWeekReferenceDate),
+        () => getCalendarWeekDates(editWeekReferenceDate),
         [editWeekReferenceDate],
     );
 
@@ -9504,9 +9537,9 @@ function AdminPanel() {
     }
 
     function moveEditAppointmentWeek(amount: number) {
-        const currentWeek = getManualWeekDates(editWeekReferenceDate);
+        const currentWeek = getCalendarWeekDates(editWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getManualWeekDates(nextReference);
+        const nextWeek = getCalendarWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -9531,19 +9564,7 @@ function AdminPanel() {
     }
 
     function getEditAppointmentMonthCells() {
-        const year = editCalendarMonth.getFullYear();
-        const month = editCalendarMonth.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-        return [
-            ...Array.from({length: leadingEmpty}, () => null),
-            ...Array.from({length: daysInMonth}, (_, index) =>
-                formatDateForInput(new Date(year, month, index + 1)),
-            ),
-        ];
+        return getMonthCalendarDateCells(editCalendarMonth);
     }
 
     const editSelectedService = adminServices.find(
@@ -9829,6 +9850,7 @@ function AdminPanel() {
     function closeClientHistory() {
         resetNailRecordForm();
         setNailRecords([]);
+        setIsLoadingNailRecords(false);
         setSelectedClient(null);
     }
 
@@ -10187,13 +10209,14 @@ function AdminPanel() {
     }
 
     useEffect(() => {
-        if (!isAuthenticated || !selectedClient) {
-            setNailRecords([]);
-            setIsLoadingNailRecords(false);
-            return;
-        }
+        if (!isAuthenticated || !selectedClient) return;
 
+        // Carrega e sincroniza o estado ao trocar a cliente selecionada.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         void loadNailRecordsForClient(selectedClient);
+        // A chave identifica a cliente; usar o objeto inteiro reiniciaria a
+        // consulta apos atualizacoes locais do mesmo cadastro.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAuthenticated, selectedClient?.key]);
 
     const clients = useMemo<AdminClient[]>(() => {
@@ -10428,21 +10451,8 @@ function AdminPanel() {
             .slice(0, 8);
     }, [manualBookingClients, manualClientSearch]);
 
-    function getManualWeekDates(referenceDate: string) {
-        const reference = new Date(`${referenceDate}T12:00:00`);
-        const day = reference.getDay();
-        const diffToMonday = day === 0 ? -6 : 1 - day;
-        reference.setDate(reference.getDate() + diffToMonday);
-
-        return Array.from({length: 7}, (_, index) => {
-            const date = new Date(reference);
-            date.setDate(reference.getDate() + index);
-            return formatDateForInput(date);
-        });
-    }
-
     const manualVisibleWeekDates = useMemo(
-        () => getManualWeekDates(manualWeekReferenceDate),
+        () => getCalendarWeekDates(manualWeekReferenceDate),
         [manualWeekReferenceDate],
     );
 
@@ -10458,9 +10468,9 @@ function AdminPanel() {
     }
 
     function moveManualBookingWeek(amount: number) {
-        const currentWeek = getManualWeekDates(manualWeekReferenceDate);
+        const currentWeek = getCalendarWeekDates(manualWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getManualWeekDates(nextReference);
+        const nextWeek = getCalendarWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -10480,19 +10490,7 @@ function AdminPanel() {
     }
 
     function getManualMonthCalendarCells() {
-        const year = manualCalendarMonth.getFullYear();
-        const month = manualCalendarMonth.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-        return [
-            ...Array.from({length: leadingEmpty}, () => null),
-            ...Array.from({length: daysInMonth}, (_, index) =>
-                formatDateForInput(new Date(year, month, index + 1)),
-            ),
-        ];
+        return getMonthCalendarDateCells(manualCalendarMonth);
     }
 
     const manualSelectedService = adminServices.find((service) => service.name === manualServiceName);
@@ -10502,7 +10500,7 @@ function AdminPanel() {
 
         const candidateStarts = Array.from(
             new Set([
-                ...getFixedAdminNewAppointmentStartMinutes(manualDate),
+                ...getFixedAdminManualStartMinutes(manualDate),
                 ...getConfiguredClientStartMinutes(
                     manualDate,
                     adminTimeOverrides,
@@ -10794,7 +10792,7 @@ function AdminPanel() {
         const appointmentIds = client.appointments.map((appointment) => appointment.id);
 
         if (!appointmentIds.length) {
-            setSelectedClient(null);
+            closeClientHistory();
             return;
         }
 
@@ -10819,7 +10817,7 @@ function AdminPanel() {
                 ),
             );
 
-            setSelectedClient(null);
+            closeClientHistory();
         } catch (error) {
             console.error("Erro ao remover cliente da lista:", error);
             setPanelError("Não foi possível remover a cliente da lista.");
@@ -10836,7 +10834,7 @@ function AdminPanel() {
     }, [agendaDate]);
 
     const agendaVisibleWeekDates = useMemo(
-        () => getManualWeekDates(agendaWeekReferenceDate),
+        () => getCalendarWeekDates(agendaWeekReferenceDate),
         [agendaWeekReferenceDate],
     );
 
@@ -10848,7 +10846,7 @@ function AdminPanel() {
     }
 
     function moveAgendaPickerWeek(amount: number) {
-        const currentWeek = getManualWeekDates(agendaWeekReferenceDate);
+        const currentWeek = getCalendarWeekDates(agendaWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
 
         setAgendaWeekReferenceDate(nextReference);
@@ -10864,19 +10862,7 @@ function AdminPanel() {
     }
 
     function getAgendaMonthCalendarCells() {
-        const year = agendaCalendarMonth.getFullYear();
-        const month = agendaCalendarMonth.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-        return [
-            ...Array.from({ length: leadingEmpty }, () => null),
-            ...Array.from({ length: daysInMonth }, (_, index) =>
-                formatDateForInput(new Date(year, month, index + 1)),
-            ),
-        ];
+        return getMonthCalendarDateCells(agendaCalendarMonth);
     }
 
     const agendaPickerMonthLabel = useMemo(() => {
@@ -10887,24 +10873,12 @@ function AdminPanel() {
         });
     }, [agendaWeekReferenceDate]);
 
-    function shouldShowAppointmentInAdminAgenda(appointment: AdminAppointment) {
-        if (
-            appointment.status === "cancelled" ||
-            appointment.status === "completed" ||
-            appointment.status === "no-show"
-        ) {
-            return false;
-        }
-
-        return getAppointmentDateTime(appointment).getTime() > adminNow.getTime();
-    }
-
     const agendaAppointments = useMemo(() =>
             appointments
                 .filter(
                     (item) =>
                         item.appointment_date === agendaDate &&
-                        shouldShowAppointmentInAdminAgenda(item),
+                        shouldShowAppointmentInAdminAgenda(item, adminNow),
                 )
                 .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
         [appointments, agendaDate, adminNow]);
@@ -10965,7 +10939,7 @@ function AdminPanel() {
                 .filter(
                     (item) =>
                         weekDates.includes(item.appointment_date) &&
-                        shouldShowAppointmentInAdminAgenda(item),
+                        shouldShowAppointmentInAdminAgenda(item, adminNow),
                 )
                 .sort((a, b) => `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(`${b.appointment_date}${String(b.start_time).slice(0, 5)}`)),
         [appointments, weekDates, adminNow]);
@@ -10990,7 +10964,7 @@ function AdminPanel() {
                 .filter(
                     (item) =>
                         item.appointment_date.startsWith(monthlyAgendaMonth) &&
-                        shouldShowAppointmentInAdminAgenda(item),
+                        shouldShowAppointmentInAdminAgenda(item, adminNow),
                 )
                 .sort((a, b) =>
                     `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(
@@ -11167,27 +11141,10 @@ function AdminPanel() {
         return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     }
 
-    function getDueNotificationTypes(appointment: AdminAppointment) {
-        if (appointment.status === "cancelled") return [] as WhatsAppNotificationType[];
-
-        const appointmentTime = getAppointmentDateTime(appointment).getTime();
-        const difference = appointmentTime - notificationClock;
-        const hour = 60 * 60 * 1000;
-        const types: WhatsAppNotificationType[] = [];
-
-        if (difference > 2 * hour && difference <= 40 * hour) {
-            types.push("attendance-confirmation");
-        }
-
-        // A segunda mensagem automática, que aparecia quando faltavam
-        // até 2 horas para o atendimento, foi desativada por enquanto.
-        return types;
-    }
-
     const pendingWhatsAppNotifications = useMemo(() => {
         return appointments
             .flatMap((appointment) =>
-                getDueNotificationTypes(appointment).map((type) => ({
+                getDueNotificationTypes(appointment, notificationClock).map((type) => ({
                     appointment,
                     type,
                     key: getNotificationKey(appointment.id, type),
@@ -11203,7 +11160,7 @@ function AdminPanel() {
 
 
     const scheduleConfigVisibleWeekDates = useMemo(
-        () => getManualWeekDates(scheduleConfigWeekReferenceDate),
+        () => getCalendarWeekDates(scheduleConfigWeekReferenceDate),
         [scheduleConfigWeekReferenceDate],
     );
 
@@ -11230,9 +11187,9 @@ function AdminPanel() {
     }
 
     function moveScheduleConfigWeek(amount: number) {
-        const currentWeek = getManualWeekDates(scheduleConfigWeekReferenceDate);
+        const currentWeek = getCalendarWeekDates(scheduleConfigWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getManualWeekDates(nextReference);
+        const nextWeek = getCalendarWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -11451,7 +11408,7 @@ function AdminPanel() {
     }
 
     const blockVisibleWeekDates = useMemo(
-        () => getManualWeekDates(blockWeekReferenceDate),
+        () => getCalendarWeekDates(blockWeekReferenceDate),
         [blockWeekReferenceDate],
     );
 
@@ -11466,9 +11423,9 @@ function AdminPanel() {
     }
 
     function moveBlockWeek(amount: number) {
-        const currentWeek = getManualWeekDates(blockWeekReferenceDate);
+        const currentWeek = getCalendarWeekDates(blockWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getManualWeekDates(nextReference);
+        const nextWeek = getCalendarWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -11522,6 +11479,8 @@ function AdminPanel() {
     }, [appointments, adminBlocks, blockDate]);
 
     useEffect(() => {
+        // Sincroniza a selecao com mudancas em tempo real da agenda/bloqueios.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedBlockTimes((current) => current.filter((time) => blockAvailableTimes.includes(time)));
     }, [blockAvailableTimes]);
 
@@ -11813,7 +11772,10 @@ function AdminPanel() {
     }
 
     const renderAppointmentCard = (appointment: AdminAppointment) => {
-        const dueTypes = getDueNotificationTypes(appointment);
+        const dueTypes = getDueNotificationTypes(
+            appointment,
+            notificationClock,
+        );
         const isExpanded = expandedAppointmentCardId === appointment.id;
 
         function toggleAppointmentCard() {
