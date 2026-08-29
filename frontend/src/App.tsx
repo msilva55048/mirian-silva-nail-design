@@ -4030,6 +4030,15 @@ function PublicSite() {
                                     </div>
                                 )}
 
+                                <button
+                                    className="client-account__referral-button"
+                                    type="button"
+                                    disabled={isLoadingReferralSummary}
+                                    onClick={() => void shareReferralOnWhatsApp()}
+                                >
+                                    Indicação
+                                </button>
+
                                 <div className="client-account__actions">
                                     <button
                                         className="client-account__edit-profile"
@@ -4043,26 +4052,10 @@ function PublicSite() {
                                         </span>
                                         <span className="client-account__edit-profile-arrow">›</span>
                                     </button>
-
-                                    <button
-                                        className="client-account__logout"
-                                        type="button"
-                                        onClick={() => void logoutClient()}
-                                    >
-                                        Sair da conta
-                                    </button>
                                 </div>
 
                                 <section className="client-account__section" id="client-account-appointments">
                                     <h3>Meus agendamentos</h3>
-                                    <button
-                                        className="client-account__referral-button"
-                                        type="button"
-                                        disabled={isLoadingReferralSummary}
-                                        onClick={() => void shareReferralOnWhatsApp()}
-                                    >
-                                        Indicação
-                                    </button>
                                     {clientAppointments.length > 0 ? (
                                         <div className="client-account__appointments">
                                             {clientAppointments.map((appointment) => (
@@ -4107,6 +4100,14 @@ function PublicSite() {
                                         </div>
                                     )}
                                 </section>
+
+                                <button
+                                    className="client-account__logout"
+                                    type="button"
+                                    onClick={() => void logoutClient()}
+                                >
+                                    Sair da conta
+                                </button>
                             </>
                         ) : (
                             <div className="client-account__empty">
