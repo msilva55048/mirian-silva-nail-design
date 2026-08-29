@@ -6713,10 +6713,11 @@ const adminEnhancementStyles = `
     border-left-color: #aaa0a4;
 }
 .admin-booking-card__top {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
     gap: 14px;
-    align-items: flex-start;
+}
+.admin-booking-card__top .admin-status {
+    width: 100%;
 }
 .admin-booking-card__time {
     color: #8b485d;
