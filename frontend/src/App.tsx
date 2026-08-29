@@ -4853,10 +4853,16 @@ const adminStyles = `
 .admin-status {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 116px;
+    box-sizing: border-box;
     border-radius: 999px;
-    padding: 7px 11px;
+    padding: 7px 14px;
     font-size: 0.78rem;
     font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .admin-status--pending {
@@ -4864,9 +4870,19 @@ const adminStyles = `
     color: #8a6100;
 }
 
+.admin-status--scheduled {
+    background: #fff4d9;
+    color: #8a6100;
+}
+
 .admin-status--confirmed {
     background: #e7f7ed;
     color: #1d7540;
+}
+
+.admin-status--referral {
+    background: #e4f0ff;
+    color: #2f64a3;
 }
 
 .admin-status--completed {
@@ -11509,6 +11525,33 @@ function AdminPanel() {
             : "Agendado";
     }
 
+    function isActiveReferralAppointment(appointment: AdminAppointment) {
+        const isOpenAppointment =
+            appointment.status === "pending" ||
+            appointment.status === "confirmed";
+
+        return isOpenAppointment && Boolean(
+            appointment.referral_reward_id ||
+            appointment.referral_discount_percent === 30,
+        );
+    }
+
+    function getAdminAppointmentStatusClassName(
+        appointment: AdminAppointment,
+    ) {
+        if (isActiveReferralAppointment(appointment)) {
+            return "admin-status admin-status--referral";
+        }
+
+        const displayStatus = getAdminAppointmentDisplayStatusLabel(appointment);
+
+        if (displayStatus === "Agendado") {
+            return "admin-status admin-status--scheduled";
+        }
+
+        return `admin-status admin-status--${appointment.status}`;
+    }
+
     function markWhatsAppNotificationOpened(
         appointment: AdminAppointment,
         type: WhatsAppNotificationType,
@@ -12204,7 +12247,7 @@ function AdminPanel() {
                         <h3>{appointment.client_name}</h3>
                     </div>
 
-                    <span className={`admin-status admin-status--${appointment.status}`}>
+                    <span className={getAdminAppointmentStatusClassName(appointment)}>
                         {getAdminAppointmentDisplayStatusLabel(appointment)}
                     </span>
                 </div>
@@ -13442,7 +13485,9 @@ function AdminPanel() {
                                                 {compactAppointment ? (
                                                     <>
                                                         <span
-                                                            className={`admin-status admin-status--${compactAppointment.status}`}
+                                                            className={getAdminAppointmentStatusClassName(
+                                                                compactAppointment,
+                                                            )}
                                                         >
                                                             {getAdminAppointmentDisplayStatusLabel(
                                                                 compactAppointment,
