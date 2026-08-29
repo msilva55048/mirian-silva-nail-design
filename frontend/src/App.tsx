@@ -1514,7 +1514,14 @@ function PublicSite() {
         }
 
         const loaded = ((data ?? []) as PublicClientAppointment[])
-            .filter((appointment) => appointment.client_id === profileId)
+            .filter((appointment) => (
+                appointment.client_id === profileId &&
+                // O painel da cliente mostra somente agendamentos ativos.
+                // Registros concluídos, cancelados ou de não comparecimento
+                // continuam disponíveis para o controle administrativo, mas
+                // não devem aparecer no painel pessoal da cliente.
+                (appointment.status === "pending" || appointment.status === "confirmed")
+            ))
             .sort((a, b) => {
                 const first = new Date(`${a.appointment_date}T${String(a.start_time).slice(0, 5)}:00`).getTime();
                 const second = new Date(`${b.appointment_date}T${String(b.start_time).slice(0, 5)}:00`).getTime();
