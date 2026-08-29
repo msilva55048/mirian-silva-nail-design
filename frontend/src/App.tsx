@@ -309,6 +309,14 @@ function getFixedAdminManualStartMinutes(date: string) {
         : [...ADMIN_WEEKDAY_START_MINUTES];
 }
 
+function getFixedAdminNewAppointmentStartMinutes(date: string) {
+    if (!date) return [] as number[];
+
+    // Novo agendamento ADM:
+    // dias úteis 07:00-21:00 e sábado/domingo 07:00-19:00.
+    return getFixedAdminManualStartMinutes(date);
+}
+
 function getConfiguredClientStartMinutes(
     date: string,
     overrides: ScheduleTimeOverride[] = [],
@@ -379,98 +387,48 @@ function formatDuration(minutes: number) {
     return remainingMinutes ? `${hours}h${String(remainingMinutes).padStart(2, "0")}` : `${hours}h`;
 }
 
-type OccupiedAppointmentRow = {
-    id: string;
-    appointment_date: string;
-    start_time: string;
-    duration_minutes: number;
-    status: string;
-};
+const MIRIAN_SITE_URL = "https://agendamentosmiriansilva.com.br/";
+const REFERRAL_QUERY_PARAMETER = "indicacao";
+const REFERRAL_STORAGE_KEY = "mirian-pending-referral-code";
 
-type ScheduleBlockRow = {
-    id: string;
-    block_date: string;
-    start_time: string;
-    end_time: string;
-    reason: string | null;
-};
+function normalizeReferralCode(value: string | null | undefined) {
+    const normalized = (value ?? "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
 
-type ScheduleTimeOverrideRow = {
-    id: string;
-    override_date: string;
-    start_time: string;
-    is_available: boolean;
-    created_at?: string;
-    updated_at?: string;
-};
-
-function mapOccupiedAppointment(row: OccupiedAppointmentRow): Appointment {
-    return {
-        id: row.id,
-        clientName: "",
-        clientPhone: "",
-        clientEmail: "",
-        serviceName: "",
-        date: row.appointment_date,
-        startTime: String(row.start_time).slice(0, 5),
-        durationMinutes: row.duration_minutes,
-        status: row.status as Appointment["status"],
-    };
+    return normalized.length >= 6 && normalized.length <= 32
+        ? normalized
+        : "";
 }
 
-function mapScheduleBlock(row: ScheduleBlockRow): ScheduleBlock {
-    return {
-        id: row.id,
-        date: row.block_date,
-        startTime: String(row.start_time).slice(0, 5),
-        endTime: String(row.end_time).slice(0, 5),
-        reason: row.reason || "",
-    };
-}
+function captureReferralCodeFromCurrentUrl() {
+    if (typeof window === "undefined") return null;
 
-function mapScheduleTimeOverride(
-    row: ScheduleTimeOverrideRow,
-): ScheduleTimeOverride {
-    return {
-        id: row.id,
-        override_date: row.override_date,
-        start_time: String(row.start_time).slice(0, 5),
-        is_available: Boolean(row.is_available),
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-    };
-}
+    try {
+        const url = new URL(window.location.href);
+        const codeFromUrl = normalizeReferralCode(
+            url.searchParams.get(REFERRAL_QUERY_PARAMETER),
+        );
 
-function parseLocalDate(date: string) {
-    return new Date(`${date}T12:00:00`);
-}
+        if (codeFromUrl) {
+            window.localStorage.setItem(REFERRAL_STORAGE_KEY, codeFromUrl);
+            url.searchParams.delete(REFERRAL_QUERY_PARAMETER);
+            window.history.replaceState(
+                {},
+                document.title,
+                `${url.pathname}${url.search}${url.hash}`,
+            );
+            return codeFromUrl;
+        }
 
-function getCalendarWeekDates(referenceDate: string) {
-    const reference = parseLocalDate(referenceDate);
-    const day = reference.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    reference.setDate(reference.getDate() + diffToMonday);
-
-    return Array.from({length: 7}, (_, index) => {
-        const date = new Date(reference);
-        date.setDate(reference.getDate() + index);
-        return formatDateForInput(date);
-    });
-}
-
-function getMonthCalendarDateCells(monthDate: Date) {
-    const year = monthDate.getFullYear();
-    const month = monthDate.getMonth();
-    const firstDayOfWeek = new Date(year, month, 1).getDay();
-    const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    return [
-        ...Array.from({length: leadingEmpty}, () => null),
-        ...Array.from({length: daysInMonth}, (_, index) =>
-            formatDateForInput(new Date(year, month, index + 1)),
-        ),
-    ];
+        return normalizeReferralCode(
+            window.localStorage.getItem(REFERRAL_STORAGE_KEY),
+        ) || null;
+    } catch (error) {
+        console.warn("Não foi possível guardar o código de indicação:", error);
+        return null;
+    }
 }
 
 type PublicClientProfile = {
@@ -492,6 +450,17 @@ type PublicClientAppointment = {
     price_cents: number | null;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
+};
+
+type ReferralSummary = {
+    referral_code: string;
+    pending_referrals: number;
+    successful_referrals: number;
+    reward_status: "none" | "available" | "reserved";
+    discount_percent: number;
+    discounted_appointment_id: string | null;
+    original_price_cents: number | null;
+    discounted_price_cents: number | null;
 };
 
 const clientAccountStyles = `
@@ -938,6 +907,89 @@ const clientAccountStyles = `
     background: #efe4e7;
     color: #6d3445;
 }
+.client-account__referral-button {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: 100%;
+    border: 1px solid #d7afbc;
+    border-radius: 13px;
+    padding: 13px 15px;
+    background: linear-gradient(135deg, #fff8fa, #f7e4ea);
+    color: #7a3e53;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 7px 18px rgba(83, 48, 58, .05);
+}
+.client-account__referral-button:hover {
+    border-color: #b9798e;
+    background: linear-gradient(135deg, #fffafb, #f3dce4);
+}
+.client-account__referral-button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+.client-account__referral-summary {
+    display: grid;
+    gap: 9px;
+    margin: 18px 0 22px;
+    border: 1px solid #ead9de;
+    border-radius: 16px;
+    padding: 15px;
+    background: linear-gradient(145deg, #fffafb, #fbf1f4);
+}
+.client-account__referral-summary strong {
+    color: #633b49;
+    font-size: .94rem;
+}
+.client-account__referral-summary p {
+    margin: 0;
+    color: #80666e;
+    font-size: .82rem;
+    line-height: 1.45;
+}
+.client-account__referral-summary.is-ready {
+    border-color: #d6b0bd;
+    background: linear-gradient(145deg, #fff7fa, #f8e6ec);
+}
+.client-account__referral-summary.is-reserved {
+    border-color: #d9c5a5;
+    background: linear-gradient(145deg, #fffaf0, #f8efe0);
+}
+.client-referral-invite {
+    border-radius: 12px;
+    padding: 11px 12px;
+    background: #f8e7ec;
+    color: #7a3e53;
+    font-size: .84rem;
+    line-height: 1.45;
+}
+.client-account__appointment-discount {
+    margin-top: 7px !important;
+    color: #287044 !important;
+    font-weight: 850;
+}
+.booking-modal__discount {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+.booking-modal__discount span {
+    color: #287044;
+    font-weight: 850;
+}
+.booking-modal__discount strong {
+    color: #287044;
+}
+.booking-modal__discount s {
+    margin-right: 7px;
+    color: #9a7d86;
+    font-weight: 500;
+}
 .client-account__edit-profile {
     flex: 1 1 100%;
     display: grid;
@@ -1377,7 +1429,9 @@ const clientAccountStyles = `
 `;
 
 function PublicSite() {
-    const [clientNow, setClientNow] = useState(() => Date.now());
+    const [pendingReferralCode, setPendingReferralCode] = useState<string | null>(
+        captureReferralCodeFromCurrentUrl,
+    );
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
@@ -1395,6 +1449,8 @@ function PublicSite() {
     const [clientUserEmail, setClientUserEmail] = useState("");
     const [clientProfile, setClientProfile] = useState<PublicClientProfile | null>(null);
     const [clientAppointments, setClientAppointments] = useState<PublicClientAppointment[]>([]);
+    const [referralSummary, setReferralSummary] = useState<ReferralSummary | null>(null);
+    const [isLoadingReferralSummary, setIsLoadingReferralSummary] = useState(false);
     const [, setIsCheckingClientSession] = useState(true);
     const [isLoadingClientAccount, setIsLoadingClientAccount] = useState(false);
     const [showClientAuth, setShowClientAuth] = useState(false);
@@ -1443,14 +1499,6 @@ function PublicSite() {
         return new Date(now.getFullYear(), now.getMonth(), 1);
     });
 
-    useEffect(() => {
-        const timer = window.setInterval(() => {
-            setClientNow(Date.now());
-        }, 60_000);
-
-        return () => window.clearInterval(timer);
-    }, []);
-
     function normalizeRpcRow<T>(data: T | T[] | null): T | null {
         if (!data) return null;
         return Array.isArray(data) ? (data[0] ?? null) : data;
@@ -1474,6 +1522,105 @@ function PublicSite() {
             });
 
         setClientAppointments(loaded);
+    }
+
+    async function loadReferralSummary(userId = clientUserId) {
+        if (!userId) return null;
+
+        setIsLoadingReferralSummary(true);
+
+        try {
+            const {data, error} = await supabase.rpc("get_my_referral_summary");
+
+            if (error) {
+                // A migração do programa pode ainda não ter sido aplicada no projeto.
+                // Não interrompemos o login nem o painel por causa disso.
+                console.warn("Resumo de indicação indisponível:", error);
+                setReferralSummary(null);
+                return null;
+            }
+
+            const summary = normalizeRpcRow<ReferralSummary>(
+                data as ReferralSummary[] | ReferralSummary | null,
+            );
+
+            setReferralSummary(summary);
+            return summary;
+        } finally {
+            setIsLoadingReferralSummary(false);
+        }
+    }
+
+    async function registerPendingReferral(userId = clientUserId) {
+        let storedReferralCode = "";
+        try {
+            storedReferralCode = window.localStorage.getItem(REFERRAL_STORAGE_KEY) ?? "";
+        } catch {
+            // O fluxo continua usando o código mantido no estado quando o storage é bloqueado.
+        }
+
+        const referralCode = normalizeReferralCode(
+            pendingReferralCode || storedReferralCode,
+        );
+
+        if (!referralCode || !userId) return;
+
+        try {
+            const {data, error} = await supabase.rpc("register_my_referral", {
+                p_referral_code: referralCode,
+            });
+
+            if (error) {
+                console.warn("Não foi possível registrar a indicação:", error);
+                return;
+            }
+
+            const result = String(
+                Array.isArray(data) ? data[0] ?? "" : data ?? "",
+            );
+
+            // Depois que o vínculo foi aceito, recusado por autoindicação ou
+            // identificado como cliente antiga, não reaplicamos o mesmo código.
+            if (result && result !== "profile_not_found") {
+                try {
+                    window.localStorage.removeItem(REFERRAL_STORAGE_KEY);
+                } catch {
+                    // O estado local ainda impede uma nova tentativa nesta sessão.
+                }
+                setPendingReferralCode(null);
+            }
+        } catch (error) {
+            console.warn("Erro ao registrar código de indicação:", error);
+        }
+    }
+
+    async function shareReferralOnWhatsApp() {
+        let summary = referralSummary;
+
+        if (!summary?.referral_code) {
+            summary = await loadReferralSummary();
+        }
+
+        if (!summary?.referral_code) {
+            window.alert(
+                "Não foi possível gerar seu link de indicação agora. Tente novamente em alguns instantes.",
+            );
+            return;
+        }
+
+        const referralUrl = `${MIRIAN_SITE_URL}?${REFERRAL_QUERY_PARAMETER}=${encodeURIComponent(summary.referral_code)}`;
+        const message = [
+            "Oi! Quero te indicar a Mirian Silva Nail Design 💅",
+            "",
+            "Crie sua conta e agende seu horário pelo link:",
+            referralUrl,
+        ].join("\n");
+
+        window.open(
+            `https://wa.me/?text=${encodeURIComponent(message)}`,
+            "_blank",
+            "noopener,noreferrer",
+        );
     }
 
     async function resolveClientProfile(user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>}) {
@@ -1523,7 +1670,13 @@ function PublicSite() {
         setIsLoadingClientAccount(true);
         setClientUserId(user.id);
         setClientUserEmail(user.email ?? "");
-        await resolveClientProfile(user);
+        const profile = await resolveClientProfile(user);
+        if (profile) {
+            await registerPendingReferral(user.id);
+            await loadReferralSummary(user.id);
+        } else {
+            setReferralSummary(null);
+        }
         setIsLoadingClientAccount(false);
     }
 
@@ -1558,6 +1711,11 @@ function PublicSite() {
                 setClientUserEmail("");
                 setClientProfile(null);
                 setClientAppointments([]);
+                setReferralSummary(null);
+                if (pendingReferralCode) {
+                    setClientAuthMode("signup");
+                    setShowClientAuth(true);
+                }
             }
 
             if (mounted) setIsCheckingClientSession(false);
@@ -1596,6 +1754,7 @@ function PublicSite() {
                     setClientUserEmail("");
                     setClientProfile(null);
                     setClientAppointments([]);
+                    setReferralSummary(null);
                     setShowClientAccount(false);
                 }
 
@@ -1607,9 +1766,6 @@ function PublicSite() {
             mounted = false;
             authListener.subscription.unsubscribe();
         };
-        // A sessao e assinada uma unica vez; alteracoes posteriores chegam
-        // pelo listener e usam sempre os dados atuais enviados pelo Supabase.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     function resetAuthMessages() {
@@ -2129,6 +2285,7 @@ function PublicSite() {
         setShowClientProfileEditor(false);
         setClientProfile(null);
         setClientAppointments([]);
+        setReferralSummary(null);
         setClientUserId(null);
         setClientUserEmail("");
         setClientName("");
@@ -2144,7 +2301,7 @@ function PublicSite() {
             `${appointment.appointment_date}T${String(appointment.start_time).slice(0, 5)}:00`,
         );
 
-        return appointmentMoment.getTime() > clientNow;
+        return appointmentMoment.getTime() > Date.now();
     }
 
     function openEditClientAppointment(appointment: PublicClientAppointment) {
@@ -2181,7 +2338,10 @@ function PublicSite() {
 
             if (error) throw error;
 
-            await loadClientAppointments(clientProfile.id);
+            await Promise.all([
+                loadClientAppointments(clientProfile.id),
+                loadReferralSummary(),
+            ]);
             setEditingClientAppointment(null);
             setSelectedService("");
             setSelectedDate("");
@@ -2199,6 +2359,10 @@ function PublicSite() {
     function openClientAppointments() {
         setFocusClientAppointments(true);
         setShowClientAccount(true);
+        void Promise.all([
+            clientProfile ? loadClientAppointments(clientProfile.id) : Promise.resolve(),
+            loadReferralSummary(),
+        ]);
 
         window.setTimeout(() => {
             document.getElementById("client-account-appointments")?.scrollIntoView({
@@ -2283,12 +2447,39 @@ function PublicSite() {
                 return;
             }
 
-            const loadedAppointments = (appointmentData ?? []).map(
-                mapOccupiedAppointment,
+            const loadedAppointments: Appointment[] = (
+                appointmentData ?? []
+            ).map((appointment) => ({
+                id: appointment.id,
+                clientName: "",
+                clientPhone: "",
+                clientEmail: "",
+                serviceName: "",
+                date: appointment.appointment_date,
+                startTime: String(appointment.start_time).slice(0, 5),
+                durationMinutes: appointment.duration_minutes,
+                status: appointment.status as Appointment["status"],
+            }));
+
+            const loadedBlocks: ScheduleBlock[] = (blockData ?? []).map(
+                (block) => ({
+                    id: block.id,
+                    date: block.block_date,
+                    startTime: String(block.start_time).slice(0, 5),
+                    endTime: String(block.end_time).slice(0, 5),
+                    reason: block.reason || "",
+                }),
             );
-            const loadedBlocks = (blockData ?? []).map(mapScheduleBlock);
-            const loadedOverrides = (overrideData ?? []).map(
-                mapScheduleTimeOverride,
+
+            const loadedOverrides: ScheduleTimeOverride[] = (overrideData ?? []).map(
+                (item) => ({
+                    id: item.id,
+                    override_date: item.override_date,
+                    start_time: String(item.start_time).slice(0, 5),
+                    is_available: Boolean(item.is_available),
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                }),
             );
 
             setAppointments(loadedAppointments);
@@ -2351,12 +2542,48 @@ function PublicSite() {
         };
     }, []);
 
-    const todayDate = new Date(clientNow);
+    const todayDate = new Date();
     const today = formatDateForInput(todayDate);
 
     const selectedServiceInformation = services.find(
         (service) => service.name === selectedService,
     );
+    const referralDiscountAppliesToCurrentBooking = Boolean(
+        referralSummary &&
+        (referralSummary.reward_status === "available" ||
+            (referralSummary.reward_status === "reserved" &&
+                referralSummary.discounted_appointment_id === editingClientAppointment?.id)),
+    );
+    const selectedServiceDiscountedPriceCents = selectedServiceInformation
+        ? Math.round(
+            selectedServiceInformation.priceCents *
+            (100 - (referralSummary?.discount_percent ?? 30)) /
+            100,
+        )
+        : null;
+
+    function parseLocalDate(date: string) {
+        return new Date(`${date}T12:00:00`);
+    }
+
+    function addDays(date: Date, amount: number) {
+        const result = new Date(date);
+        result.setDate(result.getDate() + amount);
+        return result;
+    }
+
+    function startOfCalendarWeek(date: Date) {
+        const result = new Date(date);
+        const day = result.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        result.setDate(result.getDate() + diffToMonday);
+        return result;
+    }
+
+    function getWeekDates(referenceDate: string) {
+        const start = startOfCalendarWeek(parseLocalDate(referenceDate));
+        return Array.from({length: 7}, (_, index) => formatDateForInput(addDays(start, index)));
+    }
 
     function selectBookingDate(date: string) {
         if (date < today) return;
@@ -2369,11 +2596,11 @@ function PublicSite() {
     }
 
     function moveBookingWeek(amount: number) {
-        const currentStart = getCalendarWeekDates(weekReferenceDate)[0];
-        const nextReference = addDaysToInputDate(currentStart, amount * 7);
+        const currentStart = startOfCalendarWeek(parseLocalDate(weekReferenceDate));
+        const nextReference = formatDateForInput(addDays(currentStart, amount * 7));
         setWeekReferenceDate(nextReference);
 
-        const nextWeek = getCalendarWeekDates(nextReference);
+        const nextWeek = getWeekDates(nextReference);
         const firstSelectable = nextWeek.find((date) => date >= today);
 
         if (firstSelectable) {
@@ -2395,25 +2622,34 @@ function PublicSite() {
     }
 
     function getMonthCalendarCells() {
-        return getMonthCalendarDateCells(calendarMonth);
+        const year = calendarMonth.getFullYear();
+        const month = calendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Grade começa na segunda-feira.
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({length: leadingEmpty}, () => null),
+            ...Array.from({length: daysInMonth}, (_, index) => {
+                const date = new Date(year, month, index + 1);
+                return formatDateForInput(date);
+            }),
+        ];
     }
 
     const visibleWeekDates = useMemo(
-        () => getCalendarWeekDates(weekReferenceDate),
+        () => getWeekDates(weekReferenceDate),
         [weekReferenceDate],
     );
 
-    function getConfiguredPublicStartMinutes(date: string) {
-        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
-    }
-
-    const availableTimes = useMemo(() => {
-        if (!selectedServiceInformation || !selectedDate) return [];
-
+    function getOccupiedIntervals(date: string) {
         const appointmentIntervals = appointments
             .filter(
                 (appointment) =>
-                    appointment.date === selectedDate &&
+                    appointment.date === date &&
                     appointment.id !== editingClientAppointment?.id &&
                     appointment.status !== "cancelled" &&
                     appointment.status !== "no-show",
@@ -2424,36 +2660,53 @@ function PublicSite() {
             });
 
         const blockedIntervals = scheduleBlocks
-            .filter((block) => block.date === selectedDate)
+            .filter((block) => block.date === date)
             .map((block) => ({
                 start: timeToMinutes(block.startTime),
                 end: timeToMinutes(block.endTime),
             }));
 
-        const occupiedIntervals = mergeIntervals([
-            ...appointmentIntervals,
-            ...blockedIntervals,
-        ]);
-        const generatedTimes = getConfiguredClientStartMinutes(
-            selectedDate,
-            scheduleTimeOverrides,
-        );
-        const currentTime = new Date(clientNow);
-        const currentMinutes =
-            currentTime.getHours() * 60 + currentTime.getMinutes();
+        return mergeIntervals([...appointmentIntervals, ...blockedIntervals]);
+    }
+
+    function isPastTime(date: string, startMinutes: number) {
+        if (date !== today) return false;
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        return startMinutes <= currentMinutes;
+    }
+
+    function getConfiguredPublicStartMinutes(date: string) {
+        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
+    }
+
+    function getAvailableTimes(date: string, serviceDurationMinutes: number) {
+        if (!date) return [];
+
+        const occupiedIntervals = getOccupiedIntervals(date);
+        const generatedTimes = getConfiguredPublicStartMinutes(date);
 
         return generatedTimes
             .filter((start) => {
-                const end = start + selectedServiceInformation.durationMinutes;
+                const end = start + serviceDurationMinutes;
+
                 const hasConflict = occupiedIntervals.some((interval) =>
                     intervalsOverlap(start, end, interval.start, interval.end),
                 );
-                const isPast =
-                    selectedDate === today && start <= currentMinutes;
 
-                return !hasConflict && !isPast;
+                return !hasConflict && !isPastTime(date, start);
             })
             .map(minutesToTime);
+    }
+
+    const availableTimes = useMemo(() => {
+        if (!selectedServiceInformation || !selectedDate) return [];
+
+        return getAvailableTimes(
+            selectedDate,
+            selectedServiceInformation.durationMinutes,
+        );
     }, [
         appointments,
         scheduleBlocks,
@@ -2461,8 +2714,6 @@ function PublicSite() {
         selectedDate,
         selectedServiceInformation,
         editingClientAppointment,
-        clientNow,
-        today,
     ]);
 
     function formatSelectedDate() {
@@ -2537,14 +2788,39 @@ function PublicSite() {
                 throw appointmentLoadError || blockLoadError;
             }
 
-            const appointmentsForSelectedDate = (latestAppointments ?? []).map(
-                mapOccupiedAppointment,
-            );
-            const blocksForSelectedDate = (latestBlocks ?? []).map(
-                mapScheduleBlock,
-            );
-            const latestDateOverrides = (latestOverrides ?? []).map(
-                mapScheduleTimeOverride,
+            const appointmentsForSelectedDate: Appointment[] = (
+                latestAppointments ?? []
+            ).map((appointment) => ({
+                id: appointment.id,
+                clientName: "",
+                clientPhone: "",
+                clientEmail: "",
+                serviceName: "",
+                date: appointment.appointment_date,
+                startTime: String(appointment.start_time).slice(0, 5),
+                durationMinutes: appointment.duration_minutes,
+                status: appointment.status as Appointment["status"],
+            }));
+
+            const blocksForSelectedDate: ScheduleBlock[] = (
+                latestBlocks ?? []
+            ).map((block) => ({
+                id: block.id,
+                date: block.block_date,
+                startTime: String(block.start_time).slice(0, 5),
+                endTime: String(block.end_time).slice(0, 5),
+                reason: block.reason || "",
+            }));
+
+            const latestDateOverrides: ScheduleTimeOverride[] = (latestOverrides ?? []).map(
+                (item) => ({
+                    id: item.id,
+                    override_date: item.override_date,
+                    start_time: String(item.start_time).slice(0, 5),
+                    is_available: Boolean(item.is_available),
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                }),
             );
 
             if (!overrideLoadError) {
@@ -2673,7 +2949,10 @@ function PublicSite() {
             }
 
             if (clientProfile) {
-                await loadClientAppointments(clientProfile.id);
+                await Promise.all([
+                    loadClientAppointments(clientProfile.id),
+                    loadReferralSummary(),
+                ]);
             }
 
             setBookingStep(5);
@@ -2804,6 +3083,7 @@ function PublicSite() {
                     flex: 1;
                 }
                 .client-logged-header__actions button {
+                    flex: 1 1 0;
                     width: 100%;
                     border: 0;
                     border-radius: 14px;
@@ -2816,6 +3096,9 @@ function PublicSite() {
                 .client-logged-header__appointments {
                     background: #6d3445;
                     color: #fff;
+                }
+                .client-logged-header__actions {
+                    gap: 9px;
                 }
                 .client-logged-page .services {
                     padding-top: 4px;
@@ -3163,7 +3446,25 @@ function PublicSite() {
                                 <div><span>Serviço</span><strong>{selectedService}</strong></div>
                                 <div><span>Data</span><strong>{formatSelectedDate()}</strong></div>
                                 <div><span>Horário</span><strong>{selectedTime}</strong></div>
-                                <div><span>Valor</span><strong>{selectedServiceInformation?.price ?? ""}</strong></div>
+                                <div className={referralDiscountAppliesToCurrentBooking ? "booking-modal__discount" : ""}>
+                                    <span>Valor</span>
+                                    <strong>
+                                        {referralDiscountAppliesToCurrentBooking && selectedServiceDiscountedPriceCents !== null ? (
+                                            <>
+                                                <s>{selectedServiceInformation?.price ?? ""}</s>
+                                                {formatCurrency(selectedServiceDiscountedPriceCents)}
+                                            </>
+                                        ) : (
+                                            selectedServiceInformation?.price ?? ""
+                                        )}
+                                    </strong>
+                                </div>
+                                {referralDiscountAppliesToCurrentBooking && (
+                                    <div className="booking-modal__discount">
+                                        <span>Benefício de indicação</span>
+                                        <strong>30% de desconto</strong>
+                                    </div>
+                                )}
                             </div>
                             {bookingError && <p className="booking-modal__error">{bookingError}</p>}
                             <button className="booking-modal__button" type="button" disabled={isConfirmingBooking}
@@ -3356,6 +3657,11 @@ function PublicSite() {
                                 ? "Acesse seus agendamentos usando seu e-mail e senha."
                                 : "Crie sua conta para manter seus agendamentos vinculados ao seu perfil."}
                         </p>
+                        {pendingReferralCode && clientAuthMode === "signup" && (
+                            <p className="client-referral-invite">
+                                Você recebeu uma indicação. Crie sua conta por aqui para que a Mirian registre a indicação corretamente.
+                            </p>
+                        )}
 
                         <div className="client-auth-tabs">
                             <button
@@ -3686,6 +3992,37 @@ function PublicSite() {
                                     <div><span>E-mail</span><strong>{clientProfile.email || clientUserEmail}</strong></div>
                                 </div>
 
+                                {referralSummary && (
+                                    <div
+                                        className={`client-account__referral-summary${
+                                            referralSummary.reward_status === "available"
+                                                ? " is-ready"
+                                                : referralSummary.reward_status === "reserved"
+                                                    ? " is-reserved"
+                                                    : ""
+                                        }`}
+                                    >
+                                        <strong>Indique uma amiga e ganhe 30% de desconto</strong>
+                                        {referralSummary.reward_status === "available" ? (
+                                            <p>
+                                                Seu desconto de 30% está disponível e será aplicado automaticamente na sua próxima manutenção. Depois de usar, você poderá conquistar outro indicando uma nova amiga.
+                                            </p>
+                                        ) : referralSummary.reward_status === "reserved" ? (
+                                            <p>
+                                                Seu desconto de 30% já está reservado para o próximo agendamento. Ele será consumido somente quando esse atendimento for realizado.
+                                            </p>
+                                        ) : referralSummary.pending_referrals > 0 ? (
+                                            <p>
+                                                Você tem {referralSummary.pending_referrals === 1 ? "uma amiga" : `${referralSummary.pending_referrals} amigas`} indicada{referralSummary.pending_referrals === 1 ? "" : "s"}. O desconto será liberado quando o primeiro serviço indicado for realizado.
+                                            </p>
+                                        ) : (
+                                            <p>
+                                                Compartilhe seu link pelo WhatsApp. Quando a nova cliente agendar e realizar o serviço, você recebe 30% na próxima manutenção.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="client-account__actions">
                                     <button
                                         className="client-account__edit-profile"
@@ -3711,6 +4048,14 @@ function PublicSite() {
 
                                 <section className="client-account__section" id="client-account-appointments">
                                     <h3>Meus agendamentos</h3>
+                                    <button
+                                        className="client-account__referral-button"
+                                        type="button"
+                                        disabled={isLoadingReferralSummary}
+                                        onClick={() => void shareReferralOnWhatsApp()}
+                                    >
+                                        Indicação
+                                    </button>
                                     {clientAppointments.length > 0 ? (
                                         <div className="client-account__appointments">
                                             {clientAppointments.map((appointment) => (
@@ -3732,6 +4077,11 @@ function PublicSite() {
                                                             {" às "}
                                                             {String(appointment.start_time).slice(0, 5)}
                                                         </span>
+                                                        {referralSummary?.discounted_appointment_id === appointment.id && (
+                                                            <span className="client-account__appointment-discount">
+                                                                30% de desconto de indicação aplicado
+                                                            </span>
+                                                        )}
                                                         {isClientAppointmentEditable(appointment) && (
                                                             <span className="client-account__appointment-hint">
                                                                 Toque para alterar dia, horário ou cancelar
@@ -3949,25 +4299,13 @@ type AdminAppointment = {
     start_time: string;
     duration_minutes: number;
     price_cents: number | null;
+    original_price_cents?: number | null;
+    referral_discount_percent?: number | null;
+    referral_reward_id?: string | null;
     client_hidden: boolean;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
 };
-
-function shouldShowAppointmentInAdminAgenda(
-    appointment: AdminAppointment,
-    now: Date,
-) {
-    if (
-        appointment.status === "cancelled" ||
-        appointment.status === "completed" ||
-        appointment.status === "no-show"
-    ) {
-        return false;
-    }
-
-    return getAppointmentDateTime(appointment).getTime() > now.getTime();
-}
 
 type AdminScheduleBlock = {
     id: string;
@@ -6025,28 +6363,6 @@ function getAppointmentEndDateTime(appointment: AdminAppointment) {
 
 
 type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
-
-function getDueNotificationTypes(
-    appointment: AdminAppointment,
-    notificationClock: number,
-) {
-    if (appointment.status === "cancelled") {
-        return [] as WhatsAppNotificationType[];
-    }
-
-    const appointmentTime = getAppointmentDateTime(appointment).getTime();
-    const difference = appointmentTime - notificationClock;
-    const hour = 60 * 60 * 1000;
-    const types: WhatsAppNotificationType[] = [];
-
-    if (difference > 2 * hour && difference <= 40 * hour) {
-        types.push("attendance-confirmation");
-    }
-
-    // A segunda mensagem automática, que aparecia quando faltavam
-    // até 2 horas para o atendimento, permanece desativada.
-    return types;
-}
 
 function formatAppointmentDateForMessage(date: string) {
     return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
@@ -8794,6 +9110,13 @@ const adminEditDateTimeStyles = `
     white-space: normal;
     overflow-wrap: anywhere;
 }
+.admin-booking-card__discount-note {
+    display: block;
+    margin-top: 4px;
+    color: #287044;
+    font-size: .68rem;
+    font-weight: 850;
+}
 .admin-edit-form textarea,
 .admin-client-editor textarea {
     width: 100%;
@@ -9146,37 +9469,40 @@ function AdminPanel() {
             return session?.user?.email?.trim().toLowerCase() === MIRIAN_ADMIN_EMAIL;
         }
 
-        function applyAdminSession(session: {user?: {email?: string | null}} | null) {
+        async function checkSession() {
+            const {data: {session}} = await supabase.auth.getSession();
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 
             if (isMirianAdminSession) {
                 setMirianLastAccessMode("admin");
-            } else {
-                setAppointments([]);
-                setAdminClientProfiles([]);
-                setNailRecords([]);
             }
 
             setIsAuthenticated(isMirianAdminSession);
             setIsCheckingSession(false);
         }
 
-        async function checkSession() {
-            const {data: {session}} = await supabase.auth.getSession();
-            applyAdminSession(session);
-        }
-
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
-            applyAdminSession(session);
+            const isMirianAdminSession = sessionIsMirianAdmin(session);
+
+            if (isMirianAdminSession) {
+                setMirianLastAccessMode("admin");
+            }
+
+            setIsAuthenticated(isMirianAdminSession);
+            setIsCheckingSession(false);
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated) {
+            setAppointments([]);
+            setAdminClientProfiles([]);
+            return;
+        }
 
         async function loadAdminData() {
             setIsLoading(true);
@@ -9189,7 +9515,7 @@ function AdminPanel() {
                 {data: timeOverrideData, error: timeOverrideLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
-                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at")
+                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, client_hidden, status, created_at")
                     .order("appointment_date", {ascending: true})
                     .order("start_time", {ascending: true}),
                 supabase.from("schedule_blocks")
@@ -9520,7 +9846,7 @@ function AdminPanel() {
     }
 
     const editVisibleWeekDates = useMemo(
-        () => getCalendarWeekDates(editWeekReferenceDate),
+        () => getManualWeekDates(editWeekReferenceDate),
         [editWeekReferenceDate],
     );
 
@@ -9537,9 +9863,9 @@ function AdminPanel() {
     }
 
     function moveEditAppointmentWeek(amount: number) {
-        const currentWeek = getCalendarWeekDates(editWeekReferenceDate);
+        const currentWeek = getManualWeekDates(editWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getCalendarWeekDates(nextReference);
+        const nextWeek = getManualWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -9564,7 +9890,19 @@ function AdminPanel() {
     }
 
     function getEditAppointmentMonthCells() {
-        return getMonthCalendarDateCells(editCalendarMonth);
+        const year = editCalendarMonth.getFullYear();
+        const month = editCalendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({length: leadingEmpty}, () => null),
+            ...Array.from({length: daysInMonth}, (_, index) =>
+                formatDateForInput(new Date(year, month, index + 1)),
+            ),
+        ];
     }
 
     const editSelectedService = adminServices.find(
@@ -9850,7 +10188,6 @@ function AdminPanel() {
     function closeClientHistory() {
         resetNailRecordForm();
         setNailRecords([]);
-        setIsLoadingNailRecords(false);
         setSelectedClient(null);
     }
 
@@ -10209,14 +10546,13 @@ function AdminPanel() {
     }
 
     useEffect(() => {
-        if (!isAuthenticated || !selectedClient) return;
+        if (!isAuthenticated || !selectedClient) {
+            setNailRecords([]);
+            setIsLoadingNailRecords(false);
+            return;
+        }
 
-        // Carrega e sincroniza o estado ao trocar a cliente selecionada.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         void loadNailRecordsForClient(selectedClient);
-        // A chave identifica a cliente; usar o objeto inteiro reiniciaria a
-        // consulta apos atualizacoes locais do mesmo cadastro.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAuthenticated, selectedClient?.key]);
 
     const clients = useMemo<AdminClient[]>(() => {
@@ -10451,8 +10787,21 @@ function AdminPanel() {
             .slice(0, 8);
     }, [manualBookingClients, manualClientSearch]);
 
+    function getManualWeekDates(referenceDate: string) {
+        const reference = new Date(`${referenceDate}T12:00:00`);
+        const day = reference.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        reference.setDate(reference.getDate() + diffToMonday);
+
+        return Array.from({length: 7}, (_, index) => {
+            const date = new Date(reference);
+            date.setDate(reference.getDate() + index);
+            return formatDateForInput(date);
+        });
+    }
+
     const manualVisibleWeekDates = useMemo(
-        () => getCalendarWeekDates(manualWeekReferenceDate),
+        () => getManualWeekDates(manualWeekReferenceDate),
         [manualWeekReferenceDate],
     );
 
@@ -10468,9 +10817,9 @@ function AdminPanel() {
     }
 
     function moveManualBookingWeek(amount: number) {
-        const currentWeek = getCalendarWeekDates(manualWeekReferenceDate);
+        const currentWeek = getManualWeekDates(manualWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getCalendarWeekDates(nextReference);
+        const nextWeek = getManualWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -10490,7 +10839,19 @@ function AdminPanel() {
     }
 
     function getManualMonthCalendarCells() {
-        return getMonthCalendarDateCells(manualCalendarMonth);
+        const year = manualCalendarMonth.getFullYear();
+        const month = manualCalendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({length: leadingEmpty}, () => null),
+            ...Array.from({length: daysInMonth}, (_, index) =>
+                formatDateForInput(new Date(year, month, index + 1)),
+            ),
+        ];
     }
 
     const manualSelectedService = adminServices.find((service) => service.name === manualServiceName);
@@ -10500,7 +10861,7 @@ function AdminPanel() {
 
         const candidateStarts = Array.from(
             new Set([
-                ...getFixedAdminManualStartMinutes(manualDate),
+                ...getFixedAdminNewAppointmentStartMinutes(manualDate),
                 ...getConfiguredClientStartMinutes(
                     manualDate,
                     adminTimeOverrides,
@@ -10792,7 +11153,7 @@ function AdminPanel() {
         const appointmentIds = client.appointments.map((appointment) => appointment.id);
 
         if (!appointmentIds.length) {
-            closeClientHistory();
+            setSelectedClient(null);
             return;
         }
 
@@ -10817,7 +11178,7 @@ function AdminPanel() {
                 ),
             );
 
-            closeClientHistory();
+            setSelectedClient(null);
         } catch (error) {
             console.error("Erro ao remover cliente da lista:", error);
             setPanelError("Não foi possível remover a cliente da lista.");
@@ -10834,7 +11195,7 @@ function AdminPanel() {
     }, [agendaDate]);
 
     const agendaVisibleWeekDates = useMemo(
-        () => getCalendarWeekDates(agendaWeekReferenceDate),
+        () => getManualWeekDates(agendaWeekReferenceDate),
         [agendaWeekReferenceDate],
     );
 
@@ -10846,7 +11207,7 @@ function AdminPanel() {
     }
 
     function moveAgendaPickerWeek(amount: number) {
-        const currentWeek = getCalendarWeekDates(agendaWeekReferenceDate);
+        const currentWeek = getManualWeekDates(agendaWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
 
         setAgendaWeekReferenceDate(nextReference);
@@ -10862,7 +11223,19 @@ function AdminPanel() {
     }
 
     function getAgendaMonthCalendarCells() {
-        return getMonthCalendarDateCells(agendaCalendarMonth);
+        const year = agendaCalendarMonth.getFullYear();
+        const month = agendaCalendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = firstDay.getDay();
+        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+        return [
+            ...Array.from({ length: leadingEmpty }, () => null),
+            ...Array.from({ length: daysInMonth }, (_, index) =>
+                formatDateForInput(new Date(year, month, index + 1)),
+            ),
+        ];
     }
 
     const agendaPickerMonthLabel = useMemo(() => {
@@ -10873,12 +11246,24 @@ function AdminPanel() {
         });
     }, [agendaWeekReferenceDate]);
 
+    function shouldShowAppointmentInAdminAgenda(appointment: AdminAppointment) {
+        if (
+            appointment.status === "cancelled" ||
+            appointment.status === "completed" ||
+            appointment.status === "no-show"
+        ) {
+            return false;
+        }
+
+        return getAppointmentDateTime(appointment).getTime() > adminNow.getTime();
+    }
+
     const agendaAppointments = useMemo(() =>
             appointments
                 .filter(
                     (item) =>
                         item.appointment_date === agendaDate &&
-                        shouldShowAppointmentInAdminAgenda(item, adminNow),
+                        shouldShowAppointmentInAdminAgenda(item),
                 )
                 .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
         [appointments, agendaDate, adminNow]);
@@ -10939,7 +11324,7 @@ function AdminPanel() {
                 .filter(
                     (item) =>
                         weekDates.includes(item.appointment_date) &&
-                        shouldShowAppointmentInAdminAgenda(item, adminNow),
+                        shouldShowAppointmentInAdminAgenda(item),
                 )
                 .sort((a, b) => `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(`${b.appointment_date}${String(b.start_time).slice(0, 5)}`)),
         [appointments, weekDates, adminNow]);
@@ -10964,7 +11349,7 @@ function AdminPanel() {
                 .filter(
                     (item) =>
                         item.appointment_date.startsWith(monthlyAgendaMonth) &&
-                        shouldShowAppointmentInAdminAgenda(item, adminNow),
+                        shouldShowAppointmentInAdminAgenda(item),
                 )
                 .sort((a, b) =>
                     `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(
@@ -11141,10 +11526,27 @@ function AdminPanel() {
         return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     }
 
+    function getDueNotificationTypes(appointment: AdminAppointment) {
+        if (appointment.status === "cancelled") return [] as WhatsAppNotificationType[];
+
+        const appointmentTime = getAppointmentDateTime(appointment).getTime();
+        const difference = appointmentTime - notificationClock;
+        const hour = 60 * 60 * 1000;
+        const types: WhatsAppNotificationType[] = [];
+
+        if (difference > 2 * hour && difference <= 40 * hour) {
+            types.push("attendance-confirmation");
+        }
+
+        // A segunda mensagem automática, que aparecia quando faltavam
+        // até 2 horas para o atendimento, foi desativada por enquanto.
+        return types;
+    }
+
     const pendingWhatsAppNotifications = useMemo(() => {
         return appointments
             .flatMap((appointment) =>
-                getDueNotificationTypes(appointment, notificationClock).map((type) => ({
+                getDueNotificationTypes(appointment).map((type) => ({
                     appointment,
                     type,
                     key: getNotificationKey(appointment.id, type),
@@ -11160,7 +11562,7 @@ function AdminPanel() {
 
 
     const scheduleConfigVisibleWeekDates = useMemo(
-        () => getCalendarWeekDates(scheduleConfigWeekReferenceDate),
+        () => getManualWeekDates(scheduleConfigWeekReferenceDate),
         [scheduleConfigWeekReferenceDate],
     );
 
@@ -11187,9 +11589,9 @@ function AdminPanel() {
     }
 
     function moveScheduleConfigWeek(amount: number) {
-        const currentWeek = getCalendarWeekDates(scheduleConfigWeekReferenceDate);
+        const currentWeek = getManualWeekDates(scheduleConfigWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getCalendarWeekDates(nextReference);
+        const nextWeek = getManualWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -11408,7 +11810,7 @@ function AdminPanel() {
     }
 
     const blockVisibleWeekDates = useMemo(
-        () => getCalendarWeekDates(blockWeekReferenceDate),
+        () => getManualWeekDates(blockWeekReferenceDate),
         [blockWeekReferenceDate],
     );
 
@@ -11423,9 +11825,9 @@ function AdminPanel() {
     }
 
     function moveBlockWeek(amount: number) {
-        const currentWeek = getCalendarWeekDates(blockWeekReferenceDate);
+        const currentWeek = getManualWeekDates(blockWeekReferenceDate);
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
-        const nextWeek = getCalendarWeekDates(nextReference);
+        const nextWeek = getManualWeekDates(nextReference);
         const today = formatDateForInput(new Date());
         const firstSelectable = nextWeek.find((date) => date >= today);
 
@@ -11479,8 +11881,6 @@ function AdminPanel() {
     }, [appointments, adminBlocks, blockDate]);
 
     useEffect(() => {
-        // Sincroniza a selecao com mudancas em tempo real da agenda/bloqueios.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedBlockTimes((current) => current.filter((time) => blockAvailableTimes.includes(time)));
     }, [blockAvailableTimes]);
 
@@ -11772,10 +12172,7 @@ function AdminPanel() {
     }
 
     const renderAppointmentCard = (appointment: AdminAppointment) => {
-        const dueTypes = getDueNotificationTypes(
-            appointment,
-            notificationClock,
-        );
+        const dueTypes = getDueNotificationTypes(appointment);
         const isExpanded = expandedAppointmentCardId === appointment.id;
 
         function toggleAppointmentCard() {
@@ -11827,6 +12224,19 @@ function AdminPanel() {
                             <div>
                                 <span>Duração</span>
                                 <strong>{appointment.duration_minutes} min</strong>
+                            </div>
+                            <div>
+                                <span>Valor</span>
+                                <strong>
+                                    {appointment.price_cents !== null
+                                        ? formatCurrency(appointment.price_cents)
+                                        : "Não informado"}
+                                </strong>
+                                {appointment.referral_discount_percent === 30 && (
+                                    <small className="admin-booking-card__discount-note">
+                                        30% de desconto de indicação
+                                    </small>
+                                )}
                             </div>
                             <div>
                                 <span>Telefone</span>
