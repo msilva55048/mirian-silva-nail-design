@@ -12146,7 +12146,25 @@ function AdminPanel() {
             setIsSavingBlock(false);
             return;
         }
-        setAdminBlocks((current) => [...current, ...((data ?? []) as AdminScheduleBlock[])]);
+        const insertedBlocks = (data ?? []) as AdminScheduleBlock[];
+        if (insertedBlocks.length > 0) {
+            setAdminBlocks((current) => [...current, ...insertedBlocks]);
+        } else {
+            // Algumas configurações do Supabase não devolvem as linhas do
+            // INSERT, mesmo quando ele foi concluído. Recarregamos somente
+            // os bloqueios do dia para atualizar a lista imediatamente.
+            const {data: refreshedBlocks} = await supabase
+                .from("schedule_blocks")
+                .select("id, block_date, start_time, end_time, reason, created_at")
+                .eq("block_date", blockDate)
+                .order("start_time", {ascending: true});
+            if (refreshedBlocks) {
+                setAdminBlocks((current) => [
+                    ...current.filter((item) => item.block_date !== blockDate),
+                    ...(refreshedBlocks as AdminScheduleBlock[]),
+                ]);
+            }
+        }
         setSelectedBlockTimes([]);
         setBlockReason("");
         setIsSavingBlock(false);
