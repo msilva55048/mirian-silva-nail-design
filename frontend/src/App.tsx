@@ -3057,21 +3057,14 @@ function PublicSite() {
                     throw rescheduleError;
                 }
             } else {
-                const {error: insertError} = await supabase
-                    .from("appointments")
-                    .insert({
-                        client_name: clientName.trim(),
-                        client_phone: clientPhone.trim(),
-                        client_email: (clientProfile?.email ?? clientUserEmail) || null,
-                        client_id: clientProfile?.id ?? null,
-                        service_name: selectedServiceInformation.name,
-                        appointment_date: selectedDate,
-                        start_time: selectedTime,
-                        duration_minutes:
-                        selectedServiceInformation.durationMinutes,
-                        price_cents: selectedServiceInformation.priceCents,
-                        status: "confirmed",
-                    });
+                const {error: insertError} = await supabase.rpc(
+                    "create_my_appointment",
+                    {
+                        p_service_name: selectedServiceInformation.name,
+                        p_appointment_date: selectedDate,
+                        p_start_time: selectedTime,
+                    },
+                );
 
                 if (insertError) {
                     throw insertError;
