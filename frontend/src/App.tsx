@@ -290,6 +290,19 @@ function isWeekendDate(date: string) {
     return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
+function getMonthCellsForDate(value: string) {
+    const reference = value ? new Date(`${value}T12:00:00`) : new Date();
+    const first = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const days = new Date(reference.getFullYear(), reference.getMonth() + 1, 0).getDate();
+    const leading = (first.getDay() + 6) % 7;
+    return [
+        ...Array.from({length: leading}, () => ""),
+        ...Array.from({length: days}, (_, index) =>
+            formatDateForInput(new Date(reference.getFullYear(), reference.getMonth(), index + 1)),
+        ),
+    ];
+}
+
 function getFixedClientStartMinutes(date: string) {
     if (!date) return [] as number[];
 
@@ -1493,7 +1506,7 @@ function PublicSite() {
     const [editingClientAppointment, setEditingClientAppointment] = useState<PublicClientAppointment | null>(null);
     const [isCancellingClientAppointment, setIsCancellingClientAppointment] = useState(false);
     const [weekReferenceDate, setWeekReferenceDate] = useState(() => formatDateForInput(new Date()));
-    const [showMonthCalendar, setShowMonthCalendar] = useState(false);
+    const [showMonthCalendar, setShowMonthCalendar] = useState(true);
     const [calendarMonth, setCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2599,7 +2612,7 @@ function PublicSite() {
         setWeekReferenceDate(date);
         setSelectedTime("");
         setBookingError("");
-        setShowMonthCalendar(false);
+        setShowMonthCalendar(true);
     }
 
     function moveBookingWeek(amount: number) {
@@ -2749,7 +2762,7 @@ function PublicSite() {
         setSelectedDate("");
         setSelectedTime("");
         setWeekReferenceDate(formatDateForInput(new Date()));
-        setShowMonthCalendar(false);
+        setShowMonthCalendar(true);
         setEditingClientAppointment(null);
         setBookingError("");
     }
@@ -2976,6 +2989,7 @@ function PublicSite() {
     return (
         <main className="home">
             <style>{clientAccountStyles}</style>
+            <style>{`\n.client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }\n.client-month-calendar, .admin-manual-month-calendar { display: block !important; }\n.client-week-picker__calendar-button, .admin-manual-week-picker__month button { display: none !important; }\n.client-week-picker__top > .client-week-picker__navs, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display: none !important; }\n`}</style>
             <style>{`
                 @media (max-width: 700px) {
                     .home {
@@ -3198,7 +3212,7 @@ function PublicSite() {
                                 type="button"
                                 onClick={() => {
                                     setBookingError("");
-                                    setShowMonthCalendar(false);
+                                    setShowMonthCalendar(true);
                                     setBookingStep(1);
                                 }}
                                 aria-label="Fechar agenda"
@@ -9283,7 +9297,7 @@ function AdminPanel() {
         formatDateForInput(new Date()),
     );
     const [showAgendaDatePicker, setShowAgendaDatePicker] = useState(false);
-    const [showAgendaMonthCalendar, setShowAgendaMonthCalendar] = useState(false);
+    const [showAgendaMonthCalendar, setShowAgendaMonthCalendar] = useState(true);
     const [agendaCalendarMonth, setAgendaCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -9300,7 +9314,7 @@ function AdminPanel() {
     const [manualDate, setManualDate] = useState(formatDateForInput(new Date()));
     const [manualWeekReferenceDate, setManualWeekReferenceDate] = useState(formatDateForInput(new Date()));
     const [manualTime, setManualTime] = useState("");
-    const [showManualMonthCalendar, setShowManualMonthCalendar] = useState(false);
+    const [showManualMonthCalendar, setShowManualMonthCalendar] = useState(true);
     const [manualCalendarMonth, setManualCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -9321,7 +9335,7 @@ function AdminPanel() {
     const [editAppointmentTime, setEditAppointmentTime] = useState("");
     const [showEditDateTimePicker, setShowEditDateTimePicker] = useState(false);
     const [editWeekReferenceDate, setEditWeekReferenceDate] = useState(formatDateForInput(new Date()));
-    const [showEditMonthCalendar, setShowEditMonthCalendar] = useState(false);
+    const [showEditMonthCalendar, setShowEditMonthCalendar] = useState(true);
     const [editCalendarMonth, setEditCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -9866,7 +9880,7 @@ function AdminPanel() {
         );
 
         setShowEditDateTimePicker(false);
-        setShowEditMonthCalendar(false);
+        setShowEditMonthCalendar(true);
         setAppointmentEditError("");
     }
 
@@ -9884,7 +9898,7 @@ function AdminPanel() {
         setEditWeekReferenceDate(date);
         setEditAppointmentTime("");
         setAppointmentEditError("");
-        setShowEditMonthCalendar(false);
+        setShowEditMonthCalendar(true);
     }
 
     function moveEditAppointmentWeek(amount: number) {
@@ -10838,7 +10852,7 @@ function AdminPanel() {
         setManualWeekReferenceDate(date);
         setManualTime("");
         setManualError("");
-        setShowManualMonthCalendar(false);
+        setShowManualMonthCalendar(true);
     }
 
     function moveManualBookingWeek(amount: number) {
@@ -11227,7 +11241,7 @@ function AdminPanel() {
     function selectAgendaPickerDate(date: string) {
         setAgendaDate(date);
         setAgendaWeekReferenceDate(date);
-        setShowAgendaMonthCalendar(false);
+        setShowAgendaMonthCalendar(true);
         setShowAgendaDatePicker(false);
     }
 
@@ -11236,7 +11250,7 @@ function AdminPanel() {
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
 
         setAgendaWeekReferenceDate(nextReference);
-        setShowAgendaMonthCalendar(false);
+        setShowAgendaMonthCalendar(true);
     }
 
     function openAgendaMonthCalendar() {
@@ -12172,7 +12186,7 @@ function AdminPanel() {
             setAgendaDate(today);
             setAgendaWeekReferenceDate(today);
             setShowAgendaDatePicker(true);
-            setShowAgendaMonthCalendar(false);
+            setShowAgendaMonthCalendar(true);
         }
 
         if (view === "new") {
@@ -12209,7 +12223,7 @@ function AdminPanel() {
         setManualClientSearch("");
         setManualError("");
         setManualSuccess("");
-        setShowManualMonthCalendar(false);
+        setShowManualMonthCalendar(true);
         setShowManualForm(true);
         setAdminView("new");
 
@@ -12347,13 +12361,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><style>{`.admin-manual-week-days, .admin-agenda-date-picker__week-days { display:none !important; } .admin-manual-month-calendar { display:block !important; } .admin-manual-week-picker__month button, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display:none !important; }`}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><style>{`.admin-manual-week-days, .admin-agenda-date-picker__week-days { display:none !important; } .admin-manual-month-calendar { display:block !important; } .admin-manual-week-picker__month button, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display:none !important; }`}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -12371,7 +12385,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><style>{`.admin-manual-week-days, .admin-agenda-date-picker__week-days { display:none !important; } .admin-manual-month-calendar { display:block !important; } .admin-manual-week-picker__month button, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display:none !important; }`}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -12454,7 +12468,7 @@ function AdminPanel() {
                                             setAgendaDate(nextDate);
                                             setAgendaWeekReferenceDate(nextDate);
                                             setShowAgendaDatePicker(false);
-                                            setShowAgendaMonthCalendar(false);
+                                            setShowAgendaMonthCalendar(true);
                                         }}
                                     >
                                         ←
@@ -12478,7 +12492,7 @@ function AdminPanel() {
 
                                                     if (nextValue) {
                                                         setAgendaWeekReferenceDate(agendaDate);
-                                                        setShowAgendaMonthCalendar(false);
+                                                        setShowAgendaMonthCalendar(true);
                                                     }
 
                                                     return nextValue;
@@ -12638,7 +12652,7 @@ function AdminPanel() {
                                             setAgendaDate(nextDate);
                                             setAgendaWeekReferenceDate(nextDate);
                                             setShowAgendaDatePicker(false);
-                                            setShowAgendaMonthCalendar(false);
+                                            setShowAgendaMonthCalendar(true);
                                         }}
                                     >
                                         →
@@ -12652,7 +12666,7 @@ function AdminPanel() {
                                         setAgendaDate(today);
                                         setAgendaWeekReferenceDate(today);
                                         setShowAgendaDatePicker(adminView === "agenda");
-                                        setShowAgendaMonthCalendar(false);
+                                        setShowAgendaMonthCalendar(true);
                                     }}
                                 >
                                     Hoje
@@ -13020,6 +13034,18 @@ function AdminPanel() {
                                         >
                                             ›
                                         </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-manual-month-calendar">
+                                    <div className="admin-manual-month-calendar__header">
+                                        <button type="button" onClick={() => setScheduleConfigDate(addDaysToInputDate(scheduleConfigDate, -30))}>‹</button>
+                                        <strong>{new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                        <button type="button" onClick={() => setScheduleConfigDate(addDaysToInputDate(scheduleConfigDate, 30))}>›</button>
+                                    </div>
+                                    <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
+                                    <div className="admin-manual-month-calendar__grid">
+                                        {getMonthCellsForDate(scheduleConfigDate).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${scheduleConfigDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectScheduleConfigDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`schedule-empty-${index}`} />)}
                                     </div>
                                 </div>
 
@@ -13927,6 +13953,18 @@ function AdminPanel() {
                                         >
                                             ›
                                         </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-manual-month-calendar">
+                                    <div className="admin-manual-month-calendar__header">
+                                        <button type="button" onClick={() => setBlockDate(addDaysToInputDate(blockDate, -30))}>‹</button>
+                                        <strong>{new Date(`${blockDate}T12:00:00`).toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                        <button type="button" onClick={() => setBlockDate(addDaysToInputDate(blockDate, 30))}>›</button>
+                                    </div>
+                                    <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
+                                    <div className="admin-manual-month-calendar__grid">
+                                        {getMonthCellsForDate(blockDate).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${blockDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectBlockDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`block-empty-${index}`} />)}
                                     </div>
                                 </div>
 
