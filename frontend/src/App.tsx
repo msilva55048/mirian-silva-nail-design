@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {supabase} from "./lib/supabase";
 import "./App.css";
 
@@ -6,6 +6,58 @@ declare global {
     interface Navigator {
         standalone?: boolean;
     }
+}
+
+function useCloseOverlayOnBrowserBack(overlayKey: string | null, closeOverlay: () => void) {
+    const closeOverlayRef = useRef(closeOverlay);
+    const historyEntryIsActiveRef = useRef(false);
+    const closedByBrowserBackRef = useRef(false);
+
+    useEffect(() => {
+        closeOverlayRef.current = closeOverlay;
+    });
+
+    useEffect(() => {
+        if (!overlayKey || typeof window === "undefined") return;
+
+        const modalHistoryId = `mirian-modal-${Date.now()}-${Math.random()}`;
+
+        window.history.pushState(
+            {
+                ...(window.history.state ?? {}),
+                mirianModalHistoryId: modalHistoryId,
+            },
+            document.title,
+            window.location.href,
+        );
+
+        historyEntryIsActiveRef.current = true;
+        closedByBrowserBackRef.current = false;
+
+        const handleBrowserBack = () => {
+            if (!historyEntryIsActiveRef.current) return;
+
+            historyEntryIsActiveRef.current = false;
+            closedByBrowserBackRef.current = true;
+            closeOverlayRef.current();
+        };
+
+        window.addEventListener("popstate", handleBrowserBack);
+
+        return () => {
+            window.removeEventListener("popstate", handleBrowserBack);
+
+            if (
+                historyEntryIsActiveRef.current &&
+                !closedByBrowserBackRef.current
+            ) {
+                historyEntryIsActiveRef.current = false;
+                window.history.back();
+            }
+
+            closedByBrowserBackRef.current = false;
+        };
+    }, [overlayKey]);
 }
 
 const IS_PUBLIC_ROUTE =
@@ -275,6 +327,17 @@ const CLIENT_WEEKEND_START_MINUTES = [
     13 * 60,  // 13:00
 ] as const;
 
+const OCTOBER_2026_SCHEDULE_CHANGE_DATE = "2026-10-14";
+
+const CLIENT_START_MINUTES_FROM_OCTOBER_14_2026 = [
+    7 * 60,   // 07:00
+    9 * 60,   // 09:00
+    11 * 60,  // 11:00
+    13 * 60,  // 13:00
+    17 * 60,  // 17:00
+    19 * 60,  // 19:00
+] as const;
+
 const ADMIN_WEEKDAY_START_MINUTES = Array.from(
     {length: 29},
     (_, index) => 7 * 60 + index * 30,
@@ -290,8 +353,25 @@ function isWeekendDate(date: string) {
     return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
+function getMonthCellsForDate(value: string) {
+    const reference = value ? new Date(`${value}T12:00:00`) : new Date();
+    const first = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const days = new Date(reference.getFullYear(), reference.getMonth() + 1, 0).getDate();
+    const leading = (first.getDay() + 6) % 7;
+    return [
+        ...Array.from({length: leading}, () => ""),
+        ...Array.from({length: days}, (_, index) =>
+            formatDateForInput(new Date(reference.getFullYear(), reference.getMonth(), index + 1)),
+        ),
+    ];
+}
+
 function getFixedClientStartMinutes(date: string) {
     if (!date) return [] as number[];
+
+    if (date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE) {
+        return [...CLIENT_START_MINUTES_FROM_OCTOBER_14_2026];
+    }
 
     // ÚNICA fonte da grade pública de horários.
     // Todas as clientes, antigas ou novas, passam por esta mesma função.
@@ -304,16 +384,23 @@ function getFixedAdminManualStartMinutes(date: string) {
     if (!date) return [] as number[];
 
     // Grade exclusiva do painel ADM para criar/editar agendamentos.
-    return isWeekendDate(date)
+    const starts = isWeekendDate(date)
         ? [...ADMIN_WEEKEND_START_MINUTES]
         : [...ADMIN_WEEKDAY_START_MINUTES];
+
+    // A partir de 14/10/2026, 21:00 deixa de ser oferecido no painel ADM.
+    return date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE
+        ? starts.filter((start) => start !== 21 * 60)
+        : starts;
 }
 
 function getFixedAdminNewAppointmentStartMinutes(date: string) {
     if (!date) return [] as number[];
 
     // Novo agendamento ADM:
-    // dias úteis 07:00-21:00 e sábado/domingo 07:00-19:00.
+    // Até 13/10/2026, dias úteis 07:00-21:00.
+    // A partir de 14/10/2026, 21:00 deixa de ser oferecido.
+    // Sábado e domingo permanecem 07:00-19:00.
     return getFixedAdminManualStartMinutes(date);
 }
 
@@ -340,6 +427,11 @@ function getConfiguredClientStartMinutes(
 
     return [...new Set([...baseStarts, ...addedStarts])]
         .filter((start) => !removedStarts.has(start))
+        .filter(
+            (start) =>
+                date < OCTOBER_2026_SCHEDULE_CHANGE_DATE ||
+                start !== 21 * 60,
+        )
         .sort((a, b) => a - b);
 }
 
@@ -642,17 +734,6 @@ const clientAccountStyles = `
     padding: 2px 1px 5px;
     overflow: visible;
 }
-
-/* Calendário mensal permanece aberto; a navegação semanal não é exibida. */
-.client-week-days,
-.admin-manual-week-days,
-.admin-agenda-date-picker__week-days {
-    display: none !important;
-}
-.client-month-calendar,
-.admin-manual-month-calendar {
-    display: block !important;
-}
 .client-week-days__row {
     display: grid;
     gap: 6px;
@@ -942,9 +1023,6 @@ const clientAccountStyles = `
 .client-account__referral-button:disabled {
     opacity: .6;
     cursor: wait;
-}
-.client-account__referral-icon {
-    font-size: 1.1rem;
 }
 .client-account__referral-summary {
     display: grid;
@@ -1528,7 +1606,14 @@ function PublicSite() {
         }
 
         const loaded = ((data ?? []) as PublicClientAppointment[])
-            .filter((appointment) => appointment.client_id === profileId)
+            .filter((appointment) => (
+                appointment.client_id === profileId &&
+                // O painel da cliente mostra somente agendamentos ativos.
+                // Registros concluídos, cancelados ou de não comparecimento
+                // continuam disponíveis para o controle administrativo, mas
+                // não devem aparecer no painel pessoal da cliente.
+                (appointment.status === "pending" || appointment.status === "confirmed")
+            ))
             .sort((a, b) => {
                 const first = new Date(`${a.appointment_date}T${String(a.start_time).slice(0, 5)}:00`).getTime();
                 const second = new Date(`${b.appointment_date}T${String(b.start_time).slice(0, 5)}:00`).getTime();
@@ -2438,8 +2523,8 @@ function PublicSite() {
                     )
                     .neq("status", "cancelled"),
                 supabase
-                    .from("schedule_blocks")
-                    .select("id, block_date, start_time, end_time, reason"),
+                    .from("client_schedule_blocks")
+                    .select("id, block_date, start_time, end_time"),
                 supabase
                     .from("schedule_time_overrides")
                     .select("id, override_date, start_time, is_available, created_at, updated_at"),
@@ -2606,7 +2691,7 @@ function PublicSite() {
         setWeekReferenceDate(date);
         setSelectedTime("");
         setBookingError("");
-        setShowMonthCalendar(false);
+        setShowMonthCalendar(true);
     }
 
     function moveBookingWeek(amount: number) {
@@ -2756,10 +2841,60 @@ function PublicSite() {
         setSelectedDate("");
         setSelectedTime("");
         setWeekReferenceDate(formatDateForInput(new Date()));
-        setShowMonthCalendar(false);
+        setShowMonthCalendar(true);
         setEditingClientAppointment(null);
         setBookingError("");
     }
+
+    const publicOverlayKey =
+        bookingStep !== 1 ||
+        showClientAuth ||
+        showPasswordRecoveryRequest ||
+        showPasswordRecoveryReset ||
+        showClientAccount ||
+        showClientProfileEditor
+            ? "public-overlay"
+            : null;
+
+    useCloseOverlayOnBrowserBack(publicOverlayKey, () => {
+        if (showClientProfileEditor) {
+            closeClientProfileEditor();
+            return;
+        }
+
+        if (showClientAccount) {
+            setShowClientAccount(false);
+            return;
+        }
+
+        if (showPasswordRecoveryReset) {
+            setShowPasswordRecoveryReset(false);
+            setRecoverySessionUserId(null);
+            setRecoveryNewPassword("");
+            setRecoveryConfirmPassword("");
+            setRecoveryResetError("");
+            setRecoveryResetSuccess("");
+            return;
+        }
+
+        if (showPasswordRecoveryRequest) {
+            setShowPasswordRecoveryRequest(false);
+            setRecoveryRequestError("");
+            setRecoveryRequestSuccess("");
+            return;
+        }
+
+        if (showClientAuth) {
+            setShowClientAuth(false);
+            setAuthError("");
+            setAuthSuccess("");
+            return;
+        }
+
+        if (bookingStep !== 1) {
+            closeBooking();
+        }
+    });
 
     async function confirmBooking() {
         setBookingError("");
@@ -2785,8 +2920,8 @@ function PublicSite() {
                     .eq("appointment_date", selectedDate)
                     .neq("status", "cancelled"),
                 supabase
-                    .from("schedule_blocks")
-                    .select("id, block_date, start_time, end_time, reason")
+                    .from("client_schedule_blocks")
+                    .select("id, block_date, start_time, end_time")
                     .eq("block_date", selectedDate),
                 supabase
                     .from("schedule_time_overrides")
@@ -2922,21 +3057,14 @@ function PublicSite() {
                     throw rescheduleError;
                 }
             } else {
-                const {error: insertError} = await supabase
-                    .from("appointments")
-                    .insert({
-                        client_name: clientName.trim(),
-                        client_phone: clientPhone.trim(),
-                        client_email: (clientProfile?.email ?? clientUserEmail) || null,
-                        client_id: clientProfile?.id ?? null,
-                        service_name: selectedServiceInformation.name,
-                        appointment_date: selectedDate,
-                        start_time: selectedTime,
-                        duration_minutes:
-                        selectedServiceInformation.durationMinutes,
-                        price_cents: selectedServiceInformation.priceCents,
-                        status: "confirmed",
-                    });
+                const {error: insertError} = await supabase.rpc(
+                    "create_my_appointment",
+                    {
+                        p_service_name: selectedServiceInformation.name,
+                        p_appointment_date: selectedDate,
+                        p_start_time: selectedTime,
+                    },
+                );
 
                 if (insertError) {
                     throw insertError;
@@ -2983,6 +3111,7 @@ function PublicSite() {
     return (
         <main className="home">
             <style>{clientAccountStyles}</style>
+            <style>{`\n.client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }\n.client-month-calendar, .admin-manual-month-calendar { display: block !important; }\n.client-week-picker__calendar-button, .admin-manual-week-picker__month button { display: none !important; }\n.client-week-picker__top > .client-week-picker__navs, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display: none !important; }\n`}</style>
             <style>{`
                 @media (max-width: 700px) {
                     .home {
@@ -3111,14 +3240,6 @@ function PublicSite() {
                     background: #6d3445;
                     color: #fff;
                 }
-                .client-logged-header__referral {
-                    background: linear-gradient(135deg, #a86175, #7b3c54);
-                    color: #fff;
-                }
-                .client-logged-header__referral:disabled {
-                    opacity: .65;
-                    cursor: wait;
-                }
                 .client-logged-header__actions {
                     gap: 9px;
                 }
@@ -3145,8 +3266,6 @@ function PublicSite() {
                     }
                     .client-logged-header__actions {
                         width: 100%;
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
                     }
                     .client-logged-header__actions button {
                         width: 100%;
@@ -3164,14 +3283,6 @@ function PublicSite() {
                         </div>
 
                         <div className="client-logged-header__actions">
-                            <button
-                                className="client-logged-header__referral"
-                                type="button"
-                                disabled={isLoadingReferralSummary}
-                                onClick={() => void shareReferralOnWhatsApp()}
-                            >
-                                {isLoadingReferralSummary ? "Carregando..." : "Indicar amiga"}
-                            </button>
                             <button
                                 className="client-logged-header__appointments"
                                 type="button"
@@ -3223,7 +3334,7 @@ function PublicSite() {
                                 type="button"
                                 onClick={() => {
                                     setBookingError("");
-                                    setShowMonthCalendar(false);
+                                    setShowMonthCalendar(true);
                                     setBookingStep(1);
                                 }}
                                 aria-label="Fechar agenda"
@@ -4055,6 +4166,15 @@ function PublicSite() {
                                     </div>
                                 )}
 
+                                <button
+                                    className="client-account__referral-button"
+                                    type="button"
+                                    disabled={isLoadingReferralSummary}
+                                    onClick={() => void shareReferralOnWhatsApp()}
+                                >
+                                    Indicação
+                                </button>
+
                                 <div className="client-account__actions">
                                     <button
                                         className="client-account__edit-profile"
@@ -4067,24 +4187,6 @@ function PublicSite() {
                                             <small>Nome, telefone, e-mail e senha</small>
                                         </span>
                                         <span className="client-account__edit-profile-arrow">›</span>
-                                    </button>
-
-                                    <button
-                                        className="client-account__referral-button"
-                                        type="button"
-                                        disabled={isLoadingReferralSummary}
-                                        onClick={() => void shareReferralOnWhatsApp()}
-                                    >
-                                        <span className="client-account__referral-icon">⌁</span>
-                                        {isLoadingReferralSummary ? "Gerando seu link..." : "Indicar amiga pelo WhatsApp"}
-                                    </button>
-
-                                    <button
-                                        className="client-account__logout"
-                                        type="button"
-                                        onClick={() => void logoutClient()}
-                                    >
-                                        Sair da conta
                                     </button>
                                 </div>
 
@@ -4134,6 +4236,14 @@ function PublicSite() {
                                         </div>
                                     )}
                                 </section>
+
+                                <button
+                                    className="client-account__logout"
+                                    type="button"
+                                    onClick={() => void logoutClient()}
+                                >
+                                    Sair da conta
+                                </button>
                             </>
                         ) : (
                             <div className="client-account__empty">
@@ -4887,10 +4997,16 @@ const adminStyles = `
 .admin-status {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 116px;
+    box-sizing: border-box;
     border-radius: 999px;
-    padding: 7px 11px;
+    padding: 7px 14px;
     font-size: 0.78rem;
     font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .admin-status--pending {
@@ -4898,9 +5014,19 @@ const adminStyles = `
     color: #8a6100;
 }
 
+.admin-status--scheduled {
+    background: #fff4d9;
+    color: #8a6100;
+}
+
 .admin-status--confirmed {
     background: #e7f7ed;
     color: #1d7540;
+}
+
+.admin-status--referral {
+    background: #e4f0ff;
+    color: #2f64a3;
 }
 
 .admin-status--completed {
@@ -6731,10 +6857,11 @@ const adminEnhancementStyles = `
     border-left-color: #aaa0a4;
 }
 .admin-booking-card__top {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
     gap: 14px;
-    align-items: flex-start;
+}
+.admin-booking-card__top .admin-status {
+    width: 100%;
 }
 .admin-booking-card__time {
     color: #8b485d;
@@ -9291,7 +9418,7 @@ function AdminPanel() {
     const [agendaWeekReferenceDate, setAgendaWeekReferenceDate] = useState(
         formatDateForInput(new Date()),
     );
-    const [showAgendaDatePicker, setShowAgendaDatePicker] = useState(true);
+    const [showAgendaDatePicker, setShowAgendaDatePicker] = useState(false);
     const [showAgendaMonthCalendar, setShowAgendaMonthCalendar] = useState(true);
     const [agendaCalendarMonth, setAgendaCalendarMonth] = useState(() => {
         const now = new Date();
@@ -9384,6 +9511,10 @@ function AdminPanel() {
 
     const [scheduleConfigDate, setScheduleConfigDate] = useState(formatDateForInput(new Date()));
     const [scheduleConfigWeekReferenceDate, setScheduleConfigWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [scheduleConfigCalendarMonth, setScheduleConfigCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [scheduleConfigNewTime, setScheduleConfigNewTime] = useState("");
     const [scheduleConfigEditingTime, setScheduleConfigEditingTime] = useState<string | null>(null);
     const [scheduleConfigEditedTime, setScheduleConfigEditedTime] = useState("");
@@ -9393,6 +9524,10 @@ function AdminPanel() {
 
     const [blockDate, setBlockDate] = useState(formatDateForInput(new Date()));
     const [blockWeekReferenceDate, setBlockWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [blockCalendarMonth, setBlockCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [selectedBlockTimes, setSelectedBlockTimes] = useState<string[]>([]);
     const [blockReason, setBlockReason] = useState("");
     const [blockError, setBlockError] = useState("");
@@ -9875,7 +10010,7 @@ function AdminPanel() {
         );
 
         setShowEditDateTimePicker(false);
-        setShowEditMonthCalendar(false);
+        setShowEditMonthCalendar(true);
         setAppointmentEditError("");
     }
 
@@ -9893,7 +10028,7 @@ function AdminPanel() {
         setEditWeekReferenceDate(date);
         setEditAppointmentTime("");
         setAppointmentEditError("");
-        setShowEditMonthCalendar(false);
+        setShowEditMonthCalendar(true);
     }
 
     function moveEditAppointmentWeek(amount: number) {
@@ -10071,25 +10206,6 @@ function AdminPanel() {
         setSelectedAdminAppointment(null);
     }
 
-    async function permanentlyDeleteAppointment(appointmentId: string, expectedStatus: string) {
-        const rpcResult = await supabase.rpc("admin_delete_appointment", {
-            p_appointment_id: appointmentId,
-            p_expected_status: expectedStatus,
-        });
-        const rpcDeleted = rpcResult.data === true ||
-            (Array.isArray(rpcResult.data) && rpcResult.data[0] === true) ||
-            (rpcResult.data && typeof rpcResult.data === "object" &&
-                "admin_delete_appointment" in rpcResult.data &&
-                (rpcResult.data as {admin_delete_appointment?: unknown}).admin_delete_appointment === true);
-        if (!rpcResult.error && rpcDeleted) return;
-
-        const directResult = await supabase.from("appointments").delete().eq("id", appointmentId).select("id");
-        if (directResult.error) throw rpcResult.error ?? directResult.error;
-        if (!directResult.data || directResult.data.length === 0) {
-            throw rpcResult.error ?? new Error("O agendamento não foi removido do banco.");
-        }
-    }
-
     async function clearCancelledAppointmentFromHistory(
         appointment: AdminAppointment,
     ) {
@@ -10107,7 +10223,17 @@ function AdminPanel() {
         setPanelError("");
 
         try {
-            await permanentlyDeleteAppointment(appointment.id, "cancelled");
+            const {data: deleted, error} = await supabase.rpc(
+                "admin_delete_appointment",
+                {
+                    p_appointment_id: appointment.id,
+                    p_expected_status: "cancelled",
+                },
+            );
+
+            if (error || deleted !== true) {
+                throw error ?? new Error("O agendamento não foi removido do banco.");
+            }
 
             setAppointments((current) =>
                 current.filter((item) => item.id !== appointment.id),
@@ -10156,7 +10282,17 @@ function AdminPanel() {
         setPanelError("");
 
         try {
-            await permanentlyDeleteAppointment(appointment.id, appointment.status);
+            const {data: deleted, error} = await supabase.rpc(
+                "admin_delete_appointment",
+                {
+                    p_appointment_id: appointment.id,
+                    p_expected_status: appointment.status,
+                },
+            );
+
+            if (error || deleted !== true) {
+                throw error ?? new Error("O agendamento não foi removido do banco.");
+            }
 
             setAppointments((current) =>
                 current.filter((item) => item.id !== appointment.id),
@@ -10228,6 +10364,26 @@ function AdminPanel() {
         setNailRecords([]);
         setSelectedClient(null);
     }
+
+    const adminOverlayKey = selectedAdminAppointment || selectedClient || editingClient
+        ? "admin-overlay"
+        : null;
+
+    useCloseOverlayOnBrowserBack(adminOverlayKey, () => {
+        if (editingClient) {
+            setEditingClient(null);
+            return;
+        }
+
+        if (selectedClient) {
+            closeClientHistory();
+            return;
+        }
+
+        if (selectedAdminAppointment) {
+            setSelectedAdminAppointment(null);
+        }
+    });
 
     async function findClientProfile(client: AdminClient): Promise<ClientProfile | null> {
         const {data, error} = await supabase
@@ -10851,7 +11007,7 @@ function AdminPanel() {
         setManualWeekReferenceDate(date);
         setManualTime("");
         setManualError("");
-        setShowManualMonthCalendar(false);
+        setShowManualMonthCalendar(true);
     }
 
     function moveManualBookingWeek(amount: number) {
@@ -11238,9 +11394,12 @@ function AdminPanel() {
     );
 
     function selectAgendaPickerDate(date: string) {
+        const today = formatDateForInput(new Date());
+        if (date < today) return;
+
         setAgendaDate(date);
         setAgendaWeekReferenceDate(date);
-        setShowAgendaMonthCalendar(false);
+        setShowAgendaMonthCalendar(true);
         setShowAgendaDatePicker(false);
     }
 
@@ -11249,7 +11408,7 @@ function AdminPanel() {
         const nextReference = addDaysToInputDate(currentWeek[0], amount * 7);
 
         setAgendaWeekReferenceDate(nextReference);
-        setShowAgendaMonthCalendar(false);
+        setShowAgendaMonthCalendar(true);
     }
 
     function openAgendaMonthCalendar() {
@@ -11547,6 +11706,33 @@ function AdminPanel() {
             : "Agendado";
     }
 
+    function isActiveReferralAppointment(appointment: AdminAppointment) {
+        const isOpenAppointment =
+            appointment.status === "pending" ||
+            appointment.status === "confirmed";
+
+        return isOpenAppointment && Boolean(
+            appointment.referral_reward_id ||
+            appointment.referral_discount_percent === 30,
+        );
+    }
+
+    function getAdminAppointmentStatusClassName(
+        appointment: AdminAppointment,
+    ) {
+        if (isActiveReferralAppointment(appointment)) {
+            return "admin-status admin-status--referral";
+        }
+
+        const displayStatus = getAdminAppointmentDisplayStatusLabel(appointment);
+
+        if (displayStatus === "Agendado") {
+            return "admin-status admin-status--scheduled";
+        }
+
+        return `admin-status admin-status--${appointment.status}`;
+    }
+
     function markWhatsAppNotificationOpened(
         appointment: AdminAppointment,
         type: WhatsAppNotificationType,
@@ -11617,8 +11803,12 @@ function AdminPanel() {
         const today = formatDateForInput(new Date());
         if (date < today) return;
 
+        const selected = new Date(`${date}T12:00:00`);
         setScheduleConfigDate(date);
         setScheduleConfigWeekReferenceDate(date);
+        setScheduleConfigCalendarMonth(
+            new Date(selected.getFullYear(), selected.getMonth(), 1),
+        );
         setScheduleConfigEditingTime(null);
         setScheduleConfigEditedTime("");
         setScheduleConfigNewTime("");
@@ -11856,8 +12046,12 @@ function AdminPanel() {
         const today = formatDateForInput(new Date());
         if (date < today) return;
 
+        const selected = new Date(`${date}T12:00:00`);
         setBlockDate(date);
         setBlockWeekReferenceDate(date);
+        setBlockCalendarMonth(
+            new Date(selected.getFullYear(), selected.getMonth(), 1),
+        );
         setSelectedBlockTimes([]);
         setBlockError("");
     }
@@ -12158,7 +12352,7 @@ function AdminPanel() {
             setAgendaDate(today);
             setAgendaWeekReferenceDate(today);
             setShowAgendaDatePicker(true);
-            setShowAgendaMonthCalendar(false);
+            setShowAgendaMonthCalendar(true);
         }
 
         if (view === "new") {
@@ -12195,7 +12389,7 @@ function AdminPanel() {
         setManualClientSearch("");
         setManualError("");
         setManualSuccess("");
-        setShowManualMonthCalendar(false);
+        setShowManualMonthCalendar(true);
         setShowManualForm(true);
         setAdminView("new");
 
@@ -12242,7 +12436,7 @@ function AdminPanel() {
                         <h3>{appointment.client_name}</h3>
                     </div>
 
-                    <span className={`admin-status admin-status--${appointment.status}`}>
+                    <span className={getAdminAppointmentStatusClassName(appointment)}>
                         {getAdminAppointmentDisplayStatusLabel(appointment)}
                     </span>
                 </div>
@@ -12333,13 +12527,13 @@ function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><style>{`.admin-manual-week-days, .admin-agenda-date-picker__week-days { display:none !important; } .admin-manual-month-calendar { display:block !important; } .admin-manual-week-picker__month button, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display:none !important; }`}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><style>{`.admin-manual-week-days, .admin-agenda-date-picker__week-days { display:none !important; } .admin-manual-month-calendar { display:block !important; } .admin-manual-week-picker__month button, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display:none !important; }`}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -12357,7 +12551,7 @@ function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminSevenDaysOnlyStyles + adminAgendaMonthSameSizeStyles + adminMatchedCalendarAndWeekStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><style>{`.admin-manual-week-days, .admin-agenda-date-picker__week-days { display:none !important; } .admin-manual-month-calendar { display:block !important; } .admin-manual-week-picker__month button, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display:none !important; }`}</style>
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
@@ -12435,12 +12629,15 @@ function AdminPanel() {
                                 {adminView === "week" && (
                                     <button
                                         type="button"
+                                        disabled={agendaDate <= formatDateForInput(new Date())}
                                         onClick={() => {
-                                            const nextDate = addDaysToInputDate(agendaDate, -7);
+                                            const today = formatDateForInput(new Date());
+                                            const previousDate = addDaysToInputDate(agendaDate, -7);
+                                            const nextDate = previousDate < today ? today : previousDate;
                                             setAgendaDate(nextDate);
                                             setAgendaWeekReferenceDate(nextDate);
                                             setShowAgendaDatePicker(false);
-                                            setShowAgendaMonthCalendar(false);
+                                            setShowAgendaMonthCalendar(true);
                                         }}
                                     >
                                         ←
@@ -12464,7 +12661,7 @@ function AdminPanel() {
 
                                                     if (nextValue) {
                                                         setAgendaWeekReferenceDate(agendaDate);
-                                                        setShowAgendaMonthCalendar(false);
+                                                        setShowAgendaMonthCalendar(true);
                                                     }
 
                                                     return nextValue;
@@ -12579,11 +12776,15 @@ function AdminPanel() {
                                                                     );
                                                                 }
 
+                                                                const isPast =
+                                                                    date < formatDateForInput(new Date());
+
                                                                 return (
                                                                     <button
                                                                         type="button"
                                                                         key={date}
-                                                                        className={agendaDate === date ? "is-selected" : ""}
+                                                                        disabled={isPast}
+                                                                        className={`${agendaDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`}
                                                                         onClick={() => selectAgendaPickerDate(date)}
                                                                     >
                                                                         {new Date(`${date}T12:00:00`).getDate()}
@@ -12595,12 +12796,14 @@ function AdminPanel() {
                                                 )}<div className="admin-manual-week-days admin-manual-week-days--seven">
                                                 {agendaVisibleWeekDates.map((date) => {
                                                     const parsed = new Date(`${date}T12:00:00`);
+                                                    const isPast = date < formatDateForInput(new Date());
 
                                                     return (
                                                         <button
                                                             key={date}
                                                             type="button"
-                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}`}
+                                                            disabled={isPast}
+                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
                                                             onClick={() => selectAgendaPickerDate(date)}
                                                         >
                                                             <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
@@ -12624,7 +12827,7 @@ function AdminPanel() {
                                             setAgendaDate(nextDate);
                                             setAgendaWeekReferenceDate(nextDate);
                                             setShowAgendaDatePicker(false);
-                                            setShowAgendaMonthCalendar(false);
+                                            setShowAgendaMonthCalendar(true);
                                         }}
                                     >
                                         →
@@ -12638,7 +12841,7 @@ function AdminPanel() {
                                         setAgendaDate(today);
                                         setAgendaWeekReferenceDate(today);
                                         setShowAgendaDatePicker(adminView === "agenda");
-                                        setShowAgendaMonthCalendar(false);
+                                        setShowAgendaMonthCalendar(true);
                                     }}
                                 >
                                     Hoje
@@ -13006,6 +13209,18 @@ function AdminPanel() {
                                         >
                                             ›
                                         </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-manual-month-calendar">
+                                    <div className="admin-manual-month-calendar__header">
+                                        <button type="button" onClick={() => setScheduleConfigCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button>
+                                        <strong>{scheduleConfigCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                        <button type="button" onClick={() => setScheduleConfigCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
+                                    </div>
+                                    <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
+                                    <div className="admin-manual-month-calendar__grid">
+                                        {getMonthCellsForDate(formatDateForInput(scheduleConfigCalendarMonth)).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${scheduleConfigDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectScheduleConfigDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`schedule-empty-${index}`} />)}
                                     </div>
                                 </div>
 
@@ -13480,7 +13695,9 @@ function AdminPanel() {
                                                 {compactAppointment ? (
                                                     <>
                                                         <span
-                                                            className={`admin-status admin-status--${compactAppointment.status}`}
+                                                            className={getAdminAppointmentStatusClassName(
+                                                                compactAppointment,
+                                                            )}
                                                         >
                                                             {getAdminAppointmentDisplayStatusLabel(
                                                                 compactAppointment,
@@ -13911,6 +14128,18 @@ function AdminPanel() {
                                         >
                                             ›
                                         </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-manual-month-calendar">
+                                    <div className="admin-manual-month-calendar__header">
+                                        <button type="button" onClick={() => setBlockCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button>
+                                        <strong>{blockCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                        <button type="button" onClick={() => setBlockCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
+                                    </div>
+                                    <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
+                                    <div className="admin-manual-month-calendar__grid">
+                                        {getMonthCellsForDate(formatDateForInput(blockCalendarMonth)).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${blockDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectBlockDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`block-empty-${index}`} />)}
                                     </div>
                                 </div>
 
