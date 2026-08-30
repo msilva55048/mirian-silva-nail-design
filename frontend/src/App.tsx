@@ -642,6 +642,17 @@ const clientAccountStyles = `
     padding: 2px 1px 5px;
     overflow: visible;
 }
+
+/* Calendário mensal permanece aberto; a navegação semanal não é exibida. */
+.client-week-days,
+.admin-manual-week-days,
+.admin-agenda-date-picker__week-days {
+    display: none !important;
+}
+.client-month-calendar,
+.admin-manual-month-calendar {
+    display: block !important;
+}
 .client-week-days__row {
     display: grid;
     gap: 6px;
@@ -1496,7 +1507,7 @@ function PublicSite() {
     const [editingClientAppointment, setEditingClientAppointment] = useState<PublicClientAppointment | null>(null);
     const [isCancellingClientAppointment, setIsCancellingClientAppointment] = useState(false);
     const [weekReferenceDate, setWeekReferenceDate] = useState(() => formatDateForInput(new Date()));
-    const [showMonthCalendar, setShowMonthCalendar] = useState(false);
+    const [showMonthCalendar, setShowMonthCalendar] = useState(true);
     const [calendarMonth, setCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2470,7 +2481,7 @@ function PublicSite() {
                     date: block.block_date,
                     startTime: String(block.start_time).slice(0, 5),
                     endTime: String(block.end_time).slice(0, 5),
-                    reason: block.reason || "",
+                    reason: "",
                 }),
             );
 
@@ -2812,7 +2823,7 @@ function PublicSite() {
                 date: block.block_date,
                 startTime: String(block.start_time).slice(0, 5),
                 endTime: String(block.end_time).slice(0, 5),
-                reason: block.reason || "",
+                reason: "",
             }));
 
             const latestDateOverrides: ScheduleTimeOverride[] = (latestOverrides ?? []).map(
@@ -9280,8 +9291,8 @@ function AdminPanel() {
     const [agendaWeekReferenceDate, setAgendaWeekReferenceDate] = useState(
         formatDateForInput(new Date()),
     );
-    const [showAgendaDatePicker, setShowAgendaDatePicker] = useState(false);
-    const [showAgendaMonthCalendar, setShowAgendaMonthCalendar] = useState(false);
+    const [showAgendaDatePicker, setShowAgendaDatePicker] = useState(true);
+    const [showAgendaMonthCalendar, setShowAgendaMonthCalendar] = useState(true);
     const [agendaCalendarMonth, setAgendaCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -9298,7 +9309,7 @@ function AdminPanel() {
     const [manualDate, setManualDate] = useState(formatDateForInput(new Date()));
     const [manualWeekReferenceDate, setManualWeekReferenceDate] = useState(formatDateForInput(new Date()));
     const [manualTime, setManualTime] = useState("");
-    const [showManualMonthCalendar, setShowManualMonthCalendar] = useState(false);
+    const [showManualMonthCalendar, setShowManualMonthCalendar] = useState(true);
     const [manualCalendarMonth, setManualCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -9319,7 +9330,7 @@ function AdminPanel() {
     const [editAppointmentTime, setEditAppointmentTime] = useState("");
     const [showEditDateTimePicker, setShowEditDateTimePicker] = useState(false);
     const [editWeekReferenceDate, setEditWeekReferenceDate] = useState(formatDateForInput(new Date()));
-    const [showEditMonthCalendar, setShowEditMonthCalendar] = useState(false);
+    const [showEditMonthCalendar, setShowEditMonthCalendar] = useState(true);
     const [editCalendarMonth, setEditCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -10060,6 +10071,25 @@ function AdminPanel() {
         setSelectedAdminAppointment(null);
     }
 
+    async function permanentlyDeleteAppointment(appointmentId: string, expectedStatus: string) {
+        const rpcResult = await supabase.rpc("admin_delete_appointment", {
+            p_appointment_id: appointmentId,
+            p_expected_status: expectedStatus,
+        });
+        const rpcDeleted = rpcResult.data === true ||
+            (Array.isArray(rpcResult.data) && rpcResult.data[0] === true) ||
+            (rpcResult.data && typeof rpcResult.data === "object" &&
+                "admin_delete_appointment" in rpcResult.data &&
+                (rpcResult.data as {admin_delete_appointment?: unknown}).admin_delete_appointment === true);
+        if (!rpcResult.error && rpcDeleted) return;
+
+        const directResult = await supabase.from("appointments").delete().eq("id", appointmentId).select("id");
+        if (directResult.error) throw rpcResult.error ?? directResult.error;
+        if (!directResult.data || directResult.data.length === 0) {
+            throw rpcResult.error ?? new Error("O agendamento não foi removido do banco.");
+        }
+    }
+
     async function clearCancelledAppointmentFromHistory(
         appointment: AdminAppointment,
     ) {
@@ -10077,15 +10107,7 @@ function AdminPanel() {
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", appointment.id)
-                .eq("status", "cancelled");
-
-            if (error) {
-                throw error;
-            }
+            await permanentlyDeleteAppointment(appointment.id, "cancelled");
 
             setAppointments((current) =>
                 current.filter((item) => item.id !== appointment.id),
@@ -10134,14 +10156,7 @@ function AdminPanel() {
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", appointment.id);
-
-            if (error) {
-                throw error;
-            }
+            await permanentlyDeleteAppointment(appointment.id, appointment.status);
 
             setAppointments((current) =>
                 current.filter((item) => item.id !== appointment.id),
