@@ -374,7 +374,8 @@ function getMonthCellsForDate(value: string) {
     const reference = value ? new Date(`${value}T12:00:00`) : new Date();
     const first = new Date(reference.getFullYear(), reference.getMonth(), 1);
     const days = new Date(reference.getFullYear(), reference.getMonth() + 1, 0).getDate();
-    const leading = (first.getDay() + 6) % 7;
+    // Calendário no padrão domingo a sábado.
+    const leading = first.getDay();
     return [
         ...Array.from({length: leading}, () => ""),
         ...Array.from({length: days}, (_, index) =>
@@ -2746,9 +2747,9 @@ function PublicSite() {
         const firstDay = new Date(year, month, 1);
         const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-        // Grade começa na segunda-feira.
+        // Grade começa no domingo.
         const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+        const leadingEmpty = firstDayOfWeek;
 
         return [
             ...Array.from({length: leadingEmpty}, () => null),
@@ -3450,7 +3451,7 @@ function PublicSite() {
                                         </div>
 
                                         <div className="client-month-calendar__weekdays">
-                                            {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day) => (
+                                            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
                                                 <span key={day}>{day}</span>
                                             ))}
                                         </div>
@@ -10084,7 +10085,7 @@ function AdminPanel() {
         const firstDay = new Date(year, month, 1);
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+        const leadingEmpty = firstDayOfWeek;
 
         return [
             ...Array.from({length: leadingEmpty}, () => null),
@@ -11067,7 +11068,7 @@ function AdminPanel() {
         const firstDay = new Date(year, month, 1);
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+        const leadingEmpty = firstDayOfWeek;
 
         return [
             ...Array.from({length: leadingEmpty}, () => null),
@@ -11454,7 +11455,7 @@ function AdminPanel() {
         const firstDay = new Date(year, month, 1);
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfWeek = firstDay.getDay();
-        const leadingEmpty = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+        const leadingEmpty = firstDayOfWeek;
 
         return [
             ...Array.from({ length: leadingEmpty }, () => null),
@@ -12807,7 +12808,7 @@ function AdminPanel() {
                                                         </div>
 
                                                         <div className="admin-manual-month-calendar__weekdays">
-                                                            {["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"].map(
+                                                            {["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"].map(
                                                                 (day) => <span key={day}>{day}</span>,
                                                             )}
                                                         </div>
@@ -13265,7 +13266,7 @@ function AdminPanel() {
                                         <strong>{scheduleConfigCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
                                         <button type="button" onClick={() => setScheduleConfigCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
                                     </div>
-                                    <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
+                                    <div className="admin-manual-month-calendar__weekdays">{["DOM","SEG","TER","QUA","QUI","SEX","SÁB"].map((day) => <span key={day}>{day}</span>)}</div>
                                     <div className="admin-manual-month-calendar__grid">
                                         {getMonthCellsForDate(formatDateForInput(scheduleConfigCalendarMonth)).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${scheduleConfigDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectScheduleConfigDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`schedule-empty-${index}`} />)}
                                     </div>
@@ -14038,7 +14039,7 @@ function AdminPanel() {
                                                         </div>
 
                                                         <div className="admin-manual-month-calendar__weekdays">
-                                                            {['SEG','TER','QUA','QUI','SEX','SÁB','DOM'].map((day) => <span key={day}>{day}</span>)}
+                                                            {['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map((day) => <span key={day}>{day}</span>)}
                                                         </div>
 
                                                         <div className="admin-manual-month-calendar__grid">
@@ -14184,7 +14185,7 @@ function AdminPanel() {
                                         <strong>{blockCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
                                         <button type="button" onClick={() => setBlockCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
                                     </div>
-                                    <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
+                                    <div className="admin-manual-month-calendar__weekdays">{["DOM","SEG","TER","QUA","QUI","SEX","SÁB"].map((day) => <span key={day}>{day}</span>)}</div>
                                     <div className="admin-manual-month-calendar__grid">
                                         {getMonthCellsForDate(formatDateForInput(blockCalendarMonth)).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${blockDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectBlockDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`block-empty-${index}`} />)}
                                     </div>
@@ -14627,13 +14628,13 @@ function AdminPanel() {
 
                                                             <div className="admin-manual-month-calendar__weekdays">
                                                                 {[
+                                                                    "DOM",
                                                                     "SEG",
                                                                     "TER",
                                                                     "QUA",
                                                                     "QUI",
                                                                     "SEX",
                                                                     "SÁB",
-                                                                    "DOM",
                                                                 ].map((day) => (
                                                                     <span key={day}>
                                                                         {day}
