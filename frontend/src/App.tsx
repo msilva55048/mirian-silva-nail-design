@@ -2523,8 +2523,8 @@ function PublicSite() {
                     )
                     .neq("status", "cancelled"),
                 supabase
-                    .from("schedule_blocks")
-                    .select("id, block_date, start_time, end_time, reason"),
+                    .from("client_schedule_blocks")
+                    .select("id, block_date, start_time, end_time"),
                 supabase
                     .from("schedule_time_overrides")
                     .select("id, override_date, start_time, is_available, created_at, updated_at"),
@@ -2920,8 +2920,8 @@ function PublicSite() {
                     .eq("appointment_date", selectedDate)
                     .neq("status", "cancelled"),
                 supabase
-                    .from("schedule_blocks")
-                    .select("id, block_date, start_time, end_time, reason")
+                    .from("client_schedule_blocks")
+                    .select("id, block_date, start_time, end_time")
                     .eq("block_date", selectedDate),
                 supabase
                     .from("schedule_time_overrides")
