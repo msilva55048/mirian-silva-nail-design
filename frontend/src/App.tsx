@@ -275,6 +275,17 @@ const CLIENT_WEEKEND_START_MINUTES = [
     13 * 60,  // 13:00
 ] as const;
 
+const OCTOBER_2026_SCHEDULE_CHANGE_DATE = "2026-10-14";
+
+const CLIENT_START_MINUTES_FROM_OCTOBER_14_2026 = [
+    7 * 60,   // 07:00
+    9 * 60,   // 09:00
+    11 * 60,  // 11:00
+    13 * 60,  // 13:00
+    17 * 60,  // 17:00
+    19 * 60,  // 19:00
+] as const;
+
 const ADMIN_WEEKDAY_START_MINUTES = Array.from(
     {length: 29},
     (_, index) => 7 * 60 + index * 30,
@@ -306,6 +317,10 @@ function getMonthCellsForDate(value: string) {
 function getFixedClientStartMinutes(date: string) {
     if (!date) return [] as number[];
 
+    if (date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE) {
+        return [...CLIENT_START_MINUTES_FROM_OCTOBER_14_2026];
+    }
+
     // ÚNICA fonte da grade pública de horários.
     // Todas as clientes, antigas ou novas, passam por esta mesma função.
     return isWeekendDate(date)
@@ -317,16 +332,23 @@ function getFixedAdminManualStartMinutes(date: string) {
     if (!date) return [] as number[];
 
     // Grade exclusiva do painel ADM para criar/editar agendamentos.
-    return isWeekendDate(date)
+    const starts = isWeekendDate(date)
         ? [...ADMIN_WEEKEND_START_MINUTES]
         : [...ADMIN_WEEKDAY_START_MINUTES];
+
+    // A partir de 14/10/2026, 21:00 deixa de ser oferecido no painel ADM.
+    return date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE
+        ? starts.filter((start) => start !== 21 * 60)
+        : starts;
 }
 
 function getFixedAdminNewAppointmentStartMinutes(date: string) {
     if (!date) return [] as number[];
 
     // Novo agendamento ADM:
-    // dias úteis 07:00-21:00 e sábado/domingo 07:00-19:00.
+    // Até 13/10/2026, dias úteis 07:00-21:00.
+    // A partir de 14/10/2026, 21:00 deixa de ser oferecido.
+    // Sábado e domingo permanecem 07:00-19:00.
     return getFixedAdminManualStartMinutes(date);
 }
 
@@ -353,6 +375,11 @@ function getConfiguredClientStartMinutes(
 
     return [...new Set([...baseStarts, ...addedStarts])]
         .filter((start) => !removedStarts.has(start))
+        .filter(
+            (start) =>
+                date < OCTOBER_2026_SCHEDULE_CHANGE_DATE ||
+                start !== 21 * 60,
+        )
         .sort((a, b) => a - b);
 }
 
