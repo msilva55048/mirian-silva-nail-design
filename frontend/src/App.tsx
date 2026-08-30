@@ -361,9 +361,9 @@ const ADMIN_WEEKDAY_START_MINUTES = Array.from(
 ); // 07:00 até 21:00 direto, de 30 em 30 minutos.
 
 const ADMIN_WEEKEND_START_MINUTES = Array.from(
-    {length: 25},
+    {length: 17},
     (_, index) => 7 * 60 + index * 30,
-); // ADM sábado e domingo: 07:00 até 19:00, de 30 em 30 minutos.
+); // ADM sábado e domingo até 13/10/2026: 07:00 até 15:00, de 30 em 30 minutos.
 
 function isWeekendDate(date: string) {
     const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
