@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {supabase} from "./lib/supabase";
 import "./App.css";
 
@@ -6,6 +6,58 @@ declare global {
     interface Navigator {
         standalone?: boolean;
     }
+}
+
+function useCloseOverlayOnBrowserBack(overlayKey: string | null, closeOverlay: () => void) {
+    const closeOverlayRef = useRef(closeOverlay);
+    const historyEntryIsActiveRef = useRef(false);
+    const closedByBrowserBackRef = useRef(false);
+
+    useEffect(() => {
+        closeOverlayRef.current = closeOverlay;
+    });
+
+    useEffect(() => {
+        if (!overlayKey || typeof window === "undefined") return;
+
+        const modalHistoryId = `mirian-modal-${Date.now()}-${Math.random()}`;
+
+        window.history.pushState(
+            {
+                ...(window.history.state ?? {}),
+                mirianModalHistoryId: modalHistoryId,
+            },
+            document.title,
+            window.location.href,
+        );
+
+        historyEntryIsActiveRef.current = true;
+        closedByBrowserBackRef.current = false;
+
+        const handleBrowserBack = () => {
+            if (!historyEntryIsActiveRef.current) return;
+
+            historyEntryIsActiveRef.current = false;
+            closedByBrowserBackRef.current = true;
+            closeOverlayRef.current();
+        };
+
+        window.addEventListener("popstate", handleBrowserBack);
+
+        return () => {
+            window.removeEventListener("popstate", handleBrowserBack);
+
+            if (
+                historyEntryIsActiveRef.current &&
+                !closedByBrowserBackRef.current
+            ) {
+                historyEntryIsActiveRef.current = false;
+                window.history.back();
+            }
+
+            closedByBrowserBackRef.current = false;
+        };
+    }, [overlayKey]);
 }
 
 const IS_PUBLIC_ROUTE =
@@ -2793,6 +2845,56 @@ function PublicSite() {
         setEditingClientAppointment(null);
         setBookingError("");
     }
+
+    const publicOverlayKey =
+        bookingStep !== 1 ||
+        showClientAuth ||
+        showPasswordRecoveryRequest ||
+        showPasswordRecoveryReset ||
+        showClientAccount ||
+        showClientProfileEditor
+            ? "public-overlay"
+            : null;
+
+    useCloseOverlayOnBrowserBack(publicOverlayKey, () => {
+        if (showClientProfileEditor) {
+            closeClientProfileEditor();
+            return;
+        }
+
+        if (showClientAccount) {
+            setShowClientAccount(false);
+            return;
+        }
+
+        if (showPasswordRecoveryReset) {
+            setShowPasswordRecoveryReset(false);
+            setRecoverySessionUserId(null);
+            setRecoveryNewPassword("");
+            setRecoveryConfirmPassword("");
+            setRecoveryResetError("");
+            setRecoveryResetSuccess("");
+            return;
+        }
+
+        if (showPasswordRecoveryRequest) {
+            setShowPasswordRecoveryRequest(false);
+            setRecoveryRequestError("");
+            setRecoveryRequestSuccess("");
+            return;
+        }
+
+        if (showClientAuth) {
+            setShowClientAuth(false);
+            setAuthError("");
+            setAuthSuccess("");
+            return;
+        }
+
+        if (bookingStep !== 1) {
+            closeBooking();
+        }
+    });
 
     async function confirmBooking() {
         setBookingError("");
@@ -10264,6 +10366,26 @@ function AdminPanel() {
         setNailRecords([]);
         setSelectedClient(null);
     }
+
+    const adminOverlayKey = selectedAdminAppointment || selectedClient || editingClient
+        ? "admin-overlay"
+        : null;
+
+    useCloseOverlayOnBrowserBack(adminOverlayKey, () => {
+        if (editingClient) {
+            setEditingClient(null);
+            return;
+        }
+
+        if (selectedClient) {
+            closeClientHistory();
+            return;
+        }
+
+        if (selectedAdminAppointment) {
+            setSelectedAdminAppointment(null);
+        }
+    });
 
     async function findClientProfile(client: AdminClient): Promise<ClientProfile | null> {
         const {data, error} = await supabase
