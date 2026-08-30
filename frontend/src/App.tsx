@@ -10263,8 +10263,13 @@ function AdminPanel() {
                 "Erro ao limpar agendamento cancelado do histórico:",
                 error,
             );
+            const detail = error instanceof Error
+                ? error.message
+                : (error && typeof error === "object"
+                    ? String((error as {message?: unknown}).message ?? JSON.stringify(error))
+                    : String(error ?? "Erro desconhecido"));
             setPanelError(
-                `Não foi possível limpar o agendamento cancelado (ID enviado: ${appointment.id}).`,
+                `Não foi possível limpar o agendamento cancelado (ID: ${appointment.id}): ${detail}`,
             );
         } finally {
             setClearingCancelledAppointmentId(null);
@@ -10320,8 +10325,13 @@ function AdminPanel() {
                 "Erro ao excluir agendamento confirmado pelo ADM:",
                 error,
             );
+            const detail = error instanceof Error
+                ? error.message
+                : (error && typeof error === "object"
+                    ? String((error as {message?: unknown}).message ?? JSON.stringify(error))
+                    : String(error ?? "Erro desconhecido"));
             setPanelError(
-                `Não foi possível excluir o agendamento confirmado (ID enviado: ${appointment.id}).`,
+                `Não foi possível excluir o agendamento confirmado (ID: ${appointment.id}): ${detail}`,
             );
         } finally {
             setDeletingConfirmedAppointmentId(null);
