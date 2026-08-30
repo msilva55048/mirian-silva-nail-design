@@ -243,7 +243,7 @@ export default function AdminPanel() {
                     (appointment.status === "confirmed" ||
                         appointment.status === "pending") &&
                     getAppointmentEndDateTime(appointment).getTime() <=
-                        adminNow.getTime(),
+                    adminNow.getTime(),
             )
             .map((appointment) => appointment.id);
 
@@ -840,14 +840,16 @@ export default function AdminPanel() {
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", appointment.id)
-                .eq("status", "cancelled");
+            const {data: deleted, error} = await supabase.rpc(
+                "admin_delete_appointment",
+                {
+                    p_appointment_id: appointment.id,
+                    p_expected_status: "cancelled",
+                },
+            );
 
-            if (error) {
-                throw error;
+            if (error || deleted !== true) {
+                throw error ?? new Error("O agendamento não foi removido do banco.");
             }
 
             setAppointments((current) =>
@@ -857,11 +859,11 @@ export default function AdminPanel() {
             setSelectedClient((current) =>
                 current
                     ? {
-                          ...current,
-                          appointments: current.appointments.filter(
-                              (item) => item.id !== appointment.id,
-                          ),
-                      }
+                        ...current,
+                        appointments: current.appointments.filter(
+                            (item) => item.id !== appointment.id,
+                        ),
+                    }
                     : current,
             );
         } catch (error) {
@@ -869,8 +871,15 @@ export default function AdminPanel() {
                 "Erro ao limpar agendamento cancelado do histórico:",
                 error,
             );
+            const message = error instanceof Error
+                ? error.message
+                : (error && typeof error === "object" && "message" in error
+                    ? String((error as {message?: unknown}).message ?? "")
+                    : "");
             setPanelError(
-                "Não foi possível limpar o agendamento cancelado do histórico.",
+                message
+                    ? `Não foi possível limpar o agendamento cancelado: ${message}`
+                    : "Não foi possível limpar o agendamento cancelado do histórico.",
             );
         } finally {
             setClearingCancelledAppointmentId(null);
@@ -894,14 +903,16 @@ export default function AdminPanel() {
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", appointment.id)
-                .eq("status", "confirmed");
+            const {data: deleted, error} = await supabase.rpc(
+                "admin_delete_appointment",
+                {
+                    p_appointment_id: appointment.id,
+                    p_expected_status: "confirmed",
+                },
+            );
 
-            if (error) {
-                throw error;
+            if (error || deleted !== true) {
+                throw error ?? new Error("O agendamento não foi removido do banco.");
             }
 
             setAppointments((current) =>
@@ -911,15 +922,15 @@ export default function AdminPanel() {
             setSelectedClient((current) =>
                 current
                     ? {
-                          ...current,
-                          appointments: current.appointments.filter(
-                              (item) => item.id !== appointment.id,
-                          ),
-                          nextAppointment:
-                              current.nextAppointment?.id === appointment.id
-                                  ? null
-                                  : current.nextAppointment,
-                      }
+                        ...current,
+                        appointments: current.appointments.filter(
+                            (item) => item.id !== appointment.id,
+                        ),
+                        nextAppointment:
+                            current.nextAppointment?.id === appointment.id
+                                ? null
+                                : current.nextAppointment,
+                    }
                     : current,
             );
         } catch (error) {
@@ -927,8 +938,15 @@ export default function AdminPanel() {
                 "Erro ao excluir agendamento confirmado pelo ADM:",
                 error,
             );
+            const message = error instanceof Error
+                ? error.message
+                : (error && typeof error === "object" && "message" in error
+                    ? String((error as {message?: unknown}).message ?? "")
+                    : "");
             setPanelError(
-                "Não foi possível excluir o agendamento confirmado.",
+                message
+                    ? `Não foi possível excluir o agendamento confirmado: ${message}`
+                    : "Não foi possível excluir o agendamento confirmado.",
             );
         } finally {
             setDeletingConfirmedAppointmentId(null);
@@ -1431,7 +1449,7 @@ export default function AdminPanel() {
                         (
                             item.status === "completed" ||
                             getAppointmentEndDateTime(item).getTime() <=
-                                adminNow.getTime()
+                            adminNow.getTime()
                         ),
                 );
 
@@ -1442,7 +1460,7 @@ export default function AdminPanel() {
                             item.status !== "no-show" &&
                             item.status !== "completed" &&
                             getAppointmentEndDateTime(item).getTime() >
-                                adminNow.getTime(),
+                            adminNow.getTime(),
                     )
                     .sort(
                         (a, b) =>
@@ -3042,10 +3060,10 @@ export default function AdminPanel() {
                                                 {adminView === "agenda"
                                                     ? formatAdminDate(agendaDate)
                                                     : `${formatAdminDate(
-                                                          weekDates[0],
-                                                      )} até ${formatAdminDate(
-                                                          weekDates[6],
-                                                      )}`}
+                                                        weekDates[0],
+                                                    )} até ${formatAdminDate(
+                                                        weekDates[6],
+                                                    )}`}
                                             </strong>
                                         </span>
 
@@ -4038,7 +4056,7 @@ export default function AdminPanel() {
                                         (
                                             item.status === "completed" ||
                                             getAppointmentEndDateTime(item).getTime() <=
-                                                adminNow.getTime()
+                                            adminNow.getTime()
                                         ),
                                 ).length;
 
@@ -4048,7 +4066,7 @@ export default function AdminPanel() {
                                         item.status !== "no-show" &&
                                         item.status !== "completed" &&
                                         getAppointmentEndDateTime(item).getTime() >
-                                            adminNow.getTime(),
+                                        adminNow.getTime(),
                                 ).length;
 
                                 const cancelled = client.appointments.filter(
@@ -4350,7 +4368,7 @@ export default function AdminPanel() {
                             )}
                         </section>
 
-                        
+
                     </section>
                 ) : adminView === "blocks" ? (
                     <section className="admin-content-section">
@@ -4783,7 +4801,7 @@ export default function AdminPanel() {
                                                                                 new Date(
                                                                                     current.getFullYear(),
                                                                                     current.getMonth() -
-                                                                                        1,
+                                                                                    1,
                                                                                     1,
                                                                                 ),
                                                                         )
@@ -4810,7 +4828,7 @@ export default function AdminPanel() {
                                                                                 new Date(
                                                                                     current.getFullYear(),
                                                                                     current.getMonth() +
-                                                                                        1,
+                                                                                    1,
                                                                                     1,
                                                                                 ),
                                                                         )
@@ -5482,5 +5500,3 @@ export default function AdminPanel() {
         </main>
     );
 }
-
-
