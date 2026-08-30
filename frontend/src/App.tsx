@@ -329,7 +329,7 @@ const CLIENT_WEEKEND_START_MINUTES = [
 
 const OCTOBER_2026_SCHEDULE_CHANGE_DATE = "2026-10-14";
 
-const CLIENT_START_MINUTES_FROM_OCTOBER_14_2026 = [
+const CLIENT_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026 = [
     7 * 60,   // 07:00
     9 * 60,   // 09:00
     11 * 60,  // 11:00
@@ -337,6 +337,23 @@ const CLIENT_START_MINUTES_FROM_OCTOBER_14_2026 = [
     17 * 60,  // 17:00
     19 * 60,  // 19:00
 ] as const;
+
+const CLIENT_WEEKEND_START_MINUTES_FROM_OCTOBER_14_2026 = [
+    7 * 60,   // 07:00
+    9 * 60,   // 09:00
+    11 * 60,  // 11:00
+    13 * 60,  // 13:00
+] as const;
+
+const ADMIN_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026 = [
+    ...Array.from({length: 13}, (_, index) => 7 * 60 + index * 30),
+    ...Array.from({length: 5}, (_, index) => 17 * 60 + index * 30),
+]; // 07:00-13:00 e 17:00-19:00, de 30 em 30 minutos.
+
+const ADMIN_WEEKEND_START_MINUTES_FROM_OCTOBER_14_2026 = Array.from(
+    {length: 13},
+    (_, index) => 7 * 60 + index * 30,
+); // 07:00-13:00, de 30 em 30 minutos.
 
 const ADMIN_WEEKDAY_START_MINUTES = Array.from(
     {length: 29},
@@ -370,7 +387,9 @@ function getFixedClientStartMinutes(date: string) {
     if (!date) return [] as number[];
 
     if (date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE) {
-        return [...CLIENT_START_MINUTES_FROM_OCTOBER_14_2026];
+        return isWeekendDate(date)
+            ? [...CLIENT_WEEKEND_START_MINUTES_FROM_OCTOBER_14_2026]
+            : [...CLIENT_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026];
     }
 
     // ÚNICA fonte da grade pública de horários.
@@ -383,15 +402,16 @@ function getFixedClientStartMinutes(date: string) {
 function getFixedAdminManualStartMinutes(date: string) {
     if (!date) return [] as number[];
 
+    if (date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE) {
+        return isWeekendDate(date)
+            ? [...ADMIN_WEEKEND_START_MINUTES_FROM_OCTOBER_14_2026]
+            : [...ADMIN_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026];
+    }
+
     // Grade exclusiva do painel ADM para criar/editar agendamentos.
-    const starts = isWeekendDate(date)
+    return isWeekendDate(date)
         ? [...ADMIN_WEEKEND_START_MINUTES]
         : [...ADMIN_WEEKDAY_START_MINUTES];
-
-    // A partir de 14/10/2026, 21:00 deixa de ser oferecido no painel ADM.
-    return date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE
-        ? starts.filter((start) => start !== 21 * 60)
-        : starts;
 }
 
 function getFixedAdminNewAppointmentStartMinutes(date: string) {
@@ -399,8 +419,8 @@ function getFixedAdminNewAppointmentStartMinutes(date: string) {
 
     // Novo agendamento ADM:
     // Até 13/10/2026, dias úteis 07:00-21:00.
-    // A partir de 14/10/2026, 21:00 deixa de ser oferecido.
-    // Sábado e domingo permanecem 07:00-19:00.
+    // A partir de 14/10/2026, dias úteis 07:00-13:00 e 17:00-19:00.
+    // A partir de 14/10/2026, sábado e domingo 07:00-13:00.
     return getFixedAdminManualStartMinutes(date);
 }
 
