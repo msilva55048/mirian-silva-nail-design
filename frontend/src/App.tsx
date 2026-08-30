@@ -14268,6 +14268,7 @@ function AdminPanel() {
                             <div className="admin-block-list">
                                 {adminBlocks
                                     .filter((item) => item.block_date === blockDate)
+                                    .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
                                     .map((block) => (
                                         <div className="admin-block-item" key={block.id}>
                                             <div>
