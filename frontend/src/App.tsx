@@ -2566,7 +2566,7 @@ function PublicSite() {
                     date: block.block_date,
                     startTime: String(block.start_time).slice(0, 5),
                     endTime: String(block.end_time).slice(0, 5),
-                    reason: block.reason || "",
+                    reason: "",
                 }),
             );
 
@@ -2958,7 +2958,7 @@ function PublicSite() {
                 date: block.block_date,
                 startTime: String(block.start_time).slice(0, 5),
                 endTime: String(block.end_time).slice(0, 5),
-                reason: block.reason || "",
+                reason: "",
             }));
 
             const latestDateOverrides: ScheduleTimeOverride[] = (latestOverrides ?? []).map(
@@ -10223,14 +10223,16 @@ function AdminPanel() {
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", appointment.id)
-                .eq("status", "cancelled");
+            const {data: deleted, error} = await supabase.rpc(
+                "admin_delete_appointment",
+                {
+                    p_appointment_id: appointment.id,
+                    p_expected_status: "cancelled",
+                },
+            );
 
-            if (error) {
-                throw error;
+            if (error || deleted !== true) {
+                throw error ?? new Error("O agendamento não foi removido do banco.");
             }
 
             setAppointments((current) =>
@@ -10280,13 +10282,16 @@ function AdminPanel() {
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", appointment.id);
+            const {data: deleted, error} = await supabase.rpc(
+                "admin_delete_appointment",
+                {
+                    p_appointment_id: appointment.id,
+                    p_expected_status: appointment.status,
+                },
+            );
 
-            if (error) {
-                throw error;
+            if (error || deleted !== true) {
+                throw error ?? new Error("O agendamento não foi removido do banco.");
             }
 
             setAppointments((current) =>
