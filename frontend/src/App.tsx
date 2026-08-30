@@ -9389,6 +9389,10 @@ function AdminPanel() {
 
     const [scheduleConfigDate, setScheduleConfigDate] = useState(formatDateForInput(new Date()));
     const [scheduleConfigWeekReferenceDate, setScheduleConfigWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [scheduleConfigCalendarMonth, setScheduleConfigCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [scheduleConfigNewTime, setScheduleConfigNewTime] = useState("");
     const [scheduleConfigEditingTime, setScheduleConfigEditingTime] = useState<string | null>(null);
     const [scheduleConfigEditedTime, setScheduleConfigEditedTime] = useState("");
@@ -9398,6 +9402,10 @@ function AdminPanel() {
 
     const [blockDate, setBlockDate] = useState(formatDateForInput(new Date()));
     const [blockWeekReferenceDate, setBlockWeekReferenceDate] = useState(formatDateForInput(new Date()));
+    const [blockCalendarMonth, setBlockCalendarMonth] = useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
     const [selectedBlockTimes, setSelectedBlockTimes] = useState<string[]>([]);
     const [blockReason, setBlockReason] = useState("");
     const [blockError, setBlockError] = useState("");
@@ -11239,6 +11247,9 @@ function AdminPanel() {
     );
 
     function selectAgendaPickerDate(date: string) {
+        const today = formatDateForInput(new Date());
+        if (date < today) return;
+
         setAgendaDate(date);
         setAgendaWeekReferenceDate(date);
         setShowAgendaMonthCalendar(true);
@@ -11645,8 +11656,12 @@ function AdminPanel() {
         const today = formatDateForInput(new Date());
         if (date < today) return;
 
+        const selected = new Date(`${date}T12:00:00`);
         setScheduleConfigDate(date);
         setScheduleConfigWeekReferenceDate(date);
+        setScheduleConfigCalendarMonth(
+            new Date(selected.getFullYear(), selected.getMonth(), 1),
+        );
         setScheduleConfigEditingTime(null);
         setScheduleConfigEditedTime("");
         setScheduleConfigNewTime("");
@@ -11884,8 +11899,12 @@ function AdminPanel() {
         const today = formatDateForInput(new Date());
         if (date < today) return;
 
+        const selected = new Date(`${date}T12:00:00`);
         setBlockDate(date);
         setBlockWeekReferenceDate(date);
+        setBlockCalendarMonth(
+            new Date(selected.getFullYear(), selected.getMonth(), 1),
+        );
         setSelectedBlockTimes([]);
         setBlockError("");
     }
@@ -12463,8 +12482,11 @@ function AdminPanel() {
                                 {adminView === "week" && (
                                     <button
                                         type="button"
+                                        disabled={agendaDate <= formatDateForInput(new Date())}
                                         onClick={() => {
-                                            const nextDate = addDaysToInputDate(agendaDate, -7);
+                                            const today = formatDateForInput(new Date());
+                                            const previousDate = addDaysToInputDate(agendaDate, -7);
+                                            const nextDate = previousDate < today ? today : previousDate;
                                             setAgendaDate(nextDate);
                                             setAgendaWeekReferenceDate(nextDate);
                                             setShowAgendaDatePicker(false);
@@ -12607,11 +12629,15 @@ function AdminPanel() {
                                                                     );
                                                                 }
 
+                                                                const isPast =
+                                                                    date < formatDateForInput(new Date());
+
                                                                 return (
                                                                     <button
                                                                         type="button"
                                                                         key={date}
-                                                                        className={agendaDate === date ? "is-selected" : ""}
+                                                                        disabled={isPast}
+                                                                        className={`${agendaDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`}
                                                                         onClick={() => selectAgendaPickerDate(date)}
                                                                     >
                                                                         {new Date(`${date}T12:00:00`).getDate()}
@@ -12623,12 +12649,14 @@ function AdminPanel() {
                                                 )}<div className="admin-manual-week-days admin-manual-week-days--seven">
                                                 {agendaVisibleWeekDates.map((date) => {
                                                     const parsed = new Date(`${date}T12:00:00`);
+                                                    const isPast = date < formatDateForInput(new Date());
 
                                                     return (
                                                         <button
                                                             key={date}
                                                             type="button"
-                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}`}
+                                                            disabled={isPast}
+                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
                                                             onClick={() => selectAgendaPickerDate(date)}
                                                         >
                                                             <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
@@ -13039,13 +13067,13 @@ function AdminPanel() {
 
                                 <div className="admin-manual-month-calendar">
                                     <div className="admin-manual-month-calendar__header">
-                                        <button type="button" onClick={() => setScheduleConfigDate(addDaysToInputDate(scheduleConfigDate, -30))}>‹</button>
-                                        <strong>{new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
-                                        <button type="button" onClick={() => setScheduleConfigDate(addDaysToInputDate(scheduleConfigDate, 30))}>›</button>
+                                        <button type="button" onClick={() => setScheduleConfigCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button>
+                                        <strong>{scheduleConfigCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                        <button type="button" onClick={() => setScheduleConfigCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
                                     </div>
                                     <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
                                     <div className="admin-manual-month-calendar__grid">
-                                        {getMonthCellsForDate(scheduleConfigDate).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${scheduleConfigDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectScheduleConfigDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`schedule-empty-${index}`} />)}
+                                        {getMonthCellsForDate(formatDateForInput(scheduleConfigCalendarMonth)).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${scheduleConfigDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectScheduleConfigDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`schedule-empty-${index}`} />)}
                                     </div>
                                 </div>
 
@@ -13958,13 +13986,13 @@ function AdminPanel() {
 
                                 <div className="admin-manual-month-calendar">
                                     <div className="admin-manual-month-calendar__header">
-                                        <button type="button" onClick={() => setBlockDate(addDaysToInputDate(blockDate, -30))}>‹</button>
-                                        <strong>{new Date(`${blockDate}T12:00:00`).toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
-                                        <button type="button" onClick={() => setBlockDate(addDaysToInputDate(blockDate, 30))}>›</button>
+                                        <button type="button" onClick={() => setBlockCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button>
+                                        <strong>{blockCalendarMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                        <button type="button" onClick={() => setBlockCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button>
                                     </div>
                                     <div className="admin-manual-month-calendar__weekdays">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map((day) => <span key={day}>{day}</span>)}</div>
                                     <div className="admin-manual-month-calendar__grid">
-                                        {getMonthCellsForDate(blockDate).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${blockDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectBlockDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`block-empty-${index}`} />)}
+                                        {getMonthCellsForDate(formatDateForInput(blockCalendarMonth)).map((date, index) => date ? (() => { const isPast = date < formatDateForInput(new Date()); return <button key={date} type="button" disabled={isPast} className={`${blockDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`} onClick={() => selectBlockDate(date)}>{new Date(`${date}T12:00:00`).getDate()}</button>; })() : <span className="is-empty" key={`block-empty-${index}`} />)}
                                     </div>
                                 </div>
 
