@@ -3111,23 +3111,7 @@ function PublicSite() {
     return (
         <main className="home">
             <style>{clientAccountStyles}</style>
-            <style>{`
-                .client-week-days,
-                .admin-manual-week-days,
-                .admin-agenda-date-picker__week-days {
-                    display: none !important;
-                }
-                .client-month-calendar,
-                .admin-manual-month-calendar {
-                    display: block !important;
-                }
-                .client-week-picker__calendar-button,
-                .admin-manual-week-picker__month button,
-                .client-week-picker__top > .client-week-picker__navs,
-                .admin-manual-week-picker__top > .admin-manual-week-picker__navs {
-                    display: none !important;
-                }
-            `}</style>
+            <style>{`\n.client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }\n.client-month-calendar, .admin-manual-month-calendar { display: block !important; }\n.client-week-picker__calendar-button, .admin-manual-week-picker__month button { display: none !important; }\n.client-week-picker__top > .client-week-picker__navs, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display: none !important; }\n`}</style>
             <style>{`
                 @media (max-width: 700px) {
                     .home {
@@ -10279,15 +10263,8 @@ function AdminPanel() {
                 "Erro ao limpar agendamento cancelado do histórico:",
                 error,
             );
-            const message = error instanceof Error
-                ? error.message
-                : (error && typeof error === "object" && "message" in error
-                    ? String((error as {message?: unknown}).message ?? "")
-                    : "");
             setPanelError(
-                message
-                    ? `Não foi possível limpar o agendamento cancelado: ${message}`
-                    : "Não foi possível limpar o agendamento cancelado do histórico.",
+                `Não foi possível limpar o agendamento cancelado (ID enviado: ${appointment.id}).`,
             );
         } finally {
             setClearingCancelledAppointmentId(null);
@@ -10343,15 +10320,8 @@ function AdminPanel() {
                 "Erro ao excluir agendamento confirmado pelo ADM:",
                 error,
             );
-            const message = error instanceof Error
-                ? error.message
-                : (error && typeof error === "object" && "message" in error
-                    ? String((error as {message?: unknown}).message ?? "")
-                    : "");
             setPanelError(
-                message
-                    ? `Não foi possível excluir o agendamento confirmado: ${message}`
-                    : "Não foi possível excluir o agendamento confirmado.",
+                `Não foi possível excluir o agendamento confirmado (ID enviado: ${appointment.id}).`,
             );
         } finally {
             setDeletingConfirmedAppointmentId(null);
