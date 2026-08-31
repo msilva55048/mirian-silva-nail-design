@@ -4468,6 +4468,7 @@ type AdminAppointment = {
     referral_discount_percent?: number | null;
     referral_reward_id?: string | null;
     is_referred_first_appointment?: boolean | null;
+    is_paid?: boolean | null;
     client_hidden: boolean;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
@@ -9087,7 +9088,88 @@ const adminClientScheduledMetricStyles = `
 /* Cards compactos expansíveis — Agenda do dia/semana/mês e Clientes */
 .admin-booking-card--collapsible,
 .admin-client-card--collapsible {
+    position: relative;
     cursor: pointer;
+}
+
+.admin-client-history__list article {
+    position: relative;
+    padding-top: 50px;
+}
+
+.admin-payment-control {
+    position: absolute;
+    top: 13px;
+    right: 14px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.admin-payment-control small {
+    font-size: .68rem;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.admin-payment-control.is-unpaid small {
+    color: #a43f4b;
+}
+
+.admin-payment-control.is-paid small {
+    color: #24734a;
+}
+
+.admin-payment-control button {
+    position: relative;
+    width: 48px;
+    height: 27px;
+    flex: 0 0 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #c84f5a;
+    box-shadow: inset 0 0 0 1px rgba(91, 24, 34, .12);
+    cursor: pointer;
+    transition: background .18s ease, opacity .18s ease;
+}
+
+.admin-payment-control.is-paid button {
+    background: #2e9a61;
+}
+
+.admin-payment-control button span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 7px rgba(52, 28, 35, .25);
+    transition: transform .18s ease;
+}
+
+.admin-payment-control.is-paid button span {
+    transform: translateX(21px);
+}
+
+.admin-payment-control button:focus-visible {
+    outline: 3px solid rgba(109, 52, 69, .2);
+    outline-offset: 2px;
+}
+
+.admin-payment-control button:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+
+.admin-booking-card__top,
+.admin-client-card:has(.admin-payment-control) .admin-client-card__compact-summary,
+.admin-client-card:has(.admin-payment-control) .admin-client-card__top {
+    padding-top: 34px;
 }
 
 .admin-booking-card--collapsible:focus-visible,
@@ -9175,6 +9257,11 @@ const adminClientScheduledMetricStyles = `
 
     .admin-client-card__compact-summary {
         gap: 10px;
+    }
+
+    .admin-payment-control {
+        top: 11px;
+        right: 11px;
     }
 }
 
@@ -9477,6 +9564,7 @@ function AdminPanel() {
     const [selectedAdminAppointment, setSelectedAdminAppointment] = useState<AdminAppointment | null>(null);
     const [expandedAppointmentCardId, setExpandedAppointmentCardId] = useState<string | null>(null);
     const [expandedClientCardKey, setExpandedClientCardKey] = useState<string | null>(null);
+    const [updatingPaymentAppointmentIds, setUpdatingPaymentAppointmentIds] = useState<string[]>([]);
     const [editAppointmentName, setEditAppointmentName] = useState("");
     const [editAppointmentPhone, setEditAppointmentPhone] = useState("");
     const [editAppointmentEmail, setEditAppointmentEmail] = useState("");
@@ -9713,7 +9801,7 @@ function AdminPanel() {
                 {data: timeOverrideData, error: timeOverrideLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
-                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, is_referred_first_appointment, client_hidden, status, created_at")
+                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, is_referred_first_appointment, is_paid, client_hidden, status, created_at")
                     .order("appointment_date", {ascending: true})
                     .order("start_time", {ascending: true}),
                 supabase.from("schedule_blocks")
@@ -12465,6 +12553,89 @@ function AdminPanel() {
         }, 40);
     }
 
+    async function toggleAppointmentPayment(appointment: AdminAppointment) {
+        if (updatingPaymentAppointmentIds.includes(appointment.id)) return;
+
+        const nextPaymentStatus = !Boolean(appointment.is_paid);
+
+        setPanelError("");
+        setUpdatingPaymentAppointmentIds((current) => [
+            ...current,
+            appointment.id,
+        ]);
+
+        try {
+            const {data, error} = await supabase
+                .from("appointments")
+                .update({is_paid: nextPaymentStatus})
+                .eq("id", appointment.id)
+                .select("id, is_paid")
+                .single();
+
+            if (error || !data) {
+                throw error ?? new Error("O agendamento não retornou o status do pagamento.");
+            }
+
+            const savedPaymentStatus = Boolean(data.is_paid);
+            const updatePayment = (item: AdminAppointment) =>
+                item.id === appointment.id
+                    ? {...item, is_paid: savedPaymentStatus}
+                    : item;
+
+            setAppointments((current) => current.map(updatePayment));
+            setSelectedAdminAppointment((current) =>
+                current ? updatePayment(current) : current,
+            );
+            setSelectedClient((current) =>
+                current
+                    ? {
+                        ...current,
+                        appointments: current.appointments.map(updatePayment),
+                        lastAppointment: current.lastAppointment
+                            ? updatePayment(current.lastAppointment)
+                            : null,
+                        nextAppointment: current.nextAppointment
+                            ? updatePayment(current.nextAppointment)
+                            : null,
+                    }
+                    : current,
+            );
+        } catch (error) {
+            console.error("Erro ao atualizar pagamento do agendamento:", error);
+            setPanelError("Não foi possível atualizar o pagamento deste agendamento.");
+        } finally {
+            setUpdatingPaymentAppointmentIds((current) =>
+                current.filter((id) => id !== appointment.id),
+            );
+        }
+    }
+
+    function renderPaymentToggle(appointment: AdminAppointment) {
+        const isPaid = Boolean(appointment.is_paid);
+        const isUpdating = updatingPaymentAppointmentIds.includes(appointment.id);
+
+        return (
+            <div
+                className={`admin-payment-control${isPaid ? " is-paid" : " is-unpaid"}`}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+            >
+                <small>{isPaid ? "Pago" : "Não pago"}</small>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isPaid}
+                    aria-label={`${isPaid ? "Marcar como não pago" : "Marcar como pago"}: ${appointment.client_name}`}
+                    title={isPaid ? "Pago — toque para alterar" : "Não pago — toque para alterar"}
+                    disabled={isUpdating}
+                    onClick={() => void toggleAppointmentPayment(appointment)}
+                >
+                    <span />
+                </button>
+            </div>
+        );
+    }
+
     const renderAppointmentCard = (appointment: AdminAppointment) => {
         const dueTypes = getDueNotificationTypes(appointment);
         const isExpanded = expandedAppointmentCardId === appointment.id;
@@ -12490,6 +12661,8 @@ function AdminPanel() {
                     }
                 }}
             >
+                {renderPaymentToggle(appointment)}
+
                 <div className="admin-booking-card__top">
                     <div>
                         <span className="admin-booking-card__time">
@@ -13743,6 +13916,9 @@ function AdminPanel() {
                                             }
                                         }}
                                     >
+                                        {compactAppointment &&
+                                            renderPaymentToggle(compactAppointment)}
+
                                         {!isExpandedClient ? (
                                             <div className="admin-client-card__compact-summary">
                                                 <div className="admin-client-card__compact-main">
@@ -15039,6 +15215,8 @@ function AdminPanel() {
                                                     }
                                                 }}
                                             >
+                                                {renderPaymentToggle(appointment)}
+
                                                 <div>
                                                     <strong>
                                                         {
