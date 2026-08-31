@@ -8214,6 +8214,13 @@ const adminEnhancementStyles = `
     border: 1px solid #d7c0c7; border-radius: 10px; padding: 8px 11px; background: #fff; color: #6d3445;
     font: inherit; font-weight: 850; cursor: pointer;
 }
+.admin-selected-client button:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+.admin-appointment-search-client {
+    margin-top: 10px;
+}
 
 .admin-manual-week-picker { display: grid; gap: 12px; }
 .admin-manual-week-picker__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -11591,26 +11598,41 @@ function AdminPanel() {
                 .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
         [appointments, agendaDate, adminNow]);
 
-    const filteredAgendaAppointments = useMemo(() => {
+    const filteredAppointmentSearchClients = useMemo(() => {
         const query = appointmentSearch
             .trim()
             .toLocaleLowerCase("pt-BR");
         const digits = appointmentSearch.replace(/\D/g, "");
 
-        if (!query) return agendaAppointments;
+        if (!query) return [] as AdminClient[];
 
-        return appointments
-            .filter(shouldShowAppointmentInAdminAgenda)
-            .filter((appointment) => {
-                const normalizedName = appointment.client_name
+        return clients
+            .filter((client) => {
+                const normalizedName = client.name
                     .trim()
                     .toLocaleLowerCase("pt-BR");
-                const phoneDigits = appointment.client_phone.replace(/\D/g, "");
+                const clientPhoneDigits = client.phone.replace(/\D/g, "");
 
                 return (
                     normalizedName.startsWith(query) ||
-                    (Boolean(digits) && phoneDigits.includes(digits))
+                    (Boolean(digits) && clientPhoneDigits.includes(digits))
                 );
+            })
+            .slice(0, 8);
+    }, [clients, appointmentSearch]);
+
+    const filteredAgendaAppointments = useMemo(() => {
+        if (!appointmentSearch.trim()) return agendaAppointments;
+
+        const seenAppointmentIds = new Set<string>();
+
+        return filteredAppointmentSearchClients
+            .flatMap((client) => client.appointments)
+            .filter(shouldShowAppointmentInAdminAgenda)
+            .filter((appointment) => {
+                if (seenAppointmentIds.has(appointment.id)) return false;
+                seenAppointmentIds.add(appointment.id);
+                return true;
             })
             .sort((first, second) =>
                 `${first.appointment_date}${String(first.start_time).slice(0, 5)}`
@@ -11618,7 +11640,7 @@ function AdminPanel() {
                         `${second.appointment_date}${String(second.start_time).slice(0, 5)}`,
                     ),
             );
-    }, [appointments, agendaAppointments, appointmentSearch, adminNow]);
+    }, [agendaAppointments, filteredAppointmentSearchClients, appointmentSearch, adminNow]);
 
     const agendaAvailableTimes = useMemo(() => {
         if (!agendaDate) return [] as string[];
@@ -12580,6 +12602,62 @@ function AdminPanel() {
         }, 40);
     }
 
+    function openNewAppointmentForClient(client: AdminClient) {
+        const clientPhoneDigits = normalizeClientPhone(client.phone);
+        const bookingClient = manualBookingClients.find((candidate) => {
+            const candidatePhoneDigits = normalizeClientPhone(candidate.phone);
+
+            if (clientPhoneDigits && candidatePhoneDigits) {
+                return clientPhoneDigits === candidatePhoneDigits;
+            }
+
+            return (
+                candidate.name.trim().toLocaleLowerCase("pt-BR") ===
+                client.name.trim().toLocaleLowerCase("pt-BR") &&
+                candidate.email.trim().toLocaleLowerCase("pt-BR") ===
+                client.email.trim().toLocaleLowerCase("pt-BR")
+            );
+        }) ?? {
+            key: client.key,
+            profileId: client.key.startsWith("profile:")
+                ? client.key.slice("profile:".length)
+                : null,
+            name: client.name,
+            phone: client.phone,
+            email: client.email,
+        };
+
+        setManualDate(agendaDate);
+        setManualWeekReferenceDate(agendaDate);
+        setManualTime("");
+
+        const selectedDate = new Date(`${agendaDate}T12:00:00`);
+        setManualCalendarMonth(
+            new Date(
+                selectedDate.getFullYear(),
+                selectedDate.getMonth(),
+                1,
+            ),
+        );
+
+        setSelectedManualClient(bookingClient);
+        setManualClientSearch(bookingClient.name);
+        setManualError("");
+        setManualSuccess("");
+        setShowManualMonthCalendar(true);
+        setShowManualForm(true);
+        setAdminView("new");
+
+        window.setTimeout(() => {
+            document
+                .getElementById("admin-active-content")
+                ?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
+        }, 40);
+    }
+
     async function toggleAppointmentPayment(appointment: AdminAppointment) {
         if (updatingPaymentAppointmentIds.includes(appointment.id)) return;
 
@@ -12638,6 +12716,15 @@ function AdminPanel() {
     }
 
     function renderPaymentToggle(appointment: AdminAppointment) {
+        const today = formatDateForInput(new Date());
+        const isActiveAppointment =
+            appointment.appointment_date >= today &&
+            appointment.status !== "completed" &&
+            appointment.status !== "cancelled" &&
+            appointment.status !== "no-show";
+
+        if (!isActiveAppointment) return null;
+
         const isPaid = Boolean(appointment.is_paid);
         const isUpdating = updatingPaymentAppointmentIds.includes(appointment.id);
 
@@ -13159,6 +13246,53 @@ function AdminPanel() {
                                         placeholder="Nome ou telefone"
                                     />
                                 </label>
+
+                                {appointmentSearch.trim() &&
+                                    filteredAppointmentSearchClients
+                                        .filter(
+                                            (client) =>
+                                                !client.appointments.some(
+                                                    shouldShowAppointmentInAdminAgenda,
+                                                ),
+                                        )
+                                        .map((client) => {
+                                            const today = formatDateForInput(new Date());
+                                            const canScheduleOnSelectedDate =
+                                                agendaDate >= today &&
+                                                agendaAvailableTimes.length > 0;
+
+                                            return (
+                                                <div
+                                                    className="admin-selected-client admin-appointment-search-client"
+                                                    key={`appointment-search-${client.key}`}
+                                                >
+                                                    <div>
+                                                        <span>Cliente cadastrada</span>
+                                                        <strong>{client.name}</strong>
+                                                        <small>
+                                                            {client.phone}
+                                                            {client.email
+                                                                ? ` • ${client.email}`
+                                                                : ""}
+                                                            {" • Sem agendamento ativo"}
+                                                        </small>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!canScheduleOnSelectedDate}
+                                                        onClick={() =>
+                                                            openNewAppointmentForClient(client)
+                                                        }
+                                                    >
+                                                        {agendaDate < today
+                                                            ? "Data passada"
+                                                            : agendaAvailableTimes.length
+                                                                ? "Agendar"
+                                                                : "Sem horário"}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
                             </div>
                         )}
 
@@ -13168,13 +13302,19 @@ function AdminPanel() {
                             <div className="admin-card-list">
                                 {filteredAgendaAppointments.length
                                     ? filteredAgendaAppointments.map(renderAppointmentCard)
-                                    : (
-                                        <div className="admin-empty admin-empty--top">
-                                            {appointmentSearch.trim()
-                                                ? "Nenhum agendamento ativo encontrado para esta cliente."
-                                                : "Nenhum agendamento nesta data."}
-                                        </div>
-                                    )}
+                                    : appointmentSearch.trim()
+                                        ? filteredAppointmentSearchClients.length === 0
+                                            ? (
+                                                <div className="admin-empty admin-empty--top">
+                                                    Nenhuma cliente cadastrada encontrada.
+                                                </div>
+                                            )
+                                            : null
+                                        : (
+                                            <div className="admin-empty admin-empty--top">
+                                                Nenhum agendamento nesta data.
+                                            </div>
+                                        )}
                             </div>
                         ) : (
                             <div className="admin-card-list">
