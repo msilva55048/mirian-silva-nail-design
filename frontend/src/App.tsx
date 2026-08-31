@@ -13099,9 +13099,14 @@ function AdminPanel() {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const today = formatDateForInput(new Date());
+                                        const now = new Date();
+                                        const today = formatDateForInput(now);
+
                                         setAgendaDate(today);
                                         setAgendaWeekReferenceDate(today);
+                                        setAgendaCalendarMonth(
+                                            new Date(now.getFullYear(), now.getMonth(), 1),
+                                        );
                                         setShowAgendaDatePicker(adminView === "agenda");
                                         setShowAgendaMonthCalendar(true);
                                     }}
