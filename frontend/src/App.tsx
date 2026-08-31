@@ -11520,9 +11520,6 @@ function AdminPanel() {
     );
 
     function selectAgendaPickerDate(date: string) {
-        const today = formatDateForInput(new Date());
-        if (date < today) return;
-
         setAgendaDate(date);
         setAgendaWeekReferenceDate(date);
         setShowAgendaMonthCalendar(true);
@@ -11569,6 +11566,23 @@ function AdminPanel() {
         });
     }, [agendaWeekReferenceDate]);
 
+    const adminToday = formatDateForInput(adminNow);
+    const isViewingPastAgendaDate = agendaDate < adminToday;
+
+    function isRealizedPastAppointment(appointment: AdminAppointment) {
+        if (
+            appointment.status === "cancelled" ||
+            appointment.status === "no-show"
+        ) {
+            return false;
+        }
+
+        return (
+            appointment.status === "completed" ||
+            getAppointmentEndDateTime(appointment).getTime() <= adminNow.getTime()
+        );
+    }
+
     function shouldShowAppointmentInAdminAgenda(appointment: AdminAppointment) {
         if (
             appointment.status === "cancelled" ||
@@ -11586,10 +11600,12 @@ function AdminPanel() {
                 .filter(
                     (item) =>
                         item.appointment_date === agendaDate &&
-                        shouldShowAppointmentInAdminAgenda(item),
+                        (isViewingPastAgendaDate
+                            ? isRealizedPastAppointment(item)
+                            : shouldShowAppointmentInAdminAgenda(item)),
                 )
                 .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
-        [appointments, agendaDate, adminNow]);
+        [appointments, agendaDate, adminNow, isViewingPastAgendaDate]);
 
     const filteredAgendaAppointments = useMemo(() => {
         const query = appointmentSearch
@@ -11599,8 +11615,11 @@ function AdminPanel() {
 
         if (!query) return agendaAppointments;
 
-        return appointments
-            .filter(shouldShowAppointmentInAdminAgenda)
+        const searchableAppointments = isViewingPastAgendaDate
+            ? agendaAppointments
+            : appointments.filter(shouldShowAppointmentInAdminAgenda);
+
+        return searchableAppointments
             .filter((appointment) => {
                 const normalizedName = appointment.client_name
                     .trim()
@@ -11618,10 +11637,10 @@ function AdminPanel() {
                         `${second.appointment_date}${String(second.start_time).slice(0, 5)}`,
                     ),
             );
-    }, [appointments, agendaAppointments, appointmentSearch, adminNow]);
+    }, [appointments, agendaAppointments, appointmentSearch, adminNow, isViewingPastAgendaDate]);
 
     const agendaAvailableTimes = useMemo(() => {
-        if (!agendaDate) return [] as string[];
+        if (!agendaDate || isViewingPastAgendaDate) return [] as string[];
 
         const candidateStarts = Array.from(
             new Set([
@@ -11669,7 +11688,7 @@ function AdminPanel() {
                 return !isPastToday && !isOccupied;
             })
             .map(minutesToTime);
-    }, [agendaDate, appointments, adminTimeOverrides]);
+    }, [agendaDate, appointments, adminTimeOverrides, isViewingPastAgendaDate]);
 
     const weeklyAppointments = useMemo(() =>
             appointments
@@ -12666,6 +12685,9 @@ function AdminPanel() {
     const renderAppointmentCard = (appointment: AdminAppointment) => {
         const dueTypes = getDueNotificationTypes(appointment);
         const isExpanded = expandedAppointmentCardId === appointment.id;
+        const isHistoricalCompletedAppointment =
+            appointment.appointment_date < adminToday &&
+            isRealizedPastAppointment(appointment);
 
         function toggleAppointmentCard() {
             setExpandedAppointmentCardId((current) =>
@@ -12698,8 +12720,16 @@ function AdminPanel() {
                         <h3>{appointment.client_name}</h3>
                     </div>
 
-                    <span className={getAdminAppointmentStatusClassName(appointment)}>
-                        {getAdminAppointmentDisplayStatusLabel(appointment)}
+                    <span
+                        className={
+                            isHistoricalCompletedAppointment
+                                ? "admin-status admin-status--completed"
+                                : getAdminAppointmentStatusClassName(appointment)
+                        }
+                    >
+                        {isHistoricalCompletedAppointment
+                            ? "Concluído"
+                            : getAdminAppointmentDisplayStatusLabel(appointment)}
                     </span>
                 </div>
 
@@ -12742,46 +12772,48 @@ function AdminPanel() {
                             </div>
                         </div>
 
-                        <div
-                            className="admin-booking-card__footer"
-                            onClick={(event) => event.stopPropagation()}
-                        >
-                            <button
-                                type="button"
-                                onClick={() => openAppointmentDetails(appointment)}
+                        {!isHistoricalCompletedAppointment && (
+                            <div
+                                className="admin-booking-card__footer"
+                                onClick={(event) => event.stopPropagation()}
                             >
-                                Editar detalhes
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openAppointmentDetails(appointment)}
+                                >
+                                    Editar detalhes
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => void cancelAppointment(appointment)}
-                            >
-                                Cancelar
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => void cancelAppointment(appointment)}
+                                >
+                                    Cancelar
+                                </button>
 
-                            {dueTypes.map((type) => {
-                                const key = getNotificationKey(appointment.id, type);
-                                const wasOpened = Boolean(openedWhatsAppNotifications[key]);
+                                {dueTypes.map((type) => {
+                                    const key = getNotificationKey(appointment.id, type);
+                                    const wasOpened = Boolean(openedWhatsAppNotifications[key]);
 
-                                return (
-                                    <a
-                                        key={type}
-                                        className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
-                                        href={getWhatsAppUrl(appointment, type)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={() =>
-                                            markWhatsAppNotificationOpened(appointment, type)
-                                        }
-                                    >
-                                        {wasOpened
-                                            ? "Abrir novamente"
-                                            : getWhatsAppNotificationLabel(type)}
-                                    </a>
-                                );
-                            })}
-                        </div>
+                                    return (
+                                        <a
+                                            key={type}
+                                            className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
+                                            href={getWhatsAppUrl(appointment, type)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={() =>
+                                                markWhatsAppNotificationOpened(appointment, type)
+                                            }
+                                        >
+                                            {wasOpened
+                                                ? "Abrir novamente"
+                                                : getWhatsAppNotificationLabel(type)}
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </>
                 )}
             </article>
@@ -12891,13 +12923,10 @@ function AdminPanel() {
                                 {adminView === "week" && (
                                     <button
                                         type="button"
-                                        disabled={agendaDate <= formatDateForInput(new Date())}
                                         onClick={() => {
-                                            const today = formatDateForInput(new Date());
                                             const previousDate = addDaysToInputDate(agendaDate, -7);
-                                            const nextDate = previousDate < today ? today : previousDate;
-                                            setAgendaDate(nextDate);
-                                            setAgendaWeekReferenceDate(nextDate);
+                                            setAgendaDate(previousDate);
+                                            setAgendaWeekReferenceDate(previousDate);
                                             setShowAgendaDatePicker(false);
                                             setShowAgendaMonthCalendar(true);
                                         }}
@@ -13038,15 +13067,11 @@ function AdminPanel() {
                                                                     );
                                                                 }
 
-                                                                const isPast =
-                                                                    date < formatDateForInput(new Date());
-
                                                                 return (
                                                                     <button
                                                                         type="button"
                                                                         key={date}
-                                                                        disabled={isPast}
-                                                                        className={`${agendaDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                                        className={agendaDate === date ? "is-selected" : ""}
                                                                         onClick={() => selectAgendaPickerDate(date)}
                                                                     >
                                                                         {new Date(`${date}T12:00:00`).getDate()}
@@ -13058,14 +13083,12 @@ function AdminPanel() {
                                                 )}<div className="admin-manual-week-days admin-manual-week-days--seven">
                                                 {agendaVisibleWeekDates.map((date) => {
                                                     const parsed = new Date(`${date}T12:00:00`);
-                                                    const isPast = date < formatDateForInput(new Date());
 
                                                     return (
                                                         <button
                                                             key={date}
                                                             type="button"
-                                                            disabled={isPast}
-                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}`}
                                                             onClick={() => selectAgendaPickerDate(date)}
                                                         >
                                                             <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
@@ -13116,7 +13139,7 @@ function AdminPanel() {
                             </div>
                         </div>
 
-                        {adminView === "agenda" && (
+                        {adminView === "agenda" && !isViewingPastAgendaDate && (
                             <div className="admin-top-agenda__header">
                                 <div style={{width: "100%"}}>
                                     <span>Horários disponíveis</span>
@@ -13170,9 +13193,13 @@ function AdminPanel() {
                                     ? filteredAgendaAppointments.map(renderAppointmentCard)
                                     : (
                                         <div className="admin-empty admin-empty--top">
-                                            {appointmentSearch.trim()
-                                                ? "Nenhum agendamento ativo encontrado para esta cliente."
-                                                : "Nenhum agendamento nesta data."}
+                                            {isViewingPastAgendaDate
+                                                ? appointmentSearch.trim()
+                                                    ? "Nenhum atendimento realizado encontrado para esta cliente nesta data."
+                                                    : "Nenhum atendimento realizado nesta data."
+                                                : appointmentSearch.trim()
+                                                    ? "Nenhum agendamento ativo encontrado para esta cliente."
+                                                    : "Nenhum agendamento nesta data."}
                                         </div>
                                     )}
                             </div>
@@ -15561,3 +15588,4 @@ function App() {
 }
 
 export default App;
+
