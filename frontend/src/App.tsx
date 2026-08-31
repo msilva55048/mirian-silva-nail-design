@@ -11590,15 +11590,16 @@ function AdminPanel() {
     function shouldShowAppointmentCardInAdminAgenda(appointment: AdminAppointment) {
         const today = formatDateForInput(new Date());
 
-        // Ao consultar datas anteriores, a agenda funciona como histórico:
-        // mostra todos os cards que existiram naquele dia, independentemente
-        // do status final. Isso não interfere na disponibilidade dos horários.
-        if (appointment.appointment_date < today) {
+        // Datas passadas e o dia de hoje funcionam também como histórico:
+        // mantém visíveis todos os cards que existiram naquele dia, incluindo
+        // atendimentos realizados/concluídos e cancelados. Isso não altera a
+        // disponibilidade dos horários nem transforma cancelados em ocupados.
+        if (appointment.appointment_date <= today) {
             return true;
         }
 
-        // Cancelamentos permanecem visíveis para controle da Mirian, mas o
-        // horário continua livre porque "agendaAvailableTimes" ignora cancelled.
+        // Em datas futuras, cancelamentos também permanecem visíveis apenas
+        // para controle da Mirian; o horário continua livre para novo agendamento.
         if (appointment.status === "cancelled") {
             return true;
         }
