@@ -11527,9 +11527,8 @@ function AdminPanel() {
     );
 
     function selectAgendaPickerDate(date: string) {
-        const today = formatDateForInput(new Date());
-        if (date < today) return;
-
+        // A agenda administrativa também funciona como histórico.
+        // Por isso, datas anteriores a hoje podem ser selecionadas normalmente.
         setAgendaDate(date);
         setAgendaWeekReferenceDate(date);
         setShowAgendaMonthCalendar(true);
@@ -11588,12 +11587,31 @@ function AdminPanel() {
         return getAppointmentDateTime(appointment).getTime() > adminNow.getTime();
     }
 
+    function shouldShowAppointmentCardInAdminAgenda(appointment: AdminAppointment) {
+        const today = formatDateForInput(new Date());
+
+        // Ao consultar datas anteriores, a agenda funciona como histórico:
+        // mostra todos os cards que existiram naquele dia, independentemente
+        // do status final. Isso não interfere na disponibilidade dos horários.
+        if (appointment.appointment_date < today) {
+            return true;
+        }
+
+        // Cancelamentos permanecem visíveis para controle da Mirian, mas o
+        // horário continua livre porque "agendaAvailableTimes" ignora cancelled.
+        if (appointment.status === "cancelled") {
+            return true;
+        }
+
+        return shouldShowAppointmentInAdminAgenda(appointment);
+    }
+
     const agendaAppointments = useMemo(() =>
             appointments
                 .filter(
                     (item) =>
                         item.appointment_date === agendaDate &&
-                        shouldShowAppointmentInAdminAgenda(item),
+                        shouldShowAppointmentCardInAdminAgenda(item),
                 )
                 .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
         [appointments, agendaDate, adminNow]);
@@ -11628,7 +11646,7 @@ function AdminPanel() {
 
         return filteredAppointmentSearchClients
             .flatMap((client) => client.appointments)
-            .filter(shouldShowAppointmentInAdminAgenda)
+            .filter(shouldShowAppointmentCardInAdminAgenda)
             .filter((appointment) => {
                 if (seenAppointmentIds.has(appointment.id)) return false;
                 seenAppointmentIds.add(appointment.id);
@@ -11644,6 +11662,12 @@ function AdminPanel() {
 
     const agendaAvailableTimes = useMemo(() => {
         if (!agendaDate) return [] as string[];
+
+        const today = formatDateForInput(new Date());
+
+        // Datas passadas são somente para consulta do histórico.
+        // Não oferecemos horários para criar novos agendamentos no passado.
+        if (agendaDate < today) return [] as string[];
 
         const candidateStarts = Array.from(
             new Set([
@@ -11673,7 +11697,6 @@ function AdminPanel() {
             });
 
         const now = new Date();
-        const today = formatDateForInput(now);
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         return candidateStarts
@@ -11869,6 +11892,22 @@ function AdminPanel() {
     function getAdminAppointmentDisplayStatusLabel(
         appointment: AdminAppointment,
     ) {
+        const today = formatDateForInput(new Date());
+
+        // Na agenda, datas anteriores a hoje funcionam como histórico.
+        // Um atendimento passado que não foi cancelado/não compareceu
+        // é exibido como realizado, mesmo se o status persistido ainda
+        // estiver como pending/confirmed.
+        if (appointment.appointment_date < today) {
+            if (appointment.status === "cancelled") return "Cancelado";
+            if (appointment.status === "no-show") return "Não compareceu";
+            return "Realizado";
+        }
+
+        if (appointment.status === "completed") {
+            return "Realizado";
+        }
+
         if (appointment.status !== "confirmed") {
             return getAppointmentStatusLabel(appointment.status);
         }
@@ -11909,6 +11948,10 @@ function AdminPanel() {
 
         if (displayStatus === "Agendado") {
             return "admin-status admin-status--scheduled";
+        }
+
+        if (displayStatus === "Realizado") {
+            return "admin-status admin-status--completed";
         }
 
         return `admin-status admin-status--${appointment.status}`;
@@ -13132,8 +13175,7 @@ function AdminPanel() {
                                                                     <button
                                                                         type="button"
                                                                         key={date}
-                                                                        disabled={isPast}
-                                                                        className={`${agendaDate === date ? "is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                                        className={`${agendaDate === date ? "is-selected" : ""}${isPast ? " is-history" : ""}`}
                                                                         onClick={() => selectAgendaPickerDate(date)}
                                                                     >
                                                                         {new Date(`${date}T12:00:00`).getDate()}
@@ -13151,8 +13193,7 @@ function AdminPanel() {
                                                         <button
                                                             key={date}
                                                             type="button"
-                                                            disabled={isPast}
-                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}${isPast ? " is-past" : ""}`}
+                                                            className={`admin-manual-week-day${agendaDate === date ? " is-selected" : ""}${isPast ? " is-history" : ""}`}
                                                             onClick={() => selectAgendaPickerDate(date)}
                                                         >
                                                             <span>{parsed.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</span>
