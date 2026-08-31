@@ -4504,6 +4504,7 @@ type AdminClient = {
 };
 
 type ClientAnamnesisForm = {
+    profession: string;
     birthDate: string;
     referral: string;
     pregnant: string;
@@ -4519,6 +4520,7 @@ type ClientAnamnesisForm = {
 };
 
 const emptyClientAnamnesis: ClientAnamnesisForm = {
+    profession: "",
     birthDate: "",
     referral: "",
     pregnant: "",
@@ -11206,7 +11208,7 @@ function AdminPanel() {
         const {data, error} = await supabase
             .from("client_anamnesis")
             .select(
-                "birth_date, referral, pregnant, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, mycosis, continuous_medication, cleaning_products",
+                "profession, birth_date, referral, pregnant, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, mycosis, continuous_medication, cleaning_products",
             )
             .eq("client_id", profileId)
             .maybeSingle();
@@ -11219,6 +11221,7 @@ function AdminPanel() {
         }
 
         setClientAnamnesis({
+            profession: data?.profession ?? "",
             birthDate: formatBirthDateForDisplay(data?.birth_date),
             referral: data?.referral ?? "",
             pregnant: data?.pregnant ?? "",
@@ -11326,6 +11329,7 @@ function AdminPanel() {
                     .upsert(
                         {
                             client_id: existingProfile.id,
+                            profession: clientAnamnesis.profession.trim() || null,
                             birth_date: formatBirthDateForDatabase(
                                 clientAnamnesis.birthDate,
                             ),
@@ -15122,7 +15126,21 @@ function AdminPanel() {
                                 ) : (
                                     <div className="admin-anamnesis-card__questions">
                                         <label>
-                                            <span>1. Data de nascimento</span>
+                                            <span>1. Profissão</span>
+                                            <input
+                                                value={clientAnamnesis.profession}
+                                                onChange={(event) =>
+                                                    updateClientAnamnesisField(
+                                                        "profession",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Digite a profissão"
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>2. Data de nascimento</span>
                                             <input
                                                 type="text"
                                                 inputMode="numeric"
@@ -15139,7 +15157,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>2. Indicação</span>
+                                            <span>3. Indicação</span>
                                             <input
                                                 value={clientAnamnesis.referral}
                                                 onChange={(event) =>
@@ -15153,7 +15171,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>3. É gestante?</span>
+                                            <span>4. É gestante?</span>
                                             <input
                                                 value={clientAnamnesis.pregnant}
                                                 onChange={(event) =>
@@ -15167,7 +15185,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>4. Tem diabetes?</span>
+                                            <span>5. Tem diabetes?</span>
                                             <input
                                                 value={clientAnamnesis.diabetes}
                                                 onChange={(event) =>
@@ -15181,7 +15199,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>5. É bariátrica?</span>
+                                            <span>6. É bariátrica?</span>
                                             <input
                                                 value={clientAnamnesis.bariatric}
                                                 onChange={(event) =>
@@ -15195,7 +15213,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>6. Faz quimioterapia?</span>
+                                            <span>7. Faz quimioterapia?</span>
                                             <input
                                                 value={clientAnamnesis.chemotherapy}
                                                 onChange={(event) =>
@@ -15209,7 +15227,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>7. Tireoide</span>
+                                            <span>8. Tireoide</span>
                                             <input
                                                 value={clientAnamnesis.thyroid}
                                                 onChange={(event) =>
@@ -15223,7 +15241,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>8. Tem o hábito de roer as unhas?</span>
+                                            <span>9. Tem o hábito de roer as unhas?</span>
                                             <input
                                                 value={clientAnamnesis.nailBiting}
                                                 onChange={(event) =>
@@ -15237,7 +15255,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>9. Tem alergias?</span>
+                                            <span>10. Tem alergias?</span>
                                             <input
                                                 value={clientAnamnesis.allergies}
                                                 onChange={(event) =>
@@ -15251,7 +15269,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>10. Tem micose?</span>
+                                            <span>11. Tem micose?</span>
                                             <input
                                                 value={clientAnamnesis.mycosis}
                                                 onChange={(event) =>
@@ -15265,7 +15283,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>11. Usa medicamentos contínuos?</span>
+                                            <span>12. Usa medicamentos contínuos?</span>
                                             <input
                                                 value={clientAnamnesis.continuousMedication}
                                                 onChange={(event) =>
@@ -15279,7 +15297,7 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>12. Usa materiais de limpeza?</span>
+                                            <span>13. Usa materiais de limpeza?</span>
                                             <input
                                                 value={clientAnamnesis.cleaningProducts}
                                                 onChange={(event) =>
