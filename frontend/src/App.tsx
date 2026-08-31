@@ -9092,11 +9092,6 @@ const adminClientScheduledMetricStyles = `
     cursor: pointer;
 }
 
-.admin-client-history__list article {
-    position: relative;
-    padding-top: 50px;
-}
-
 .admin-payment-control {
     position: absolute;
     top: 13px;
@@ -9166,9 +9161,7 @@ const adminClientScheduledMetricStyles = `
     cursor: wait;
 }
 
-.admin-booking-card__top,
-.admin-client-card:has(.admin-payment-control) .admin-client-card__compact-summary,
-.admin-client-card:has(.admin-payment-control) .admin-client-card__top {
+.admin-booking-card__top {
     padding-top: 34px;
 }
 
@@ -13916,9 +13909,6 @@ function AdminPanel() {
                                             }
                                         }}
                                     >
-                                        {compactAppointment &&
-                                            renderPaymentToggle(compactAppointment)}
-
                                         {!isExpandedClient ? (
                                             <div className="admin-client-card__compact-summary">
                                                 <div className="admin-client-card__compact-main">
@@ -15215,8 +15205,6 @@ function AdminPanel() {
                                                     }
                                                 }}
                                             >
-                                                {renderPaymentToggle(appointment)}
-
                                                 <div>
                                                     <strong>
                                                         {
