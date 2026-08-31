@@ -4177,7 +4177,7 @@ function PublicSite() {
                                             </p>
                                         ) : referralSummary.pending_referrals > 0 ? (
                                             <p>
-                                                Você tem {referralSummary.pending_referrals === 1 ? "uma amiga" : `${referralSummary.pending_referrals} amigas`} indicada{referralSummary.pending_referrals === 1 ? "" : "s"}. O desconto será liberado quando o primeiro serviço indicado for realizado.
+                                                Você tem {referralSummary.pending_referrals === 1 ? "uma amiga" : `${referralSummary.pending_referrals} amigas`} indicada{referralSummary.pending_referrals === 1 ? "" : "s"}. O desconto será liberado quando ela fizer o primeiro agendamento.
                                             </p>
                                         ) : (
                                             <p>
@@ -4467,6 +4467,7 @@ type AdminAppointment = {
     original_price_cents?: number | null;
     referral_discount_percent?: number | null;
     referral_reward_id?: string | null;
+    is_referred_first_appointment?: boolean | null;
     client_hidden: boolean;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
@@ -5048,6 +5049,11 @@ const adminStyles = `
 .admin-status--referral {
     background: #e4f0ff;
     color: #2f64a3;
+}
+
+.admin-status--referred-first {
+    background: #f1e7ff;
+    color: #7445a2;
 }
 
 .admin-status--completed {
@@ -9705,7 +9711,7 @@ function AdminPanel() {
                 {data: timeOverrideData, error: timeOverrideLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
-                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, client_hidden, status, created_at")
+                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, is_referred_first_appointment, client_hidden, status, created_at")
                     .order("appointment_date", {ascending: true})
                     .order("start_time", {ascending: true}),
                 supabase.from("schedule_blocks")
@@ -11750,6 +11756,10 @@ function AdminPanel() {
     function getAdminAppointmentStatusClassName(
         appointment: AdminAppointment,
     ) {
+        if (appointment.is_referred_first_appointment) {
+            return "admin-status admin-status--referred-first";
+        }
+
         if (isActiveReferralAppointment(appointment)) {
             return "admin-status admin-status--referral";
         }
