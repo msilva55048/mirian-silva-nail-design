@@ -1291,3 +1291,44 @@ a {
   font-size: 13px;
   line-height: 1.5;
 }
+.admin-header__actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.admin-push-control {
+    display: grid;
+    justify-items: end;
+    gap: 5px;
+}
+
+.admin-push-control small {
+    max-width: 290px;
+    color: #765f66;
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+.admin-secondary-button.is-push-enabled {
+    border-color: #4d8b63;
+    background: #edf8f0;
+    color: #28603b;
+}
+
+@media (max-width: 700px) {
+    .admin-header__actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .admin-push-control {
+        justify-items: start;
+    }
+
+    .admin-push-control small {
+        text-align: left;
+    }
+}

@@ -1,0 +1,4 @@
+project_id = "mirian-silva-nail-design"
+
+[functions.admin-web-push]
+verify_jwt = false

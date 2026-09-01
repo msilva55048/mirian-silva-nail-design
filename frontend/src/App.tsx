@@ -1,5 +1,11 @@
 import {useEffect, useMemo, useRef, useState} from "react";
 import {supabase} from "./lib/supabase";
+import {
+    disableAdminPush,
+    enableAdminPush,
+    getAdminPushState,
+    type AdminPushState,
+} from "./lib/adminPush";
 import "./App.css";
 
 declare global {
@@ -9512,6 +9518,9 @@ function AdminPanel() {
     const [password, setPassword] = useState("");
     const [loginError, setLoginError] = useState("");
     const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const [adminPushState, setAdminPushState] = useState<AdminPushState>("disabled");
+    const [isUpdatingAdminPush, setIsUpdatingAdminPush] = useState(false);
+    const [adminPushMessage, setAdminPushMessage] = useState("");
 
     const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
     const [adminBlocks, setAdminBlocks] = useState<AdminScheduleBlock[]>([]);
@@ -9795,6 +9804,8 @@ function AdminPanel() {
             return;
         }
 
+        void getAdminPushState().then(setAdminPushState).catch(() => setAdminPushState("disabled"));
+
         async function loadAdminData() {
             setIsLoading(true);
             setPanelError("");
@@ -9882,6 +9893,30 @@ function AdminPanel() {
             void supabase.removeChannel(timeOverridesChannel);
         };
     }, [isAuthenticated]);
+
+    async function toggleAdminPush() {
+        if (isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "blocked") return;
+        setIsUpdatingAdminPush(true);
+        setAdminPushMessage("");
+
+        try {
+            if (adminPushState === "enabled") {
+                await disableAdminPush();
+                setAdminPushState("disabled");
+                setAdminPushMessage("Notificações desativadas neste aparelho.");
+            } else {
+                await enableAdminPush();
+                setAdminPushState("enabled");
+                setAdminPushMessage("Notificações ativadas neste aparelho.");
+            }
+        } catch (error) {
+            console.error("Erro ao configurar notificações push:", error);
+            setAdminPushState(await getAdminPushState().catch((): AdminPushState => "disabled"));
+            setAdminPushMessage(error instanceof Error ? error.message : "Não foi possível configurar as notificações.");
+        } finally {
+            setIsUpdatingAdminPush(false);
+        }
+    }
 
     async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -12948,7 +12983,28 @@ function AdminPanel() {
             <section className="admin-panel">
                 <header className="admin-header">
                     <div><h1>Painel da Mirian</h1><p>Gerencie os agendamentos recebidos pelo site.</p></div>
-                    <button className="admin-secondary-button" type="button" onClick={handleLogout}>Sair</button>
+                    <div className="admin-header__actions">
+                        <div className="admin-push-control">
+                            <button
+                                className={`admin-secondary-button${adminPushState === "enabled" ? " is-push-enabled" : ""}`}
+                                type="button"
+                                disabled={isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "blocked"}
+                                onClick={() => void toggleAdminPush()}
+                            >
+                                {isUpdatingAdminPush
+                                    ? "Configurando..."
+                                    : adminPushState === "enabled"
+                                        ? "🔔 Notificações ativadas"
+                                        : adminPushState === "blocked"
+                                            ? "🔕 Notificações bloqueadas"
+                                            : adminPushState === "unsupported"
+                                                ? "🔕 Indisponível neste navegador"
+                                                : "🔔 Ativar notificações"}
+                            </button>
+                            {adminPushMessage && <small role="status">{adminPushMessage}</small>}
+                        </div>
+                        <button className="admin-secondary-button" type="button" onClick={handleLogout}>Sair</button>
+                    </div>
                 </header>
 
                 <div className="admin-dashboard-cards">
