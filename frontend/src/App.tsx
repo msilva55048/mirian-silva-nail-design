@@ -9955,6 +9955,7 @@ function AdminPanel() {
     async function handleLogout() {
         clearMirianLastAccessMode();
         await supabase.auth.signOut();
+        window.location.replace("/");
     }
 
     function scrollAdminToTop() {
@@ -11642,6 +11643,23 @@ function AdminPanel() {
         return shouldShowAppointmentInAdminAgenda(appointment);
     }
 
+    function compareAdminAgendaAppointments(
+        first: AdminAppointment,
+        second: AdminAppointment,
+    ) {
+        const firstIsFinished =
+            first.status === "completed" || first.status === "cancelled";
+        const secondIsFinished =
+            second.status === "completed" || second.status === "cancelled";
+
+        if (firstIsFinished !== secondIsFinished) {
+            return firstIsFinished ? 1 : -1;
+        }
+
+        return getMinutesFromTime(first.start_time) -
+            getMinutesFromTime(second.start_time);
+    }
+
     const agendaAppointments = useMemo(() =>
             appointments
                 .filter(
@@ -11649,7 +11667,7 @@ function AdminPanel() {
                         item.appointment_date === agendaDate &&
                         shouldShowAppointmentCardInAdminAgenda(item),
                 )
-                .sort((a, b) => getMinutesFromTime(a.start_time) - getMinutesFromTime(b.start_time)),
+                .sort(compareAdminAgendaAppointments),
         [appointments, agendaDate, adminNow]);
 
     const filteredAppointmentSearchClients = useMemo(() => {
@@ -12986,22 +13004,16 @@ function AdminPanel() {
                     <div className="admin-header__actions">
                         <div className="admin-push-control">
                             <button
-                                className={`admin-secondary-button${adminPushState === "enabled" ? " is-push-enabled" : ""}`}
+                                className={`admin-secondary-button admin-push-button${adminPushState === "enabled" ? " is-push-enabled" : ""}`}
                                 type="button"
                                 disabled={isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "blocked"}
                                 onClick={() => void toggleAdminPush()}
+                                aria-label={adminPushState === "enabled" ? "Notificações ativadas" : "Ativar notificações"}
+                                title={adminPushState === "enabled" ? "Notificações ativadas" : "Ativar notificações"}
                             >
-                                {isUpdatingAdminPush
-                                    ? "Configurando..."
-                                    : adminPushState === "enabled"
-                                        ? "🔔 Notificações ativadas"
-                                        : adminPushState === "blocked"
-                                            ? "🔕 Notificações bloqueadas"
-                                            : adminPushState === "unsupported"
-                                                ? "🔕 Indisponível neste navegador"
-                                                : "🔔 Ativar notificações"}
+                                {adminPushState === "blocked" || adminPushState === "unsupported" ? "🔕" : "🔔"}
                             </button>
-                            {adminPushMessage && <small role="status">{adminPushMessage}</small>}
+                            {adminPushMessage && <span className="admin-push-status" role="status">{adminPushMessage}</span>}
                         </div>
                         <button className="admin-secondary-button" type="button" onClick={handleLogout}>Sair</button>
                     </div>
