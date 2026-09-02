@@ -8306,6 +8306,8 @@ const adminEnhancementStyles = `
 
 const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
 const MIRIAN_LAST_MODE_KEY = "mirian-last-access-mode";
+const LEGACY_WHATSAPP_NOTIFICATIONS_KEY = "mirian-whatsapp-notifications-opened";
+const LEGACY_WHATSAPP_MIGRATION_KEY = "mirian-whatsapp-notifications-migrated-v1";
 type MirianAccessMode = "admin" | "client";
 
 function getMirianLastAccessMode(): MirianAccessMode | null {
@@ -9797,6 +9799,100 @@ function AdminPanel() {
 
         void getAdminPushState().then(setAdminPushState).catch(() => setAdminPushState("disabled"));
 
+        async function migrateLegacyWhatsAppDispatches() {
+            let migrationStatus: string | null;
+            let legacyValue: string | null;
+            try {
+                migrationStatus = window.localStorage.getItem(LEGACY_WHATSAPP_MIGRATION_KEY);
+                legacyValue = window.localStorage.getItem(LEGACY_WHATSAPP_NOTIFICATIONS_KEY);
+            } catch (error) {
+                console.error("Não foi possível acessar o histórico local de mensagens:", error);
+                return false;
+            }
+
+            if (migrationStatus === "completed") {
+                return true;
+            }
+
+            if (!legacyValue) return true;
+
+            let legacyNotifications: Record<string, unknown>;
+            try {
+                legacyNotifications = JSON.parse(legacyValue) as Record<string, unknown>;
+            } catch (error) {
+                console.error("Não foi possível ler o histórico local de mensagens:", error);
+                return false;
+            }
+
+            const validTypes = new Set<WhatsAppNotificationType>([
+                "attendance-confirmation",
+                "two-hour-reminder",
+            ]);
+            const legacyDispatches = Object.entries(legacyNotifications).flatMap(([key, wasOpened]) => {
+                if (wasOpened !== true) return [];
+
+                const separatorIndex = key.lastIndexOf(":");
+                if (separatorIndex <= 0) return [];
+
+                const appointmentId = key.slice(0, separatorIndex);
+                const messageType = key.slice(separatorIndex + 1) as WhatsAppNotificationType;
+                if (!appointmentId || !validTypes.has(messageType)) return [];
+
+                return [{
+                    appointment_id: appointmentId,
+                    message_type: messageType,
+                    sent_at: new Date().toISOString(),
+                    sent_by: `${MIRIAN_ADMIN_EMAIL}:legacy-local-storage`,
+                }];
+            });
+
+            if (legacyDispatches.length) {
+                const {error: migrationError} = await supabase
+                    .from("appointment_message_dispatches")
+                    .upsert(legacyDispatches, {
+                        onConflict: "appointment_id,message_type",
+                        ignoreDuplicates: true,
+                    });
+
+                if (migrationError) {
+                    console.error("Erro ao migrar o histórico local de mensagens:", migrationError);
+                    return false;
+                }
+
+                const appointmentIds = Array.from(new Set(
+                    legacyDispatches.map((dispatch) => dispatch.appointment_id),
+                ));
+                const {data: persistedDispatches, error: verificationError} = await supabase
+                    .from("appointment_message_dispatches")
+                    .select("appointment_id, message_type")
+                    .in("appointment_id", appointmentIds);
+
+                if (verificationError) {
+                    console.error("Erro ao confirmar a migração das mensagens:", verificationError);
+                    return false;
+                }
+
+                const persistedKeys = new Set(
+                    (persistedDispatches ?? []).map((dispatch) =>
+                        `${dispatch.appointment_id}:${dispatch.message_type}`,
+                    ),
+                );
+                const allPersisted = legacyDispatches.every((dispatch) =>
+                    persistedKeys.has(`${dispatch.appointment_id}:${dispatch.message_type}`),
+                );
+
+                if (!allPersisted) return false;
+            }
+
+            try {
+                window.localStorage.setItem(LEGACY_WHATSAPP_MIGRATION_KEY, "completed");
+            } catch (error) {
+                console.error("Os dados foram migrados, mas não foi possível marcar a migração como concluída:", error);
+                return false;
+            }
+            return true;
+        }
+
         async function loadAdminData() {
             setIsLoading(true);
             setPanelError("");
@@ -9857,7 +9953,16 @@ function AdminPanel() {
             setIsLoading(false);
         }
 
-        void loadAdminData();
+        async function initializeAdminData() {
+            const migrationSucceeded = await migrateLegacyWhatsAppDispatches();
+            await loadAdminData();
+
+            if (!migrationSucceeded) {
+                setPanelError("Não foi possível migrar o histórico antigo de mensagens. Atualize a página para tentar novamente.");
+            }
+        }
+
+        void initializeAdminData();
         const appointmentsChannel = supabase.channel("admin-appointments-updates")
             .on("postgres_changes", {event: "*", schema: "public", table: "appointments"}, () => void loadAdminData())
             .subscribe();
