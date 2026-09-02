@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
 import {
     disableAdminPush,
@@ -6564,6 +6564,14 @@ function getAppointmentEndDateTime(appointment: AdminAppointment) {
 
 type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
 
+type AppointmentMessageDispatch = {
+    id: string;
+    appointment_id: string;
+    message_type: WhatsAppNotificationType;
+    sent_at: string;
+    sent_by: string;
+};
+
 function formatAppointmentDateForMessage(date: string) {
     return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
         day: "2-digit",
@@ -9528,14 +9536,7 @@ function AdminPanel() {
     const [isLoading, setIsLoading] = useState(false);
     const [panelError, setPanelError] = useState("");
     const [notificationClock, setNotificationClock] = useState(() => Date.now());
-    const [openedWhatsAppNotifications, setOpenedWhatsAppNotifications] = useState<Record<string, boolean>>(() => {
-        try {
-            const saved = window.localStorage.getItem("mirian-whatsapp-notifications-opened");
-            return saved ? JSON.parse(saved) as Record<string, boolean> : {};
-        } catch {
-            return {};
-        }
-    });
+    const [appointmentMessageDispatches, setAppointmentMessageDispatches] = useState<AppointmentMessageDispatch[]>([]);
 
     const [adminView, setAdminView] = useState<
         "agenda" | "week" | "month" | "new" | "clients" | "finance" | "schedule" | "settings" | "blocks"
@@ -9738,17 +9739,6 @@ function AdminPanel() {
 
 
     useEffect(() => {
-        try {
-            window.localStorage.setItem(
-                "mirian-whatsapp-notifications-opened",
-                JSON.stringify(openedWhatsAppNotifications),
-            );
-        } catch {
-            // O painel continua funcionando mesmo se o navegador bloquear o armazenamento local.
-        }
-    }, [openedWhatsAppNotifications]);
-
-    useEffect(() => {
         function updateBackToTopVisibility() {
             setShowAdminBackToTop(window.scrollY > 320);
         }
@@ -9801,6 +9791,7 @@ function AdminPanel() {
         if (!isAuthenticated) {
             setAppointments([]);
             setAdminClientProfiles([]);
+            setAppointmentMessageDispatches([]);
             return;
         }
 
@@ -9815,6 +9806,7 @@ function AdminPanel() {
                 {data: serviceData, error: serviceLoadError},
                 {data: clientProfileData, error: clientProfileLoadError},
                 {data: timeOverrideData, error: timeOverrideLoadError},
+                {data: messageDispatchData, error: messageDispatchLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
                     .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, is_referred_first_appointment, is_paid, client_hidden, status, created_at")
@@ -9835,14 +9827,16 @@ function AdminPanel() {
                     .select("id, override_date, start_time, is_available, created_at, updated_at")
                     .order("override_date", {ascending: true})
                     .order("start_time", {ascending: true}),
+                supabase.from("appointment_message_dispatches")
+                    .select("id, appointment_id, message_type, sent_at, sent_by"),
             ]);
 
             if (timeOverrideLoadError) {
                 console.warn("Exceções de horário ainda não disponíveis no ADM:", timeOverrideLoadError);
             }
 
-            if (appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError) {
-                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError);
+            if (appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError || messageDispatchLoadError) {
+                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError || messageDispatchLoadError);
                 setPanelError("Não foi possível carregar os dados do painel. Atualize a página.");
                 setIsLoading(false);
                 return;
@@ -9852,6 +9846,7 @@ function AdminPanel() {
             setAdminBlocks((blockData ?? []) as AdminScheduleBlock[]);
             setAdminServices((serviceData ?? []) as AdminServiceSetting[]);
             setAdminClientProfiles((clientProfileData ?? []) as ClientProfile[]);
+            setAppointmentMessageDispatches((messageDispatchData ?? []) as AppointmentMessageDispatch[]);
             setAdminTimeOverrides(
                 ((timeOverrideData ?? []) as ScheduleTimeOverride[]).map((item) => ({
                     ...item,
@@ -9885,12 +9880,20 @@ function AdminPanel() {
                 () => void loadAdminData(),
             )
             .subscribe();
+        const messageDispatchesChannel = supabase.channel("admin-message-dispatches-updates")
+            .on(
+                "postgres_changes",
+                {event: "*", schema: "public", table: "appointment_message_dispatches"},
+                () => void loadAdminData(),
+            )
+            .subscribe();
 
         return () => {
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
             void supabase.removeChannel(clientProfilesChannel);
             void supabase.removeChannel(timeOverridesChannel);
+            void supabase.removeChannel(messageDispatchesChannel);
         };
     }, [isAuthenticated]);
 
@@ -11943,6 +11946,15 @@ function AdminPanel() {
         return `${appointmentId}:${type}`;
     }
 
+    const dispatchedWhatsAppNotificationKeys = useMemo(
+        () => new Set(
+            appointmentMessageDispatches.map((dispatch) =>
+                getNotificationKey(dispatch.appointment_id, dispatch.message_type),
+            ),
+        ),
+        [appointmentMessageDispatches],
+    );
+
     function getAdminAppointmentDisplayStatusLabel(
         appointment: AdminAppointment,
     ) {
@@ -11971,7 +11983,7 @@ function AdminPanel() {
             "attendance-confirmation",
         );
 
-        return openedWhatsAppNotifications[confirmationKey]
+        return dispatchedWhatsAppNotificationKeys.has(confirmationKey)
             ? "Confirmado"
             : "Agendado";
     }
@@ -12011,12 +12023,92 @@ function AdminPanel() {
         return `admin-status admin-status--${appointment.status}`;
     }
 
-    function markWhatsAppNotificationOpened(
+    async function openWhatsAppNotification(
+        event: MouseEvent<HTMLAnchorElement>,
         appointment: AdminAppointment,
         type: WhatsAppNotificationType,
     ) {
+        event.preventDefault();
         const key = getNotificationKey(appointment.id, type);
-        setOpenedWhatsAppNotifications((current) => ({...current, [key]: true}));
+        const whatsappUrl = getWhatsAppUrl(appointment, type);
+        const whatsappWindow = window.open("about:blank", "_blank");
+
+        if (whatsappWindow) {
+            whatsappWindow.opener = null;
+        }
+
+        try {
+            const {data: existingDispatch, error: checkError} = await supabase
+                .from("appointment_message_dispatches")
+                .select("id, appointment_id, message_type, sent_at, sent_by")
+                .eq("appointment_id", appointment.id)
+                .eq("message_type", type)
+                .maybeSingle();
+
+            if (checkError) throw checkError;
+
+            if (existingDispatch) {
+                setAppointmentMessageDispatches((current) =>
+                    current.some((dispatch) => getNotificationKey(dispatch.appointment_id, dispatch.message_type) === key)
+                        ? current
+                        : [...current, existingDispatch as AppointmentMessageDispatch],
+                );
+                whatsappWindow?.close();
+                return;
+            }
+
+            const {data: insertedDispatch, error: insertError} = await supabase
+                .from("appointment_message_dispatches")
+                .insert({
+                    appointment_id: appointment.id,
+                    message_type: type,
+                    sent_at: new Date().toISOString(),
+                    sent_by: MIRIAN_ADMIN_EMAIL,
+                })
+                .select("id, appointment_id, message_type, sent_at, sent_by")
+                .single();
+
+            if (insertError) {
+                if (insertError.code === "23505") {
+                    const {data: concurrentDispatch} = await supabase
+                        .from("appointment_message_dispatches")
+                        .select("id, appointment_id, message_type, sent_at, sent_by")
+                        .eq("appointment_id", appointment.id)
+                        .eq("message_type", type)
+                        .maybeSingle();
+
+                    if (concurrentDispatch) {
+                        setAppointmentMessageDispatches((current) =>
+                            current.some((dispatch) => getNotificationKey(dispatch.appointment_id, dispatch.message_type) === key)
+                                ? current
+                                : [...current, concurrentDispatch as AppointmentMessageDispatch],
+                        );
+                    }
+
+                    whatsappWindow?.close();
+                    return;
+                }
+
+                throw insertError;
+            }
+
+            setAppointmentMessageDispatches((current) => [
+                ...current.filter((dispatch) =>
+                    getNotificationKey(dispatch.appointment_id, dispatch.message_type) !== key,
+                ),
+                insertedDispatch as AppointmentMessageDispatch,
+            ]);
+
+            if (whatsappWindow) {
+                whatsappWindow.location.replace(whatsappUrl);
+            } else {
+                window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+            }
+        } catch (error) {
+            console.error("Erro ao registrar envio da mensagem:", error);
+            whatsappWindow?.close();
+            setPanelError("Não foi possível abrir a mensagem. Tente novamente.");
+        }
     }
 
     function getWhatsAppUrl(
@@ -12054,13 +12146,13 @@ function AdminPanel() {
                     key: getNotificationKey(appointment.id, type),
                 })),
             )
-            .filter((notification) => !openedWhatsAppNotifications[notification.key])
+            .filter((notification) => !dispatchedWhatsAppNotificationKeys.has(notification.key))
             .sort(
                 (first, second) =>
                     getAppointmentDateTime(first.appointment).getTime() -
                     getAppointmentDateTime(second.appointment).getTime(),
             );
-    }, [appointments, notificationClock, openedWhatsAppNotifications]);
+    }, [appointments, notificationClock, dispatchedWhatsAppNotificationKeys]);
 
 
     const scheduleConfigVisibleWeekDates = useMemo(
@@ -12848,7 +12940,9 @@ function AdminPanel() {
     }
 
     const renderAppointmentCard = (appointment: AdminAppointment) => {
-        const dueTypes = getDueNotificationTypes(appointment);
+        const dueTypes = getDueNotificationTypes(appointment).filter((type) =>
+            !dispatchedWhatsAppNotificationKeys.has(getNotificationKey(appointment.id, type)),
+        );
         const isExpanded = expandedAppointmentCardId === appointment.id;
 
         function toggleAppointmentCard() {
@@ -12945,23 +13039,18 @@ function AdminPanel() {
                             </button>
 
                             {dueTypes.map((type) => {
-                                const key = getNotificationKey(appointment.id, type);
-                                const wasOpened = Boolean(openedWhatsAppNotifications[key]);
-
                                 return (
                                     <a
                                         key={type}
-                                        className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
+                                        className="is-due"
                                         href={getWhatsAppUrl(appointment, type)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        onClick={() =>
-                                            markWhatsAppNotificationOpened(appointment, type)
+                                        onClick={(event) =>
+                                            void openWhatsAppNotification(event, appointment, type)
                                         }
                                     >
-                                        {wasOpened
-                                            ? "Abrir novamente"
-                                            : getWhatsAppNotificationLabel(type)}
+                                        {getWhatsAppNotificationLabel(type)}
                                     </a>
                                 );
                             })}
@@ -13057,7 +13146,7 @@ function AdminPanel() {
                                         href={getWhatsAppUrl(appointment, type)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        onClick={() => markWhatsAppNotificationOpened(appointment, type)}
+                                        onClick={(event) => void openWhatsAppNotification(event, appointment, type)}
                                     >
                                         Abrir WhatsApp
                                     </a>
