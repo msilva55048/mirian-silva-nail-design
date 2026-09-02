@@ -9807,21 +9807,38 @@ function AdminPanel() {
                 legacyValue = window.localStorage.getItem(LEGACY_WHATSAPP_NOTIFICATIONS_KEY);
             } catch (error) {
                 console.error("Não foi possível acessar o histórico local de mensagens:", error);
-                return false;
+                return;
             }
 
             if (migrationStatus === "completed") {
-                return true;
+                return;
             }
 
-            if (!legacyValue) return true;
+            function markMigrationAsCompleted() {
+                try {
+                    window.localStorage.setItem(LEGACY_WHATSAPP_MIGRATION_KEY, "completed");
+                } catch (error) {
+                    console.error("Não foi possível marcar a migração de mensagens como concluída:", error);
+                }
+            }
+
+            if (!legacyValue) {
+                markMigrationAsCompleted();
+                return;
+            }
 
             let legacyNotifications: Record<string, unknown>;
             try {
-                legacyNotifications = JSON.parse(legacyValue) as Record<string, unknown>;
+                const parsedValue = JSON.parse(legacyValue) as unknown;
+                legacyNotifications = typeof parsedValue === "object" &&
+                    parsedValue !== null &&
+                    !Array.isArray(parsedValue)
+                    ? parsedValue as Record<string, unknown>
+                    : {};
             } catch (error) {
                 console.error("Não foi possível ler o histórico local de mensagens:", error);
-                return false;
+                markMigrationAsCompleted();
+                return;
             }
 
             const validTypes = new Set<WhatsAppNotificationType>([
@@ -9846,51 +9863,42 @@ function AdminPanel() {
                 }];
             });
 
-            if (legacyDispatches.length) {
+            if (!legacyDispatches.length) {
+                markMigrationAsCompleted();
+                return;
+            }
+
+            const {data: existingAppointments, error: appointmentLookupError} = await supabase
+                .from("appointments")
+                .select("id");
+
+            if (appointmentLookupError) {
+                console.error("Erro ao validar o histórico local de mensagens:", appointmentLookupError);
+                return;
+            }
+
+            const existingAppointmentIds = new Set(
+                (existingAppointments ?? []).map((appointment) => String(appointment.id)),
+            );
+            const validLegacyDispatches = legacyDispatches.filter((dispatch) =>
+                existingAppointmentIds.has(dispatch.appointment_id),
+            );
+
+            if (validLegacyDispatches.length) {
                 const {error: migrationError} = await supabase
                     .from("appointment_message_dispatches")
-                    .upsert(legacyDispatches, {
+                    .upsert(validLegacyDispatches, {
                         onConflict: "appointment_id,message_type",
                         ignoreDuplicates: true,
                     });
 
                 if (migrationError) {
                     console.error("Erro ao migrar o histórico local de mensagens:", migrationError);
-                    return false;
+                    return;
                 }
-
-                const appointmentIds = Array.from(new Set(
-                    legacyDispatches.map((dispatch) => dispatch.appointment_id),
-                ));
-                const {data: persistedDispatches, error: verificationError} = await supabase
-                    .from("appointment_message_dispatches")
-                    .select("appointment_id, message_type")
-                    .in("appointment_id", appointmentIds);
-
-                if (verificationError) {
-                    console.error("Erro ao confirmar a migração das mensagens:", verificationError);
-                    return false;
-                }
-
-                const persistedKeys = new Set(
-                    (persistedDispatches ?? []).map((dispatch) =>
-                        `${dispatch.appointment_id}:${dispatch.message_type}`,
-                    ),
-                );
-                const allPersisted = legacyDispatches.every((dispatch) =>
-                    persistedKeys.has(`${dispatch.appointment_id}:${dispatch.message_type}`),
-                );
-
-                if (!allPersisted) return false;
             }
 
-            try {
-                window.localStorage.setItem(LEGACY_WHATSAPP_MIGRATION_KEY, "completed");
-            } catch (error) {
-                console.error("Os dados foram migrados, mas não foi possível marcar a migração como concluída:", error);
-                return false;
-            }
-            return true;
+            markMigrationAsCompleted();
         }
 
         async function loadAdminData() {
@@ -9954,12 +9962,8 @@ function AdminPanel() {
         }
 
         async function initializeAdminData() {
-            const migrationSucceeded = await migrateLegacyWhatsAppDispatches();
+            await migrateLegacyWhatsAppDispatches();
             await loadAdminData();
-
-            if (!migrationSucceeded) {
-                setPanelError("Não foi possível migrar o histórico antigo de mensagens. Atualize a página para tentar novamente.");
-            }
         }
 
         void initializeAdminData();
