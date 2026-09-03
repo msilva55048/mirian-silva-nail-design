@@ -1,5 +1,9 @@
 import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
+import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
+import {useWaitingList, type WaitingListEntry} from "./features/admin/useWaitingList";
+import {WaitingList} from "./features/admin/WaitingList";
+import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -9541,7 +9545,7 @@ function AdminPanel() {
     const [appointmentMessageDispatches, setAppointmentMessageDispatches] = useState<AppointmentMessageDispatch[]>([]);
 
     const [adminView, setAdminView] = useState<
-        "agenda" | "week" | "month" | "new" | "clients" | "finance" | "schedule" | "settings" | "blocks"
+        "agenda" | "week" | "month" | "new" | "waiting" | "clients" | "finance" | "schedule" | "settings" | "blocks"
     >("agenda");
     const [agendaDate, setAgendaDate] = useState(formatDateForInput(new Date()));
     const [monthlyAgendaMonth, setMonthlyAgendaMonth] = useState(() =>
@@ -9600,6 +9604,10 @@ function AdminPanel() {
     const [isSavingAppointment, setIsSavingAppointment] = useState(false);
 
     const [clientSearch, setClientSearch] = useState("");
+    const [clientAppointmentFilter, setClientAppointmentFilter] = useState<ClientAppointmentFilter>("all");
+    const waitingList = useWaitingList(isAuthenticated);
+    const [waitingBooking, setWaitingBooking] = useState<WaitingListEntry | null>(null);
+    const [waitingMessage, setWaitingMessage] = useState("");
     const [selectedClient, setSelectedClient] = useState<AdminClient | null>(null);
     const [editingClient, setEditingClient] = useState<AdminClient | null>(null);
     const [editClientName, setEditClientName] = useState("");
@@ -10107,6 +10115,7 @@ function AdminPanel() {
         time: string,
         selectedServiceDurationMinutes: number,
     ) {
+        if (hasScheduleBlockConflict(adminBlocks, date, time, selectedServiceDurationMinutes)) return true;
         const candidateStart = getMinutesFromTime(time);
         const safeSelectedDuration =
             Math.max(1, Number(selectedServiceDurationMinutes) || 1);
@@ -10146,6 +10155,8 @@ function AdminPanel() {
 
     async function createManualAppointment(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (isSavingManualAppointment) return;
+        const bookedWaitingEntry = waitingBooking;
         setManualError("");
         setManualSuccess("");
 
@@ -10175,7 +10186,7 @@ function AdminPanel() {
         }
 
         if (manualAppointmentConflicts(manualDate, manualTime, service.duration_minutes)) {
-            setManualError("Este período entra em conflito com outro agendamento já existente.");
+            setManualError("Este período entra em conflito com outro agendamento ou bloqueio de horário.");
             return;
         }
 
@@ -10249,6 +10260,17 @@ function AdminPanel() {
             );
             setAgendaDate(manualDate);
             setManualTime("");
+            if (bookedWaitingEntry) {
+                // A RPC confirmou a criação e retornou o id. Nunca remover antes disso.
+                const removed = await waitingList.remove(bookedWaitingEntry.id);
+                setWaitingMessage(removed
+                    ? `Agendamento de ${createdRow.client_name} criado com sucesso. Cliente removida da lista de espera.`
+                    : `Agendamento de ${createdRow.client_name} criado com sucesso, mas a remoção da lista falhou. Use “Remover da lista”; não agende novamente.`);
+                setWaitingBooking(null);
+                setSelectedManualClient(null);
+                setManualClientSearch("");
+                setShowManualForm(false);
+            }
         } catch (error) {
             console.error("Erro ao criar agendamento:", error);
 
@@ -11177,29 +11199,9 @@ function AdminPanel() {
             .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     }, [appointments, adminClientProfiles, adminNow]);
 
-    const filteredClients = useMemo(() => {
-        const query = clientSearch
-            .trim()
-            .toLocaleLowerCase("pt-BR");
-        const digits = clientSearch.replace(/\D/g, "");
-
-        if (!query) return clients;
-
-        return clients.filter((client) => {
-            const normalizedName = client.name
-                .trim()
-                .toLocaleLowerCase("pt-BR");
-
-            const clientPhoneDigits = client.phone.replace(/\D/g, "");
-
-            const matchesName = normalizedName.startsWith(query);
-            const matchesPhone =
-                Boolean(digits) &&
-                clientPhoneDigits.includes(digits);
-
-            return matchesName || matchesPhone;
-        });
-    }, [clients, clientSearch]);
+    const filteredClients = useMemo(() =>
+        filterAdminClients(clients, clientSearch, clientAppointmentFilter, adminNow),
+    [clients, clientSearch, clientAppointmentFilter, adminNow]);
 
     const manualBookingClients = useMemo<AdminBookingClient[]>(() => {
         const byPhone = new Map<string, AdminBookingClient>();
@@ -11391,7 +11393,10 @@ function AdminPanel() {
                         ),
                     );
 
-                return !isPastToday && !conflictsWithAppointment;
+                const conflictsWithBlock = hasScheduleBlockConflict(
+                    adminBlocks, manualDate, minutesToTime(candidateStart), selectedServiceDurationMinutes,
+                );
+                return !isPastToday && !conflictsWithAppointment && !conflictsWithBlock;
             })
             .map(minutesToTime);
     }, [
@@ -11399,9 +11404,14 @@ function AdminPanel() {
         manualSelectedService,
         appointments,
         adminTimeOverrides,
+        adminBlocks,
     ]);
 
     const manualDisplayedTimes = useMemo(() => {
+        // Preserva a seleção especial do Admin, mas nunca recoloca um horário bloqueado.
+        if (manualTime && manualSelectedService && hasScheduleBlockConflict(
+            adminBlocks, manualDate, manualTime, manualSelectedService.duration_minutes,
+        )) return manualAvailableTimes;
         if (!manualTime || manualAvailableTimes.includes(manualTime)) {
             return manualAvailableTimes;
         }
@@ -11410,7 +11420,7 @@ function AdminPanel() {
             (first, second) =>
                 getMinutesFromTime(first) - getMinutesFromTime(second),
         );
-    }, [manualAvailableTimes, manualTime]);
+    }, [manualAvailableTimes, manualTime, adminBlocks, manualDate, manualSelectedService]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
         if (!value) return "";
@@ -12835,6 +12845,7 @@ function AdminPanel() {
         | "week"
         | "month"
         | "new"
+        | "waiting"
         | "clients"
         | "finance"
         | "schedule"
@@ -12842,6 +12853,16 @@ function AdminPanel() {
         | "blocks";
 
     function openAdminDashboardView(view: AdminDashboardView) {
+        if (isSavingManualAppointment) return;
+        if (waitingBooking || view === "waiting") {
+            setWaitingBooking(null);
+            setShowManualForm(false);
+            setSelectedManualClient(null);
+            setManualClientSearch("");
+            setManualTime("");
+            setManualError("");
+            setManualSuccess("");
+        }
         setAdminView(view);
 
         if (view === "agenda") {
@@ -13227,6 +13248,7 @@ function AdminPanel() {
                         <strong>Novo agendamento</strong>
                         <span>Cadastre um novo atendimento para uma cliente.</span>
                     </button>
+                    <button className={`admin-dashboard-card${adminView === "waiting" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("waiting")}><strong>Lista de espera</strong><span>Clientes aguardando uma vaga.</span></button>
                     <button className={`admin-dashboard-card${adminView === "clients" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("clients")}><strong>Clientes</strong><span>Cadastros, histórico e indicadores.</span></button>
                     <button className={`admin-dashboard-card${adminView === "finance" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("finance")}><strong>Financeiro</strong><span>Faturamento e previsão mensal.</span></button>
                     <button className={`admin-dashboard-card${adminView === "schedule" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("schedule")}><strong>Configuração de horários</strong><span>Adicione, altere ou remova horários de uma data específica.</span></button>
@@ -14364,6 +14386,11 @@ function AdminPanel() {
                 ) : adminView === "clients" ? (
                     <section className="admin-clients">
                         <div className="admin-clients__header"><div><span className="admin-clients__eyebrow">Clientes</span><h2>Cadastros das clientes</h2><p>Consulte histórico, edite ou exclua um cadastro.</p></div><div className="admin-clients__count"><strong>{clients.length}</strong><span>clientes cadastradas</span></div></div>
+                        <div className="admin-client-filters" aria-label="Filtrar clientes por agendamento">
+                            {([ ["with", "Clientes com agendamento"], ["without", "Clientes sem agendamento"] ] as const).map(([value, label]) =>
+                                <button key={value} type="button" className={`admin-dashboard-card${clientAppointmentFilter === value ? " is-active" : ""}`} aria-pressed={clientAppointmentFilter === value} onClick={() => setClientAppointmentFilter((current) => current === value ? "all" : value)}>{label}</button>,
+                            )}
+                        </div>
                         <div className="admin-clients__search"><label>Buscar cliente<input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Nome ou telefone"/></label></div>
                         <div className="admin-clients__grid">
                             {filteredClients.map((client) => {
@@ -14560,17 +14587,19 @@ function AdminPanel() {
                             })}
                         </div>
                     </section>
-                ) : adminView === "new" ? (
+                ) : adminView === "new" || adminView === "waiting" ? (
                     <section className="admin-content-section">
                         <section className="admin-new-appointment">
                             <div className="admin-new-appointment__header">
                                 <div>
-                                    <h2>Novo agendamento</h2>
-                                    <p>Busque a cliente cadastrada e escolha serviço, dia e horário pela agenda exclusiva do painel ADM.</p>
+                                    <h2>{adminView === "waiting" ? "Lista de espera" : "Novo agendamento"}</h2>
+                                    <p>{adminView === "waiting" ? "Clientes aguardando uma vaga, da mais antiga à mais recente." : "Busque a cliente cadastrada e escolha serviço, dia e horário pela agenda exclusiva do painel ADM."}</p>
                                 </div>
                                 <button
                                     className="admin-new-appointment__toggle"
                                     type="button"
+                                    hidden={adminView === "waiting"}
+                                    disabled={isSavingManualAppointment}
                                     onClick={() => {
                                         setShowManualForm((current) => !current);
                                         setManualError("");
@@ -14581,15 +14610,30 @@ function AdminPanel() {
                                 </button>
                             </div>
 
-                            {showManualForm && (
-                                <form className="admin-manual-booking" onSubmit={createManualAppointment}>
+                            {adminView === "waiting" && <>
+                                <WaitingList profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
+                                    setWaitingBooking(entry);
+                                    setSelectedManualClient(client);
+                                    setManualClientSearch(client.name);
+                                    setManualTime("");
+                                    setManualError("");
+                                    setManualSuccess("");
+                                    setWaitingMessage("");
+                                    setShowManualForm(true);
+                                    window.setTimeout(() => document.getElementById("admin-shared-booking")?.scrollIntoView({behavior: "smooth", block: "start"}), 40);
+                                }}/>
+                                {waitingMessage && <p role="status" className="admin-manual-form__success">{waitingMessage}</p>}
+                            </>}
+
+                            {showManualForm && (adminView === "new" || waitingBooking) && (
+                                <form id="admin-shared-booking" className={`admin-manual-booking${waitingBooking ? " admin-waiting-booking" : ""}`} onSubmit={createManualAppointment}>
                                     <section className="admin-manual-booking__section">
                                         <span className="admin-manual-booking__step">1</span>
                                         <div className="admin-manual-booking__content">
-                                            <h3>Buscar cliente</h3>
-                                            <p>Digite o nome ou telefone e selecione uma cliente cadastrada.</p>
+                                            <h3>{waitingBooking ? "Agendar cliente da lista de espera" : "Buscar cliente"}</h3>
+                                            {!waitingBooking && <p>Digite o nome ou telefone e selecione uma cliente cadastrada.</p>}
 
-                                            <div className="admin-client-picker">
+                                            <div className="admin-client-picker" hidden={Boolean(waitingBooking)}>
                                                 <input
                                                     value={manualClientSearch}
                                                     onChange={(event) => {
@@ -14639,6 +14683,7 @@ function AdminPanel() {
                                                     </div>
                                                     <button
                                                         type="button"
+                                                        hidden={Boolean(waitingBooking)}
                                                         onClick={() => {
                                                             setSelectedManualClient(null);
                                                             setManualClientSearch("");
@@ -14819,7 +14864,17 @@ function AdminPanel() {
                                         <button
                                             className="admin-manual-form__cancel"
                                             type="button"
-                                            onClick={() => setShowManualForm(false)}
+                                            disabled={isSavingManualAppointment}
+                                            onClick={() => {
+                                                setShowManualForm(false);
+                                                if (waitingBooking) {
+                                                    setWaitingBooking(null);
+                                                    setSelectedManualClient(null);
+                                                    setManualClientSearch("");
+                                                    setManualTime("");
+                                                    setManualError("");
+                                                }
+                                            }}
                                         >
                                             Cancelar
                                         </button>

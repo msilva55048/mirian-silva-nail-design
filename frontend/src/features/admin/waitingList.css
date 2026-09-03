@@ -1,0 +1,20 @@
+.admin-client-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.admin-client-filters button { min-width: 0; white-space: normal; }
+.admin-waiting-list { margin-top: 20px; min-width: 0; }
+.admin-waiting-list__results, .admin-waiting-list__entries { display: grid; gap: 12px; margin-bottom: 18px; }
+.admin-waiting-list__identity { display: grid; gap: 6px; margin-bottom: 14px; }
+.admin-waiting-list strong, .admin-waiting-list span { overflow-wrap: anywhere; }
+.admin-waiting-list input { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.admin-waiting-booking { min-width: 0; }
+.admin-waiting-booking .admin-manual-booking__content { min-width: 0; }
+.admin-waiting-booking .admin-selected-client { overflow-wrap: anywhere; }
+.admin-new-appointment [hidden] { display: none !important; }
+@media (max-width: 430px) {
+    .admin-client-filters { grid-template-columns: minmax(0, 1fr); }
+    .admin-waiting-list .admin-client-card__actions { display: flex; flex-direction: column; }
+}
