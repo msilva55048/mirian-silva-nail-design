@@ -41,3 +41,10 @@ test("migration final contém integridade, RLS e guarda anterior ao cadastro", (
     assert.match(sql, /v_anchor constant text := '    if p_client_profile_id is not null then'/);
     assert.match(sql, /raise exception 'Este período entra em conflito com um bloqueio/);
 });
+
+
+test("preferências adicionam somente campos nullable, sem alterar a estrutura existente", () => {
+    const sql = readFileSync(new URL("../supabase/migrations/20260903010000_waiting_list_preferences.sql", import.meta.url), "utf8");
+    const statements = sql.replace(/--[^\n]*/g, "").replace(/\s+/g, " ").trim();
+    assert.equal(statements, "begin; alter table public.waiting_list add column preferred_date date, add column preferred_time time without time zone; commit;");
+});

@@ -9608,6 +9608,7 @@ function AdminPanel() {
     const waitingList = useWaitingList(isAuthenticated);
     const [waitingBooking, setWaitingBooking] = useState<WaitingListEntry | null>(null);
     const [waitingMessage, setWaitingMessage] = useState("");
+    const pendingWaitingPreference = useRef<WaitingListEntry | null>(null);
     const [selectedClient, setSelectedClient] = useState<AdminClient | null>(null);
     const [editingClient, setEditingClient] = useState<AdminClient | null>(null);
     const [editClientName, setEditClientName] = useState("");
@@ -10185,7 +10186,7 @@ function AdminPanel() {
             return;
         }
 
-        if (manualAppointmentConflicts(manualDate, manualTime, service.duration_minutes)) {
+        if ((bookedWaitingEntry && (manualDate < formatDateForInput(new Date()) || !manualAvailableTimes.includes(manualTime))) || manualAppointmentConflicts(manualDate, manualTime, service.duration_minutes)) {
             setManualError("Este período entra em conflito com outro agendamento ou bloqueio de horário.");
             return;
         }
@@ -11199,6 +11200,10 @@ function AdminPanel() {
             .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     }, [appointments, adminClientProfiles, adminNow]);
 
+    const clientCategoryCount = useMemo(() =>
+        filterAdminClients(clients, "", clientAppointmentFilter, adminNow).length,
+    [clients, clientAppointmentFilter, adminNow]);
+
     const filteredClients = useMemo(() =>
         filterAdminClients(clients, clientSearch, clientAppointmentFilter, adminNow),
     [clients, clientSearch, clientAppointmentFilter, adminNow]);
@@ -11407,7 +11412,16 @@ function AdminPanel() {
         adminBlocks,
     ]);
 
+    useEffect(() => {
+        const entry = pendingWaitingPreference.current;
+        if (!entry || !waitingBooking || !manualSelectedService) return;
+        pendingWaitingPreference.current = null;
+        const time = entry.preferred_time?.slice(0, 5) ?? "";
+        setManualTime(entry.preferred_date === manualDate && manualDate >= formatDateForInput(new Date()) && manualAvailableTimes.includes(time) ? time : "");
+    }, [waitingBooking, manualDate, manualSelectedService, manualAvailableTimes]);
+
     const manualDisplayedTimes = useMemo(() => {
+        if (waitingBooking) return manualDate < formatDateForInput(new Date()) ? [] : manualAvailableTimes;
         // Preserva a seleção especial do Admin, mas nunca recoloca um horário bloqueado.
         if (manualTime && manualSelectedService && hasScheduleBlockConflict(
             adminBlocks, manualDate, manualTime, manualSelectedService.duration_minutes,
@@ -11420,7 +11434,7 @@ function AdminPanel() {
             (first, second) =>
                 getMinutesFromTime(first) - getMinutesFromTime(second),
         );
-    }, [manualAvailableTimes, manualTime, adminBlocks, manualDate, manualSelectedService]);
+    }, [manualAvailableTimes, manualTime, adminBlocks, manualDate, manualSelectedService, waitingBooking]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
         if (!value) return "";
@@ -14385,7 +14399,7 @@ function AdminPanel() {
                     </section>
                 ) : adminView === "clients" ? (
                     <section className="admin-clients">
-                        <div className="admin-clients__header"><div><span className="admin-clients__eyebrow">Clientes</span><h2>Cadastros das clientes</h2><p>Consulte histórico, edite ou exclua um cadastro.</p></div><div className="admin-clients__count"><strong>{clients.length}</strong><span>clientes cadastradas</span></div></div>
+                        <div className="admin-clients__header"><div><span className="admin-clients__eyebrow">Clientes</span><h2>Cadastros das clientes</h2><p>Consulte histórico, edite ou exclua um cadastro.</p></div><div className="admin-clients__count"><strong>{clientCategoryCount}</strong><span>{clientAppointmentFilter === "with" ? "clientes com agendamento" : clientAppointmentFilter === "without" ? "clientes sem agendamento" : "clientes cadastradas"}</span></div></div>
                         <div className="admin-client-filters" aria-label="Filtrar clientes por agendamento">
                             {([ ["with", "Clientes com agendamento"], ["without", "Clientes sem agendamento"] ] as const).map(([value, label]) =>
                                 <button key={value} type="button" className={`admin-dashboard-card${clientAppointmentFilter === value ? " is-active" : ""}`} aria-pressed={clientAppointmentFilter === value} onClick={() => setClientAppointmentFilter((current) => current === value ? "all" : value)}>{label}</button>,
@@ -14611,8 +14625,15 @@ function AdminPanel() {
                             </div>
 
                             {adminView === "waiting" && <>
-                                <WaitingList profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
+                                <WaitingList getInterestTimes={(date) => [...new Set([...getFixedAdminNewAppointmentStartMinutes(date), ...getConfiguredClientStartMinutes(date, adminTimeOverrides)])].sort((a, b) => a - b).map(minutesToTime)} profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
+                                    pendingWaitingPreference.current = entry;
                                     setWaitingBooking(entry);
+                                    if (entry.preferred_date) {
+                                        setManualDate(entry.preferred_date);
+                                        setManualWeekReferenceDate(entry.preferred_date);
+                                        const date = new Date(entry.preferred_date + "T12:00:00");
+                                        setManualCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+                                    }
                                     setSelectedManualClient(client);
                                     setManualClientSearch(client.name);
                                     setManualTime("");
@@ -14857,7 +14878,7 @@ function AdminPanel() {
                                         <button
                                             className="admin-manual-form__save"
                                             type="submit"
-                                            disabled={isSavingManualAppointment || !selectedManualClient || !manualTime}
+                                            disabled={isSavingManualAppointment || !selectedManualClient || !manualTime || (Boolean(waitingBooking) && !manualDisplayedTimes.includes(manualTime))}
                                         >
                                             {isSavingManualAppointment ? "Criando..." : "Salvar agendamento"}
                                         </button>

@@ -32,7 +32,21 @@ const blocks = [{id: "block", block_date: "2030-01-07", start_time: "09:00", end
 const calls = [];
 const localUrl = process.env.ADMIN_TEST_URL ?? "http://127.0.0.1:5173";
 assert(["127.0.0.1", "localhost", "[::1]"].includes(new URL(localUrl).hostname));
-await context.routeWebSocket(/.*/, (socket) => socket.close());
+let realtimeWaiting;
+await context.routeWebSocket(/.*/, (socket) => {
+    if (!socket.url().startsWith(apiUrl.replace("https:", "wss:") + "/realtime/")) return socket.close();
+    socket.onMessage((raw) => {
+        const message = JSON.parse(String(raw));
+        const array = Array.isArray(message);
+        const [join_ref, ref, topic, event, payload] = array ? message : [message.join_ref, message.ref, message.topic, message.event, message.payload];
+        const send = (event, payload, messageRef = ref) => socket.send(JSON.stringify(array ? [join_ref, messageRef, topic, event, payload] : {join_ref, ref: messageRef, topic, event, payload}));
+        if (event === "phx_join") {
+            const filters = (payload.config?.postgres_changes ?? []).map((filter, i) => ({...filter, id: i + 1}));
+            send("phx_reply", {status: "ok", response: {postgres_changes: filters}});
+            if (topic === "realtime:admin-waiting-list") realtimeWaiting = (row) => send("postgres_changes", {ids: [1], data: {schema: "public", table: "waiting_list", type: "UPDATE", commit_timestamp: new Date().toISOString(), columns: [], record: row, old_record: {}, errors: null}}, null);
+        } else if (event === "heartbeat" || event === "phx_leave") send("phx_reply", {status: "ok", response: {}});
+    });
+});
 await context.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -62,9 +76,9 @@ await context.route("**/*", async (route) => {
     }
     if (resource === "waiting_list") {
         if (method === "POST") {
-            const {client_id} = request.postDataJSON();
+            const {client_id, preferred_date, preferred_time} = request.postDataJSON();
             if (entries.some((entry) => entry.client_id === client_id)) return json({code: "23505", message: "duplicate"}, 409);
-            entries.push({id: `w${++entryCounter}`, client_id, created_at: `2030-01-07T06:00:0${entryCounter}Z`});
+            entries.push({id: `w${++entryCounter}`, client_id, preferred_date, preferred_time, created_at: `2030-01-07T06:00:0${entryCounter}Z`});
         }
         if (method === "DELETE") {
             if (failRemoval) return json({message: "simulated removal failure"}, 500);
@@ -92,54 +106,88 @@ const checkWidth = async (width) => {
         const bounds = await page.locator(`${selector}:visible`).evaluateAll((items) => items.map((item) => {const rect = item.getBoundingClientRect(); return {left: rect.left, right: rect.right};}));
         assert(bounds.every((rect) => rect.left >= 0 && rect.right <= width + 1), `${selector} outside ${width}px`);
     }
+    if (width === 375 && await page.locator(".admin-waiting-list__preferences").count()) await page.locator(".admin-waiting-list__preferences").screenshot({path: "node_modules/.cache/admin-features/preferences-375.png"});
     if (width === 375) await page.screenshot({path: `node_modules/.cache/admin-features/${await page.locator(".admin-waiting-booking").count() ? "booking" : await page.locator(".admin-waiting-list").count() ? "waiting" : "filters"}-375.png`, fullPage: true});
 };
 try {
     await page.goto(`${localUrl}/admin`);
     await openView("Clientes");
     await waitFor(async () => (await names()).length === 7);
+    const count = () => page.locator(".admin-clients__count").innerText();
+    assert.match(await count(), /7\s*clientes cadastradas/);
     const beforeFilterCalls = calls.length;
     await page.getByRole("button", {name: "Clientes com agendamento", exact: true}).click();
     assert.deepEqual(await names(), ["Ana", "Zélia"]);
+    assert.match(await count(), /2\s*clientes com agendamento/);
     await page.getByLabel("Buscar cliente", {exact: true}).fill("Zé");
     assert.deepEqual(await names(), ["Zélia"]);
+    assert.match(await count(), /2\s*clientes com agendamento/);
     await page.getByLabel("Buscar cliente", {exact: true}).fill("0001");
     assert.deepEqual(await names(), ["Ana"]);
     await page.getByRole("button", {name: "Clientes sem agendamento", exact: true}).click();
     assert.deepEqual(await names(), []);
+    assert.match(await count(), /5\s*clientes sem agendamento/);
     await page.getByLabel("Buscar cliente", {exact: true}).fill("");
     assert.deepEqual(await names(), ["Beatriz", "Carla Antiga", "Dora Ausente", "Maria Cancelada", "Maria Concluída"]);
     await page.getByLabel("Buscar cliente", {exact: true}).fill("Maria");
     assert.deepEqual(await names(), ["Maria Cancelada", "Maria Concluída"]);
-    assert.equal(calls.length, beforeFilterCalls, "filters must not query Supabase");
+    assert.match(await count(), /5\s*clientes sem agendamento/);
+    await page.getByRole("button", {name: "Clientes sem agendamento", exact: true}).click();
+    assert.match(await count(), /7\s*clientes cadastradas/);
+    assert.equal(calls.length, beforeFilterCalls, "filters/counts must not query Supabase");
     for (const width of [375, 390, 430, 1280]) await checkWidth(width);
     console.log("PASS: active statuses, history, duplicates, A-Z, name/phone search, zero filter queries, four widths");
     await openView("Lista de espera");
-    const add = async (name) => {
+    const add = async (name, date = "2030-01-07", time = "08:00") => {
         await page.getByLabel("Adicionar cliente à lista de espera").fill(name);
         await page.locator(".admin-waiting-list__results").getByRole("button").first().click();
+        const calendar = page.getByRole("region", {name: "Data de interesse", exact: true});
+        assert.equal(await page.locator('.admin-waiting-list input[type="date"], .admin-waiting-list input[type="time"]').count(), 0);
+        await calendar.getByRole("button", {name: "Próximo mês", exact: true}).click();
+        await calendar.getByRole("button", {name: "Mês anterior", exact: true}).click();
+        assert(await calendar.getByRole("button", {name: "06/01/2030", exact: true}).isDisabled());
+        await calendar.getByRole("button", {name: date.split("-").reverse().join("/"), exact: true}).click();
+        await page.getByRole("region", {name: "Horário de interesse", exact: true}).getByRole("button", {name: time, exact: true}).click();
+        assert.equal(await calendar.getByRole("button", {name: date.split("-").reverse().join("/"), exact: true}).getAttribute("aria-pressed"), "true");
+        for (const width of [375, 390, 430, 1280]) await checkWidth(width);
+        await page.getByRole("button", {name: "Adicionar à lista de espera", exact: true}).click();
     };
     await add("Beatriz");
     await waitFor(() => entries.length === 1);
+    assert.equal(entries[0].preferred_date, "2030-01-07");
+    assert.equal(entries[0].preferred_time, "08:00");
+    assert.equal(rpcCalls, 0, "preference must not book");
+    assert.equal(blocks.length, 1, "preference must not block");
     await waitFor(async () => await page.getByLabel("Adicionar cliente à lista de espera").inputValue() === "");
     await add("Beatriz");
     await page.getByText("Esta cliente já está na lista de espera.", {exact: true}).waitFor();
     assert.equal(entries.length, 1);
     await page.getByLabel("Adicionar cliente à lista de espera").fill("");
-    await add("Ana");
+    await add("Ana", "2030-01-07", "09:00");
     await waitFor(() => entries.length === 2);
     await page.reload();
     await openView("Lista de espera");
     await waitFor(async () => await page.locator(".admin-waiting-list__identity strong").count() === 2);
     assert.deepEqual(await page.locator(".admin-waiting-list__identity strong").allTextContents(), ["Beatriz", "Ana"]);
     for (const width of [375, 390, 430, 1280]) await checkWidth(width);
+    assert.match(await page.locator(".admin-waiting-list__entries").innerText(), /Data de interesse: 07\/01\/2030/);
+    assert.match(await page.locator(".admin-waiting-list__entries").innerText(), /Horário de interesse: 08:00/);
+    await waitFor(() => Boolean(realtimeWaiting));
+    entries[0].preferred_date = "2030-01-08";
+    realtimeWaiting(entries[0]);
+    await page.getByText("Data de interesse: 08/01/2030", {exact: true}).waitFor();
     const bookFirst = () => page.locator(".admin-waiting-list__entries").getByRole("button", {name: "Agendar", exact: true}).first().click();
     await bookFirst();
     assert.match(await page.locator(".admin-selected-client").innerText(), /Beatriz/);
+    await waitFor(async () => await page.locator(".admin-manual-times button.is-selected").innerText() === "08:00");
+    assert.match(await page.locator(".admin-manual-booking__summary").innerText(), /08\/01\/2030/);
     assert.equal(await page.getByRole("button", {name: "Trocar", exact: true}).isVisible(), false);
     await page.getByRole("button", {name: "Cancelar", exact: true}).click();
     assert.equal(entries.length, 2);
     assert.equal(rpcCalls, 0);
+    entries[0].preferred_date = "2030-01-07";
+    realtimeWaiting(entries[0]);
+    await page.getByText("Data de interesse: 08/01/2030", {exact: true}).waitFor({state: "hidden"});
     await bookFirst();
     for (const width of [375, 390, 430, 1280]) await checkWidth(width);
     const waitingTimes = await page.locator(".admin-manual-times button").allTextContents();
@@ -183,6 +231,8 @@ try {
     assert.equal(lastRpc.p_start_time, "07:00");
     assert.equal(appointments.filter((row) => row.id.startsWith("created-")).length, 1);
     await bookFirst();
+    assert.equal(await page.locator(".admin-manual-times button.is-selected").count(), 0, "blocked preference not selected");
+    assert(await page.getByRole("button", {name: "Salvar agendamento", exact: true}).isDisabled());
     await page.locator(".admin-manual-times").getByRole("button", {name: "08:00", exact: true}).click();
     failRemoval = true;
     await page.getByRole("button", {name: "Salvar agendamento", exact: true}).click();
@@ -211,6 +261,16 @@ try {
     await page.locator(".admin-manual-form__error").filter({hasText: "bloqueio de horário"}).waitFor();
     assert.equal(rpcCalls, callsBeforeBlockedSave, "stale selected time must be refused before the RPC");
     console.log("PASS: newly added block removes a stale selection from the grid and prevents submission");
+    entries.push({id: "legacy", client_id: "c6", created_at: "2030-01-07T10:00:00Z", preferred_date: null, preferred_time: null});
+    realtimeWaiting(entries[0]);
+    await openView("Lista de espera");
+    await page.getByText("Data de interesse: Não informada", {exact: true}).waitFor();
+    await page.getByText("Horário de interesse: Não informado", {exact: true}).waitFor();
+    await bookFirst();
+    assert.equal(await page.locator(".admin-manual-times button.is-selected").count(), 0);
+    await page.getByRole("button", {name: "Cancelar", exact: true}).click();
+    assert.equal(entries.length, 1);
+    console.log("PASS: category counters independent of search, preferences persistence/display/prefill, simulated Realtime, legacy nullable fields");
     console.log("All network traffic mocked; no real database writes. RLS/migration require a staging database.");
 } finally {
     await browser.close();

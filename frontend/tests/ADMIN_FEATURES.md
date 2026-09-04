@@ -80,3 +80,15 @@ O bug de bloqueios foi corrigido localmente: `manualAvailableTimes` considera os
 Os testes locais foram aprovados. A validação estrutural confirmou os requisitos em produção. Os testes simulados não equivalem a testes de concorrência e de permissões com diferentes contas no banco real. Não foram criados registros fictícios para validar a publicação.
 
 Os arquivos locais de supabase/.temp/ ficam fora do versionamento.
+
+
+## Ajuste local: contadores e preferências da lista de espera
+
+- O contador usa filterAdminClients com busca vazia e o filtro selecionado. A busca altera apenas os cartões, sem consultas adicionais ao Supabase ou duplicação da classificação.
+- A inclusão seleciona cliente cadastrada, data e horário de interesse. Os campos usam controles nativos de data/hora, adequados ao celular. Preferência não grava agendamento nem bloqueio.
+- preferred_date e preferred_time são exibidos no cartão; registros antigos mostram “Não informada” / “Não informado”.
+- Agendar preenche cliente e data, inclusive o mês do calendário. O horário só é selecionado se estiver na disponibilidade do serviço atual. Horários indisponíveis não são reinseridos; salvar continua sujeito às validações existentes. Novo Agendamento mantém seu comportamento.
+- Nova migration preparada, NÃO aplicada: supabase/migrations/20260903010000_waiting_list_preferences.sql. Adiciona apenas preferred_date (date) e preferred_time (time without time zone), ambos nullable. A migration anterior, RLS, policies, constraints e publicação Realtime não foram alteradas.
+- A leitura mantém compatibilidade com o esquema anterior; gravar as novas preferências exige aplicar a nova migration ao banco utilizado pelo frontend. O ambiente local aponta para produção; a aplicação não foi executada nesta tarefa.
+- Validação: testes de interface com HTTP e Realtime simulados, contadores por categoria independentemente da busca, inclusão sem reserva, persistência após reload, exibição, pré-preenchimento, horário bloqueado, cancelamento, falhas e sucesso, registros antigos, e larguras 375/390/430/1280 px. Testes de bloqueios e build aprovados (aviso de bundle maior que 500 kB).
+- Os testes simulados não comprovam entrega do Realtime pelo servidor real nem aplicam SQL. Nenhum registro de teste foi criado em produção.

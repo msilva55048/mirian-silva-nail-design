@@ -18,3 +18,7 @@
     .admin-client-filters { grid-template-columns: minmax(0, 1fr); }
     .admin-waiting-list .admin-client-card__actions { display: flex; flex-direction: column; }
 }
+
+.admin-waiting-list__preferences { display: grid; gap: 12px; margin-bottom: 18px; }
+.admin-waiting-list__preferences label { min-width: 0; }
+.admin-waiting-list__preferences input { width: 100%; }
