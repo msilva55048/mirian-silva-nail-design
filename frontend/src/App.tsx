@@ -11260,7 +11260,7 @@ function AdminPanel() {
 
                 const clientPhoneDigits = client.phone.replace(/\D/g, "");
 
-                const matchesName = normalizedName.startsWith(query);
+                const matchesName = normalizedName.includes(query);
                 const matchesPhone =
                     Boolean(digits) &&
                     clientPhoneDigits.includes(digits);
@@ -11826,7 +11826,7 @@ function AdminPanel() {
                 const clientPhoneDigits = client.phone.replace(/\D/g, "");
 
                 return (
-                    normalizedName.startsWith(query) ||
+                    normalizedName.includes(query) ||
                     (Boolean(digits) && clientPhoneDigits.includes(digits))
                 );
             })

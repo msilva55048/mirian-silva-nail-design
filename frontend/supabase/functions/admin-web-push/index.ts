@@ -8,7 +8,7 @@ type PushSubscriptionInput = {
 
 type PushEvent = {
     id: string;
-    event_type: "created" | "rescheduled" | "cancelled";
+    event_type: "created" | "rescheduled" | "cancelled" | "client_registered";
     client_name: string;
     service_name: string;
     old_date: string | null;
@@ -59,6 +59,13 @@ function brazilianDate(value: string | null) {
 }
 
 function notificationFor(event: PushEvent) {
+    if (event.event_type === "client_registered") {
+        return {
+            title: "Nova cliente cadastrada",
+            body: `${event.client_name} acabou de se cadastrar.`,
+        };
+    }
+
     if (event.event_type === "created") {
         return {
             title: "Novo agendamento",

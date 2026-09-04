@@ -13,7 +13,7 @@ export function filterAdminClients(clients: AdminClient[], search: string, filte
         );
         if (filter === "with" && !hasActiveAppointment) return false;
         if (filter === "without" && hasActiveAppointment) return false;
-        return !query || client.name.trim().toLocaleLowerCase("pt-BR").startsWith(query) ||
+        return !query || client.name.trim().toLocaleLowerCase("pt-BR").includes(query) ||
             (Boolean(digits) && client.phone.replace(/\D/g, "").includes(digits));
     }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
