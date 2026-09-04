@@ -1,3 +1,4 @@
+import {SelectedClientCard} from "./SelectedClientCard";
 import {formatDateForInput} from "../../shared/domain";
 import {useState} from "react";
 import type {AdminBookingClient, ClientProfile} from "./types";
@@ -33,6 +34,8 @@ export function WaitingList({profiles, list, bookingOpen, onBook, getInterestTim
                 <input value={search} onChange={(event) => {setSearch(event.target.value); setSelectedClient(null);}} placeholder="Nome ou telefone" disabled={list.loading || list.busy || bookingOpen}/>
             </label>
         </div>
+        {selectedClient && <SelectedClientCard name={selectedClient.full_name} phone={selectedClient.phone} email={selectedClient.email}
+            disabled={list.busy || bookingOpen} onChange={() => {setSelectedClient(null); setSearch("");}}/>}
         {query && !selectedClient && <div className="admin-waiting-list__results">
             {results.map((profile) => <button type="button" className="admin-dashboard-card" key={profile.id}
                 disabled={list.loading || list.busy || bookingOpen}

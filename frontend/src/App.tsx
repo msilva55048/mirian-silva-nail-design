@@ -1,3 +1,4 @@
+import {SelectedClientCard} from "./features/admin/SelectedClientCard";
 import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
 import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
@@ -14696,23 +14697,11 @@ function AdminPanel() {
                                             </div>
 
                                             {selectedManualClient && (
-                                                <div className="admin-selected-client">
-                                                    <div>
-                                                        <span>Cliente selecionada</span>
-                                                        <strong>{selectedManualClient.name}</strong>
-                                                        <small>{selectedManualClient.phone}{selectedManualClient.email ? ` • ${selectedManualClient.email}` : ""}</small>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        hidden={Boolean(waitingBooking)}
-                                                        onClick={() => {
-                                                            setSelectedManualClient(null);
-                                                            setManualClientSearch("");
-                                                        }}
-                                                    >
-                                                        Trocar
-                                                    </button>
-                                                </div>
+                                                <SelectedClientCard name={selectedManualClient.name} phone={selectedManualClient.phone} email={selectedManualClient.email}
+                                                    hideChange={Boolean(waitingBooking)} onChange={() => {
+                                                        setSelectedManualClient(null);
+                                                        setManualClientSearch("");
+                                                    }}/>
                                             )}
                                         </div>
                                     </section>

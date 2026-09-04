@@ -141,6 +141,13 @@ try {
     const add = async (name, date = "2030-01-07", time = "08:00") => {
         await page.getByLabel("Adicionar cliente à lista de espera").fill(name);
         await page.locator(".admin-waiting-list__results").getByRole("button").first().click();
+        assert.match(await page.locator(".admin-waiting-list .admin-selected-client").innerText(), /Cliente selecionada/i);
+        assert.equal(await page.getByLabel("Adicionar cliente à lista de espera").inputValue(), name);
+        await page.locator(".admin-waiting-list .admin-selected-client").getByRole("button", {name: "Trocar", exact: true}).click();
+        assert.equal(await page.getByLabel("Adicionar cliente à lista de espera").inputValue(), "");
+        assert.equal(await page.locator(".admin-waiting-list .admin-selected-client").count(), 0);
+        await page.getByLabel("Adicionar cliente à lista de espera").fill(name);
+        await page.locator(".admin-waiting-list__results").getByRole("button").first().click();
         const calendar = page.getByRole("region", {name: "Data de interesse", exact: true});
         assert.equal(await page.locator('.admin-waiting-list input[type="date"], .admin-waiting-list input[type="time"]').count(), 0);
         await calendar.getByRole("button", {name: "Próximo mês", exact: true}).click();
