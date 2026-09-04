@@ -1,7 +1,8 @@
+import {sortedUnique, type WaitingPreferences} from "./waitingPreferences";
 import {useCallback, useEffect, useRef, useState} from "react";
 import {supabase} from "../../lib/supabase";
 
-export type WaitingListEntry = {id: string; client_id: string; created_at: string; preferred_date: string | null; preferred_time: string | null};
+export type WaitingListEntry = WaitingPreferences & {id: string; client_id: string; created_at: string};
 
 export function useWaitingList(enabled: boolean) {
     const [entries, setEntries] = useState<WaitingListEntry[]>([]);
@@ -45,12 +46,18 @@ export function useWaitingList(enabled: boolean) {
         };
     }, [enabled, reload]);
 
-    async function add(clientId: string, preferredDate: string, preferredTime: string) {
+    async function add(clientId: string, preferredDates: string[], preferredTimes: string[]) {
         if (busy) return false;
+        const dates = sortedUnique(preferredDates);
+        const times = sortedUnique(preferredTimes);
+        if (!dates.length || !times.length) {
+            setError("Selecione pelo menos uma data e um horário de interesse.");
+            return false;
+        }
         revision.current++;
         setBusy(true);
         try {
-            const {error: addError} = await supabase.from("waiting_list").insert({client_id: clientId, preferred_date: preferredDate, preferred_time: preferredTime});
+            const {error: addError} = await supabase.from("waiting_list").insert({client_id: clientId, preferred_dates: dates, preferred_times: times, preferred_date: dates.length === 1 ? dates[0] : null, preferred_time: times.length === 1 ? times[0] : null});
             if (addError) {
                 setError(addError.code === "23505" ? "Esta cliente já está na lista de espera." : "Não foi possível adicionar a cliente.");
                 return false;

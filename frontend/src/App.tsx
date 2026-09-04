@@ -1,3 +1,5 @@
+import {getSingleWaitingPreference} from "./features/admin/waitingPreferences";
+import {WaitingPreferencesSummary} from "./features/admin/WaitingPreferencesSummary";
 import {SelectedClientCard} from "./features/admin/SelectedClientCard";
 import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
@@ -11417,8 +11419,9 @@ function AdminPanel() {
         const entry = pendingWaitingPreference.current;
         if (!entry || !waitingBooking || !manualSelectedService) return;
         pendingWaitingPreference.current = null;
-        const time = entry.preferred_time?.slice(0, 5) ?? "";
-        setManualTime(entry.preferred_date === manualDate && manualDate >= formatDateForInput(new Date()) && manualAvailableTimes.includes(time) ? time : "");
+        const single = getSingleWaitingPreference(entry);
+        const time = single?.time ?? "";
+        setManualTime(single?.date === manualDate && manualDate >= formatDateForInput(new Date()) && manualAvailableTimes.includes(time) ? time : "");
     }, [waitingBooking, manualDate, manualSelectedService, manualAvailableTimes]);
 
     const manualDisplayedTimes = useMemo(() => {
@@ -14629,12 +14632,12 @@ function AdminPanel() {
                                 <WaitingList getInterestTimes={(date) => [...new Set([...getFixedAdminNewAppointmentStartMinutes(date), ...getConfiguredClientStartMinutes(date, adminTimeOverrides)])].sort((a, b) => a - b).map(minutesToTime)} profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
                                     pendingWaitingPreference.current = entry;
                                     setWaitingBooking(entry);
-                                    if (entry.preferred_date) {
-                                        setManualDate(entry.preferred_date);
-                                        setManualWeekReferenceDate(entry.preferred_date);
-                                        const date = new Date(entry.preferred_date + "T12:00:00");
-                                        setManualCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-                                    }
+                                    const single = getSingleWaitingPreference(entry);
+                                    setManualDate(single?.date ?? "");
+                                    const referenceDate = single?.date ?? formatDateForInput(new Date());
+                                    setManualWeekReferenceDate(referenceDate);
+                                    const date = new Date(referenceDate + "T12:00:00");
+                                    setManualCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
                                     setSelectedManualClient(client);
                                     setManualClientSearch(client.name);
                                     setManualTime("");
@@ -14649,6 +14652,11 @@ function AdminPanel() {
 
                             {showManualForm && (adminView === "new" || waitingBooking) && (
                                 <form id="admin-shared-booking" className={`admin-manual-booking${waitingBooking ? " admin-waiting-booking" : ""}`} onSubmit={createManualAppointment}>
+                                    {waitingBooking && <section aria-label="Preferências da cliente" className="admin-waiting-booking-preferences">
+                                        <strong>Preferências da cliente</strong>
+                                        <WaitingPreferencesSummary entry={waitingBooking}/>
+                                        {!getSingleWaitingPreference(waitingBooking) && <p>Escolha uma data no calendário e um horário disponível para agendar.</p>}
+                                    </section>}
                                     <section className="admin-manual-booking__section">
                                         <span className="admin-manual-booking__step">1</span>
                                         <div className="admin-manual-booking__content">

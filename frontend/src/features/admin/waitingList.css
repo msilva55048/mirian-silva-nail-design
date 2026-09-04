@@ -22,3 +22,6 @@
 .admin-waiting-list__preferences { display: grid; gap: 12px; margin-bottom: 18px; }
 .admin-waiting-list__preferences label { min-width: 0; }
 .admin-waiting-list__preferences input { width: 100%; }
+
+.admin-waiting-preferences-summary { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.admin-waiting-booking-preferences { min-width: 0; }
