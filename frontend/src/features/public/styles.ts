@@ -303,6 +303,25 @@ export const clientAccountStyles = `
     opacity: .3;
     cursor: not-allowed;
 }
+.client-week-day.is-blocked,
+.client-month-calendar__day.is-blocked {
+    position: relative;
+    background: #fff1f2;
+    color: #79565e;
+    cursor: not-allowed;
+    opacity: 1;
+}
+.client-week-day.is-blocked::after,
+.client-month-calendar__day.is-blocked::after {
+    content: "X";
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    color: #dc2626;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+}
 .client-month-calendar__day.is-empty {
     visibility: hidden;
 }

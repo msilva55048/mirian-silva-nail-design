@@ -1,3 +1,4 @@
+import {isClientBookingDateBlocked} from "./bookingDateRules";
 import {useEffect, useMemo, useState} from "react";
 import {supabase} from "../../lib/supabase";
 import {
@@ -1051,7 +1052,7 @@ export default function PublicSite() {
     }
 
     function selectBookingDate(date: string) {
-        if (date < today) return;
+        if (date < today || isClientBookingDateBlocked(date)) return;
 
         setSelectedDate(date);
         setWeekReferenceDate(date);
@@ -1143,6 +1144,7 @@ export default function PublicSite() {
     }
 
     function getConfiguredPublicStartMinutes(date: string) {
+        if (isClientBookingDateBlocked(date)) return [];
         return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
     }
 
@@ -1215,7 +1217,7 @@ export default function PublicSite() {
     async function confirmBooking() {
         setBookingError("");
 
-        if (!selectedServiceInformation || !selectedDate || !selectedTime) {
+        if (!selectedServiceInformation || !selectedDate || !selectedTime || isClientBookingDateBlocked(selectedDate)) {
             setBookingError("Revise o serviço, a data e o horário selecionados.");
             return;
         }
@@ -1757,16 +1759,19 @@ export default function PublicSite() {
                                                 }
 
                                                 const isPast = date < today;
+                                                const isBlocked = isClientBookingDateBlocked(date);
 
                                                 return (
                                                     <button
                                                         key={date}
                                                         type="button"
-                                                        disabled={isPast}
+                                                        disabled={isPast || isBlocked}
+                                                        aria-label={isBlocked ? `${parseLocalDate(date).toLocaleDateString("pt-BR")}: indisponível para agendamento` : undefined}
                                                         className={[
                                                             "client-month-calendar__day",
                                                             date === selectedDate ? "is-selected" : "",
                                                             isPast ? "is-past" : "",
+                                                            isBlocked ? "is-blocked" : "",
                                                         ].filter(Boolean).join(" ")}
                                                         onClick={() => selectBookingDate(date)}
                                                     >
@@ -1790,16 +1795,19 @@ export default function PublicSite() {
                                             {row.dates.map((date) => {
                                                 const parsed = parseLocalDate(date);
                                                 const isPast = date < today;
+                                                const isBlocked = isClientBookingDateBlocked(date);
 
                                                 return (
                                                     <button
                                                         key={date}
                                                         type="button"
-                                                        disabled={isPast}
+                                                        disabled={isPast || isBlocked}
+                                                        aria-label={isBlocked ? `${parseLocalDate(date).toLocaleDateString("pt-BR")}: indisponível para agendamento` : undefined}
                                                         className={[
                                                             "client-week-day",
                                                             date === selectedDate ? "is-selected" : "",
                                                             isPast ? "is-past" : "",
+                                                            isBlocked ? "is-blocked" : "",
                                                         ].filter(Boolean).join(" ")}
                                                         onClick={() => selectBookingDate(date)}
                                                     >

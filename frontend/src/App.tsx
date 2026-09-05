@@ -1,3 +1,4 @@
+import {isClientBookingDateBlocked} from "./features/public/bookingDateRules";
 import {getSingleWaitingPreference} from "./features/admin/waitingPreferences";
 import {WaitingPreferencesSummary} from "./features/admin/WaitingPreferencesSummary";
 import {SelectedClientCard} from "./features/admin/SelectedClientCard";
@@ -887,6 +888,25 @@ const clientAccountStyles = `
 .client-month-calendar__day.is-past {
     opacity: .3;
     cursor: not-allowed;
+}
+.client-week-day.is-blocked,
+.client-month-calendar__day.is-blocked {
+    position: relative;
+    background: #fff1f2;
+    color: #79565e;
+    cursor: not-allowed;
+    opacity: 1;
+}
+.client-week-day.is-blocked::after,
+.client-month-calendar__day.is-blocked::after {
+    content: "X";
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    color: #dc2626;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
 }
 .client-month-calendar__day.is-empty {
     visibility: hidden;
@@ -2719,7 +2739,7 @@ function PublicSite() {
     }
 
     function selectBookingDate(date: string) {
-        if (date < today) return;
+        if (date < today || isClientBookingDateBlocked(date)) return;
 
         setSelectedDate(date);
         setWeekReferenceDate(date);
@@ -2811,6 +2831,7 @@ function PublicSite() {
     }
 
     function getConfiguredPublicStartMinutes(date: string) {
+        if (isClientBookingDateBlocked(date)) return [];
         return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
     }
 
@@ -2933,7 +2954,7 @@ function PublicSite() {
     async function confirmBooking() {
         setBookingError("");
 
-        if (!selectedServiceInformation || !selectedDate || !selectedTime) {
+        if (!selectedServiceInformation || !selectedDate || !selectedTime || isClientBookingDateBlocked(selectedDate)) {
             setBookingError("Revise o serviço, a data e o horário selecionados.");
             return;
         }
@@ -3476,16 +3497,19 @@ function PublicSite() {
                                                 }
 
                                                 const isPast = date < today;
+                                                const isBlocked = isClientBookingDateBlocked(date);
 
                                                 return (
                                                     <button
                                                         key={date}
                                                         type="button"
-                                                        disabled={isPast}
+                                                        disabled={isPast || isBlocked}
+                                                        aria-label={isBlocked ? `${parseLocalDate(date).toLocaleDateString("pt-BR")}: indisponível para agendamento` : undefined}
                                                         className={[
                                                             "client-month-calendar__day",
                                                             date === selectedDate ? "is-selected" : "",
                                                             isPast ? "is-past" : "",
+                                                            isBlocked ? "is-blocked" : "",
                                                         ].filter(Boolean).join(" ")}
                                                         onClick={() => selectBookingDate(date)}
                                                     >
@@ -3509,16 +3533,19 @@ function PublicSite() {
                                             {row.dates.map((date) => {
                                                 const parsed = parseLocalDate(date);
                                                 const isPast = date < today;
+                                                const isBlocked = isClientBookingDateBlocked(date);
 
                                                 return (
                                                     <button
                                                         key={date}
                                                         type="button"
-                                                        disabled={isPast}
+                                                        disabled={isPast || isBlocked}
+                                                        aria-label={isBlocked ? `${parseLocalDate(date).toLocaleDateString("pt-BR")}: indisponível para agendamento` : undefined}
                                                         className={[
                                                             "client-week-day",
                                                             date === selectedDate ? "is-selected" : "",
                                                             isPast ? "is-past" : "",
+                                                            isBlocked ? "is-blocked" : "",
                                                         ].filter(Boolean).join(" ")}
                                                         onClick={() => selectBookingDate(date)}
                                                     >
