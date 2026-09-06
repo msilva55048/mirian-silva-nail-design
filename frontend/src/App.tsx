@@ -1590,6 +1590,7 @@ function PublicSite() {
     const [scheduleTimeOverrides, setScheduleTimeOverrides] = useState<ScheduleTimeOverride[]>([]);
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
+    const [hasWhatsappOptIn, setHasWhatsappOptIn] = useState(false);
     const [services, setServices] = useState<Service[]>(fallbackServices);
     const [clientUserId, setClientUserId] = useState<string | null>(null);
     const [clientUserEmail, setClientUserEmail] = useState("");
@@ -1648,6 +1649,19 @@ function PublicSite() {
     function normalizeRpcRow<T>(data: T | T[] | null): T | null {
         if (!data) return null;
         return Array.isArray(data) ? (data[0] ?? null) : data;
+    }
+    async function loadWhatsappOptIn() {
+        const {data, error} = await supabase.rpc("get_my_whatsapp_opt_in");
+
+        if (error) {
+            console.warn("Não foi possível consultar a autorização do WhatsApp:", error);
+            setHasWhatsappOptIn(false);
+            return false;
+        }
+
+        const accepted = data === true;
+        setHasWhatsappOptIn(accepted);
+        return accepted;
     }
 
     async function loadClientAppointments(profileId: string) {
@@ -3124,6 +3138,21 @@ function PublicSite() {
                 if (insertError) {
                     throw insertError;
                 }
+
+                if (!hasWhatsappOptIn) {
+                    const {data: optInSaved, error: optInError} = await supabase.rpc(
+                        "accept_whatsapp_reminders",
+                    );
+
+                    if (optInError || optInSaved !== true) {
+                        console.warn(
+                            "O agendamento foi criado, mas não foi possível registrar a autorização do WhatsApp:",
+                            optInError,
+                        );
+                    } else {
+                        setHasWhatsappOptIn(true);
+                    }
+                }
             }
 
             if (!editingClientAppointment) {
@@ -3606,8 +3635,9 @@ function PublicSite() {
                                         className="booking-modal__button"
                                         type="button"
                                         disabled={!selectedDate || !selectedTime}
-                                        onClick={() => {
+                                        onClick={async () => {
                                             setBookingError("");
+                                            await loadWhatsappOptIn();
                                             setBookingStep(4);
                                         }}
                                     >
@@ -3670,6 +3700,21 @@ function PublicSite() {
                                     </div>
                                 )}
                             </div>
+                            {!editingClientAppointment && !hasWhatsappOptIn && (                                <div
+                                    style={{
+                                        marginTop: "16px",
+                                        padding: "12px 14px",
+                                        borderRadius: "10px",
+                                        background: "rgba(255, 255, 255, 0.06)",
+                                        fontSize: "13px",
+                                        lineHeight: "1.5",
+                                    }}
+                                >
+                                    Ao confirmar, você autoriza a Mirian Silva Nail Design a enviar pelo WhatsApp
+                                    confirmações e lembretes relacionados aos seus agendamentos. Você pode cancelar
+                                    essa autorização a qualquer momento.
+                                </div>
+                            )}
                             {bookingError && <p className="booking-modal__error">{bookingError}</p>}
                             <button className="booking-modal__button" type="button" disabled={isConfirmingBooking}
                                     onClick={confirmBooking}>
