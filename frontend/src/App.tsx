@@ -299,6 +299,26 @@ function minutesToTime(totalMinutes: number) {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+const REPAIR_SERVICE_NAME = "Reparo de Unha (Unitário)";
+const REPAIR_AGENDA_SLOT_MINUTES = 30;
+const LAST_GENERATED_CLIENT_START_MINUTES = 19 * 60 + 30;
+
+function getAgendaDurationMinutes(durationMinutes: number) {
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 0;
+
+    return durationMinutes <= REPAIR_AGENDA_SLOT_MINUTES
+        ? REPAIR_AGENDA_SLOT_MINUTES
+        : durationMinutes;
+}
+
+function isRepairAppointment(serviceName: string, durationMinutes: number) {
+    return (
+        serviceName === REPAIR_SERVICE_NAME &&
+        durationMinutes > 0 &&
+        durationMinutes <= REPAIR_AGENDA_SLOT_MINUTES
+    );
+}
+
 function mergeIntervals(intervals: TimeInterval[]) {
     const sorted = [...intervals].sort((a, b) => a.start - b.start);
 
@@ -330,8 +350,7 @@ const CLIENT_WEEKDAY_START_MINUTES = [
     11 * 60,  // 11:00
     13 * 60,  // 13:00
     17 * 60,  // 17:00
-    19 * 60 + 30,  // 19:30
-    21 * 60,  // 21:00
+    19 * 60,  // 19:00
 ] as const;
 
 const CLIENT_WEEKEND_START_MINUTES = [
@@ -460,14 +479,125 @@ function getConfiguredClientStartMinutes(
         .filter((item) => item.is_available)
         .map((item) => timeToMinutes(String(item.start_time).slice(0, 5)));
 
+    // Os horários-base e qualquer horário adicionado pelo painel são âncoras fixas.
+    // Um horário removido pelo painel não pode reaparecer como horário disponível.
     return [...new Set([...baseStarts, ...addedStarts])]
         .filter((start) => !removedStarts.has(start))
-        .filter(
-            (start) =>
-                date < OCTOBER_2026_SCHEDULE_CHANGE_DATE ||
-                start !== 21 * 60,
-        )
         .sort((a, b) => a - b);
+}
+
+type ClientBookingStartContext = {
+    fixedStarts: number[];
+    generatedStarts: number[];
+    allStarts: number[];
+};
+
+function getClientBookingStartContext(
+    date: string,
+    sourceAppointments: Appointment[],
+    overrides: ScheduleTimeOverride[] = [],
+    excludedAppointmentId?: string,
+): ClientBookingStartContext {
+    const fixedStarts = getConfiguredClientStartMinutes(date, overrides);
+    const fixedStartSet = new Set(fixedStarts);
+
+    const removedStarts = new Set(
+        overrides
+            .filter(
+                (item) =>
+                    item.override_date === date &&
+                    !item.is_available,
+            )
+            .map((item) => timeToMinutes(String(item.start_time).slice(0, 5))),
+    );
+
+    const repairStarts = new Set(
+        sourceAppointments
+            .filter(
+                (appointment) =>
+                    appointment.date === date &&
+                    appointment.id !== excludedAppointmentId &&
+                    appointment.status !== "cancelled" &&
+                    appointment.status !== "no-show" &&
+                    isRepairAppointment(
+                        appointment.serviceName,
+                        appointment.durationMinutes,
+                    ),
+            )
+            .map((appointment) => timeToMinutes(appointment.startTime)),
+    );
+
+    const reachableStarts = new Set(fixedStarts);
+    const generatedStarts = new Set<number>();
+
+    let generatedSomething = true;
+
+    while (generatedSomething) {
+        generatedSomething = false;
+
+        for (const start of [...reachableStarts].sort((a, b) => a - b)) {
+            if (!repairStarts.has(start)) continue;
+
+            const candidate = start + REPAIR_AGENDA_SLOT_MINUTES;
+
+            if (candidate > LAST_GENERATED_CLIENT_START_MINUTES) continue;
+            if (removedStarts.has(candidate)) continue;
+
+            const nextFixedStart = fixedStarts.find((fixedStart) => fixedStart > start);
+
+            if (nextFixedStart !== undefined) {
+                if (candidate > nextFixedStart) continue;
+            } else {
+                // Fora de um intervalo entre âncoras, a única exceção permitida
+                // é 19:00 -> 19:30. Nenhum horário após 19:30 é gerado.
+                if (
+                    start !== 19 * 60 ||
+                    candidate !== LAST_GENERATED_CLIENT_START_MINUTES
+                ) {
+                    continue;
+                }
+            }
+
+            if (fixedStartSet.has(candidate) || reachableStarts.has(candidate)) {
+                continue;
+            }
+
+            generatedStarts.add(candidate);
+            reachableStarts.add(candidate);
+            generatedSomething = true;
+        }
+    }
+
+    return {
+        fixedStarts,
+        generatedStarts: [...generatedStarts].sort((a, b) => a - b),
+        allStarts: [...reachableStarts].sort((a, b) => a - b),
+    };
+}
+
+function canServiceUseClientStart(
+    start: number,
+    serviceDurationMinutes: number,
+    context: ClientBookingStartContext,
+) {
+    if (context.fixedStarts.includes(start)) {
+        return true;
+    }
+
+    if (!context.generatedStarts.includes(start)) {
+        return false;
+    }
+
+    const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
+    const nextFixedStart = context.fixedStarts.find((fixedStart) => fixedStart > start);
+
+    if (nextFixedStart !== undefined) {
+        return start + agendaDuration <= nextFixedStart;
+    }
+
+    // 19:30 é o último horário gerado. Quando não há outra âncora fixa
+    // depois dele, qualquer duração de serviço pode começar nesse horário.
+    return start === LAST_GENERATED_CLIENT_START_MINUTES;
 }
 
 function normalizeBrazilianPhoneDigits(value: string) {
@@ -2823,7 +2953,14 @@ function PublicSite() {
             )
             .map((appointment) => {
                 const start = timeToMinutes(appointment.startTime);
-                return {start, end: start + appointment.durationMinutes};
+                const agendaDuration = getAgendaDurationMinutes(
+                    appointment.durationMinutes,
+                );
+
+                return {
+                    start,
+                    end: start + agendaDuration,
+                };
             });
 
         const blockedIntervals = scheduleBlocks
@@ -2844,20 +2981,25 @@ function PublicSite() {
         return startMinutes <= currentMinutes;
     }
 
-    function getConfiguredPublicStartMinutes(date: string) {
-        if (isClientBookingDateBlocked(date)) return [];
-        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
-    }
-
     function getAvailableTimes(date: string, serviceDurationMinutes: number) {
-        if (!date) return [];
+        if (!date || isClientBookingDateBlocked(date)) return [];
 
         const occupiedIntervals = getOccupiedIntervals(date);
-        const generatedTimes = getConfiguredPublicStartMinutes(date);
+        const startContext = getClientBookingStartContext(
+            date,
+            appointments,
+            scheduleTimeOverrides,
+            editingClientAppointment?.id,
+        );
+        const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
 
-        return generatedTimes
+        return startContext.allStarts
             .filter((start) => {
-                const end = start + serviceDurationMinutes;
+                if (!canServiceUseClientStart(start, serviceDurationMinutes, startContext)) {
+                    return false;
+                }
+
+                const end = start + agendaDuration;
 
                 const hasConflict = occupiedIntervals.some((interval) =>
                     intervalsOverlap(start, end, interval.start, interval.end),
@@ -3049,18 +3191,34 @@ function PublicSite() {
             }
 
             const selectedStart = timeToMinutes(selectedTime);
-            const selectedEnd =
-                selectedStart + selectedServiceInformation.durationMinutes;
+            const selectedAgendaDuration = getAgendaDurationMinutes(
+                selectedServiceInformation.durationMinutes,
+            );
+            const selectedEnd = selectedStart + selectedAgendaDuration;
 
-            const allowedPublicStarts = overrideLoadError
-                ? getConfiguredPublicStartMinutes(selectedDate)
-                : getConfiguredClientStartMinutes(selectedDate, latestDateOverrides);
+            const overridesForValidation = overrideLoadError
+                ? scheduleTimeOverrides
+                : latestDateOverrides;
 
-            if (!allowedPublicStarts.includes(selectedStart)) {
+            const startContextForValidation = getClientBookingStartContext(
+                selectedDate,
+                appointmentsForSelectedDate,
+                overridesForValidation,
+                editingClientAppointment?.id,
+            );
+
+            if (
+                !startContextForValidation.allStarts.includes(selectedStart) ||
+                !canServiceUseClientStart(
+                    selectedStart,
+                    selectedServiceInformation.durationMinutes,
+                    startContextForValidation,
+                )
+            ) {
                 setSelectedTime("");
                 setBookingStep(3);
                 setBookingError(
-                    "Este horário não faz parte da agenda disponível da Mirian. Escolha outro horário.",
+                    "Este horário não comporta o serviço selecionado sem ultrapassar o próximo horário fixo. Escolha outro horário.",
                 );
                 return;
             }
@@ -3075,7 +3233,8 @@ function PublicSite() {
                         appointment.startTime,
                     );
                     const appointmentEnd =
-                        appointmentStart + appointment.durationMinutes;
+                        appointmentStart +
+                        getAgendaDurationMinutes(appointment.durationMinutes);
 
                     return intervalsOverlap(
                         selectedStart,
@@ -9891,8 +10050,8 @@ function AdminPanel() {
             try {
                 const parsedValue = JSON.parse(legacyValue) as unknown;
                 legacyNotifications = typeof parsedValue === "object" &&
-                    parsedValue !== null &&
-                    !Array.isArray(parsedValue)
+                parsedValue !== null &&
+                !Array.isArray(parsedValue)
                     ? parsedValue as Record<string, unknown>
                     : {};
             } catch (error) {
@@ -11252,12 +11411,12 @@ function AdminPanel() {
     }, [appointments, adminClientProfiles, adminNow]);
 
     const clientCategoryCount = useMemo(() =>
-        filterAdminClients(clients, "", clientAppointmentFilter, adminNow).length,
-    [clients, clientAppointmentFilter, adminNow]);
+            filterAdminClients(clients, "", clientAppointmentFilter, adminNow).length,
+        [clients, clientAppointmentFilter, adminNow]);
 
     const filteredClients = useMemo(() =>
-        filterAdminClients(clients, clientSearch, clientAppointmentFilter, adminNow),
-    [clients, clientSearch, clientAppointmentFilter, adminNow]);
+            filterAdminClients(clients, clientSearch, clientAppointmentFilter, adminNow),
+        [clients, clientSearch, clientAppointmentFilter, adminNow]);
 
     const manualBookingClients = useMemo<AdminBookingClient[]>(() => {
         const byPhone = new Map<string, AdminBookingClient>();
@@ -14754,10 +14913,10 @@ function AdminPanel() {
 
                                             {selectedManualClient && (
                                                 <SelectedClientCard name={selectedManualClient.name} phone={selectedManualClient.phone} email={selectedManualClient.email}
-                                                    hideChange={Boolean(waitingBooking)} onChange={() => {
-                                                        setSelectedManualClient(null);
-                                                        setManualClientSearch("");
-                                                    }}/>
+                                                                    hideChange={Boolean(waitingBooking)} onChange={() => {
+                                                    setSelectedManualClient(null);
+                                                    setManualClientSearch("");
+                                                }}/>
                                             )}
                                         </div>
                                     </section>
