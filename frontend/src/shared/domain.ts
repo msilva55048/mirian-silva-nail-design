@@ -1,3 +1,4 @@
+import {getPublicBaseStartMinutes, isPublicBookingDateClosed} from "./publicSchedule.ts";
 export type Service = {
     name: string;
     description: string;
@@ -114,23 +115,6 @@ export function intervalsOverlap(
     return firstStart < secondEnd && firstEnd > secondStart;
 }
 
-export const CLIENT_WEEKDAY_START_MINUTES = [
-    7 * 60,   // 07:00
-    9 * 60,   // 09:00
-    11 * 60,  // 11:00
-    13 * 60,  // 13:00
-    17 * 60,  // 17:00
-    19 * 60,  // 19:00
-    21 * 60,  // 21:00
-] as const;
-
-export const CLIENT_WEEKEND_START_MINUTES = [
-    7 * 60,   // 07:00
-    9 * 60,   // 09:00
-    11 * 60,  // 11:00
-    13 * 60,  // 13:00
-] as const;
-
 export const ADMIN_WEEKDAY_START_MINUTES = [
     7 * 60,        // 07:00
     7 * 60 + 30,   // 07:30
@@ -178,13 +162,7 @@ export function isWeekendDate(date: string) {
 }
 
 export function getFixedClientStartMinutes(date: string) {
-    if (!date) return [] as number[];
-
-    // ÚNICA fonte da grade pública de horários.
-    // Todas as clientes, antigas ou novas, passam por esta mesma função.
-    return isWeekendDate(date)
-        ? [...CLIENT_WEEKEND_START_MINUTES]
-        : [...CLIENT_WEEKDAY_START_MINUTES];
+    return getPublicBaseStartMinutes(date);
 }
 
 export function getFixedAdminManualStartMinutes(date: string) {
@@ -200,7 +178,7 @@ export function getConfiguredClientStartMinutes(
     date: string,
     overrides: ScheduleTimeOverride[] = [],
 ) {
-    if (!date) return [] as number[];
+    if (!date || isPublicBookingDateClosed(date)) return [] as number[];
 
     const baseStarts = getFixedClientStartMinutes(date);
     const dateOverrides = overrides.filter(

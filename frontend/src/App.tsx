@@ -1,3 +1,4 @@
+import {getPublicBaseStartMinutes} from "./shared/publicSchedule";
 import {isClientBookingDateBlocked} from "./features/public/bookingDateRules";
 import {getSingleWaitingPreference} from "./features/admin/waitingPreferences";
 import {WaitingPreferencesSummary} from "./features/admin/WaitingPreferencesSummary";
@@ -344,39 +345,7 @@ function intervalsOverlap(
     return firstStart < secondEnd && firstEnd > secondStart;
 }
 
-const CLIENT_WEEKDAY_START_MINUTES = [
-    7 * 60,   // 07:00
-    9 * 60,   // 09:00
-    11 * 60,  // 11:00
-    13 * 60,  // 13:00
-    17 * 60,  // 17:00
-    19 * 60,  // 19:00
-] as const;
-
-const CLIENT_WEEKEND_START_MINUTES = [
-    7 * 60,   // 07:00
-    9 * 60,   // 09:00
-    11 * 60,  // 11:00
-    13 * 60,  // 13:00
-] as const;
-
 const OCTOBER_2026_SCHEDULE_CHANGE_DATE = "2026-10-14";
-
-const CLIENT_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026 = [
-    7 * 60,   // 07:00
-    9 * 60,   // 09:00
-    11 * 60,  // 11:00
-    13 * 60,  // 13:00
-    17 * 60,  // 17:00
-    19 * 60,  // 19:00
-] as const;
-
-const CLIENT_WEEKEND_START_MINUTES_FROM_OCTOBER_14_2026 = [
-    7 * 60,   // 07:00
-    9 * 60,   // 09:00
-    11 * 60,  // 11:00
-    13 * 60,  // 13:00
-] as const;
 
 const ADMIN_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026 = [
     ...Array.from({length: 13}, (_, index) => 7 * 60 + index * 30),
@@ -418,19 +387,7 @@ function getMonthCellsForDate(value: string) {
 }
 
 function getFixedClientStartMinutes(date: string) {
-    if (!date) return [] as number[];
-
-    if (date >= OCTOBER_2026_SCHEDULE_CHANGE_DATE) {
-        return isWeekendDate(date)
-            ? [...CLIENT_WEEKEND_START_MINUTES_FROM_OCTOBER_14_2026]
-            : [...CLIENT_WEEKDAY_START_MINUTES_FROM_OCTOBER_14_2026];
-    }
-
-    // ÚNICA fonte da grade pública de horários.
-    // Todas as clientes, antigas ou novas, passam por esta mesma função.
-    return isWeekendDate(date)
-        ? [...CLIENT_WEEKEND_START_MINUTES]
-        : [...CLIENT_WEEKDAY_START_MINUTES];
+    return getPublicBaseStartMinutes(date);
 }
 
 function getFixedAdminManualStartMinutes(date: string) {
@@ -462,7 +419,7 @@ function getConfiguredClientStartMinutes(
     date: string,
     overrides: ScheduleTimeOverride[] = [],
 ) {
-    if (!date) return [] as number[];
+    if (!date || isClientBookingDateBlocked(date)) return [] as number[];
 
     const baseStarts = getFixedClientStartMinutes(date);
     const dateOverrides = overrides.filter(
@@ -484,6 +441,11 @@ function getConfiguredClientStartMinutes(
     return [...new Set([...baseStarts, ...addedStarts])]
         .filter((start) => !removedStarts.has(start))
         .sort((a, b) => a - b);
+}
+
+function getConfiguredClientBlockEndMinutes(start: number, configuredStarts: number[]) {
+    // O último horário preserva o fallback de 30 minutos, sem criar fechamento.
+    return configuredStarts.find((candidate) => candidate > start) ?? start + 30;
 }
 
 type ClientBookingStartContext = {
@@ -541,6 +503,7 @@ function getClientBookingStartContext(
             const candidate = start + REPAIR_AGENDA_SLOT_MINUTES;
 
             if (candidate > LAST_GENERATED_CLIENT_START_MINUTES) continue;
+            if (candidate === LAST_GENERATED_CLIENT_START_MINUTES && fixedStarts.at(-1) !== 19 * 60) continue;
             if (removedStarts.has(candidate)) continue;
 
             const nextFixedStart = fixedStarts.find((fixedStart) => fixedStart > start);
@@ -12040,21 +12003,27 @@ function AdminPanel() {
     const agendaAvailableTimes = useMemo(() => {
         if (!agendaDate) return [] as string[];
 
-        const today = formatDateForInput(new Date());
+        const today = formatDateForInput(adminNow);
 
         // Datas passadas são somente para consulta do histórico.
         // Não oferecemos horários para criar novos agendamentos no passado.
         if (agendaDate < today) return [] as string[];
 
-        const candidateStarts = Array.from(
-            new Set([
-                ...getFixedAdminManualStartMinutes(agendaDate),
-                ...getConfiguredClientStartMinutes(
-                    agendaDate,
-                    adminTimeOverrides,
-                ),
-            ]),
-        ).sort((first, second) => first - second);
+        const candidateStarts = getClientBookingStartContext(
+            agendaDate,
+            appointments.map((appointment) => ({
+                id: appointment.id,
+                clientName: appointment.client_name,
+                clientPhone: appointment.client_phone,
+                clientEmail: appointment.client_email ?? "",
+                serviceName: appointment.service_name,
+                date: appointment.appointment_date,
+                startTime: String(appointment.start_time).slice(0, 5),
+                durationMinutes: appointment.duration_minutes,
+                status: appointment.status,
+            })),
+            adminTimeOverrides,
+        ).allStarts;
 
         const occupiedIntervals: TimeInterval[] = appointments
             .filter(
@@ -12065,7 +12034,7 @@ function AdminPanel() {
             )
             .map((appointment) => {
                 const start = getMinutesFromTime(appointment.start_time);
-                const duration = Math.max(1, Number(appointment.duration_minutes) || 1);
+                const duration = getAgendaDurationMinutes(Math.max(1, Number(appointment.duration_minutes) || 1));
 
                 return {
                     start,
@@ -12073,7 +12042,7 @@ function AdminPanel() {
                 };
             });
 
-        const now = new Date();
+        const now = adminNow;
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         return candidateStarts
@@ -12084,14 +12053,16 @@ function AdminPanel() {
 
                 const isOccupied = occupiedIntervals.some(
                     (interval) =>
-                        candidateStart >= interval.start &&
-                        candidateStart < interval.end,
+                        intervalsOverlap(candidateStart, candidateStart + 30, interval.start, interval.end),
                 );
 
-                return !isPastToday && !isOccupied;
+                const isBlocked = hasScheduleBlockConflict(
+                    adminBlocks, agendaDate, minutesToTime(candidateStart), 30,
+                );
+                return !isPastToday && !isOccupied && !isBlocked;
             })
             .map(minutesToTime);
-    }, [agendaDate, appointments, adminTimeOverrides]);
+    }, [agendaDate, appointments, adminTimeOverrides, adminBlocks, adminNow]);
 
     const weeklyAppointments = useMemo(() =>
             appointments
@@ -12771,52 +12742,49 @@ function AdminPanel() {
     }, [blockDate]);
 
     const blockAvailableTimes = useMemo(() => {
-        const candidateStarts = getFixedClientStartMinutes(blockDate);
+        const candidateStarts = getConfiguredClientStartMinutes(blockDate, adminTimeOverrides);
 
         const occupied = appointments
             .filter(
                 (item) =>
                     item.appointment_date === blockDate &&
-                    item.status !== "cancelled",
+                    item.status !== "cancelled" && item.status !== "no-show",
             )
             .map((item) => {
                 const start = getMinutesFromTime(item.start_time);
-                return {start, end: start + item.duration_minutes};
+                return {start, end: start + getAgendaDurationMinutes(item.duration_minutes)};
             });
-
-        const blocked = adminBlocks
-            .filter((item) => item.block_date === blockDate)
-            .map((item) => ({
-                start: getMinutesFromTime(item.start_time),
-                end: getMinutesFromTime(item.end_time),
-            }));
 
         return candidateStarts
             .filter((start) => {
-                const isOccupied = [...occupied, ...blocked].some((item) =>
-                    intervalsOverlap(start, start + 30, item.start, item.end),
+                const end = getConfiguredClientBlockEndMinutes(start, candidateStarts);
+                const isOccupied = occupied.some((item) =>
+                    intervalsOverlap(start, end, item.start, item.end),
                 );
 
-                return !isOccupied;
+                return !isOccupied && !hasScheduleBlockConflict(
+                    adminBlocks, blockDate, minutesToTime(start), end - start,
+                );
             })
             .map(minutesToTime);
-    }, [appointments, adminBlocks, blockDate]);
+    }, [appointments, adminBlocks, blockDate, adminTimeOverrides]);
 
     useEffect(() => {
         setSelectedBlockTimes((current) => current.filter((time) => blockAvailableTimes.includes(time)));
     }, [blockAvailableTimes]);
 
     async function saveSelectedBlocks() {
-        if (!selectedBlockTimes.length) {
+        if (!selectedBlockTimes.length || selectedBlockTimes.some((time) => !blockAvailableTimes.includes(time))) {
             setBlockError("Selecione pelo menos um horário.");
             return;
         }
         setIsSavingBlock(true);
         setBlockError("");
+        const configuredStarts = getConfiguredClientStartMinutes(blockDate, adminTimeOverrides);
         const rows = selectedBlockTimes.map((time) => ({
             block_date: blockDate,
             start_time: time,
-            end_time: minutesToTime(getMinutesFromTime(time) + 30),
+            end_time: minutesToTime(getConfiguredClientBlockEndMinutes(getMinutesFromTime(time), configuredStarts)),
             reason: blockReason.trim() || null,
         }));
         const {data, error} = await supabase.from("schedule_blocks").insert(rows)
