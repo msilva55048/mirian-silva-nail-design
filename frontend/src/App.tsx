@@ -1720,7 +1720,6 @@ function PublicSite() {
     const [scheduleTimeOverrides, setScheduleTimeOverrides] = useState<ScheduleTimeOverride[]>([]);
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
-    const [hasWhatsappOptIn, setHasWhatsappOptIn] = useState(false);
     const [services, setServices] = useState<Service[]>(fallbackServices);
     const [clientUserId, setClientUserId] = useState<string | null>(null);
     const [clientUserEmail, setClientUserEmail] = useState("");
@@ -1780,20 +1779,6 @@ function PublicSite() {
         if (!data) return null;
         return Array.isArray(data) ? (data[0] ?? null) : data;
     }
-    async function loadWhatsappOptIn() {
-        const {data, error} = await supabase.rpc("get_my_whatsapp_opt_in");
-
-        if (error) {
-            console.warn("Não foi possível consultar a autorização do WhatsApp:", error);
-            setHasWhatsappOptIn(false);
-            return false;
-        }
-
-        const accepted = data === true;
-        setHasWhatsappOptIn(accepted);
-        return accepted;
-    }
-
     async function loadClientAppointments(profileId: string) {
         const {data, error} = await supabase.rpc("get_my_client_appointments");
 
@@ -2842,9 +2827,19 @@ function PublicSite() {
     const todayDate = new Date();
     const today = formatDateForInput(todayDate);
 
-    const selectedServiceInformation = services.find(
-        (service) => service.name === selectedService,
-    );
+    const selectedServiceInformation =
+        services.find((service) => service.name === selectedService) ??
+        (editingClientAppointment &&
+        editingClientAppointment.service_name === selectedService
+            ? {
+                name: editingClientAppointment.service_name,
+                description: "",
+                duration: formatDuration(editingClientAppointment.duration_minutes),
+                durationMinutes: editingClientAppointment.duration_minutes,
+                price: formatCurrency(editingClientAppointment.price_cents ?? 0),
+                priceCents: editingClientAppointment.price_cents ?? 0,
+            }
+            : undefined);
     const referralDiscountAppliesToCurrentBooking = Boolean(
         referralSummary &&
         (referralSummary.reward_status === "available" ||
@@ -3298,20 +3293,7 @@ function PublicSite() {
                     throw insertError;
                 }
 
-                if (!hasWhatsappOptIn) {
-                    const {data: optInSaved, error: optInError} = await supabase.rpc(
-                        "accept_whatsapp_reminders",
-                    );
 
-                    if (optInError || optInSaved !== true) {
-                        console.warn(
-                            "O agendamento foi criado, mas não foi possível registrar a autorização do WhatsApp:",
-                            optInError,
-                        );
-                    } else {
-                        setHasWhatsappOptIn(true);
-                    }
-                }
             }
 
             if (!editingClientAppointment) {
@@ -3796,7 +3778,6 @@ function PublicSite() {
                                         disabled={!selectedDate || !selectedTime}
                                         onClick={async () => {
                                             setBookingError("");
-                                            await loadWhatsappOptIn();
                                             setBookingStep(4);
                                         }}
                                     >
@@ -3859,21 +3840,6 @@ function PublicSite() {
                                     </div>
                                 )}
                             </div>
-                            {!editingClientAppointment && !hasWhatsappOptIn && (                                <div
-                                    style={{
-                                        marginTop: "16px",
-                                        padding: "12px 14px",
-                                        borderRadius: "10px",
-                                        background: "rgba(255, 255, 255, 0.06)",
-                                        fontSize: "13px",
-                                        lineHeight: "1.5",
-                                    }}
-                                >
-                                    Ao confirmar, você autoriza a Mirian Silva Nail Design a enviar pelo WhatsApp
-                                    confirmações e lembretes relacionados aos seus agendamentos. Você pode cancelar
-                                    essa autorização a qualquer momento.
-                                </div>
-                            )}
                             {bookingError && <p className="booking-modal__error">{bookingError}</p>}
                             <button className="booking-modal__button" type="button" disabled={isConfirmingBooking}
                                     onClick={confirmBooking}>
@@ -10577,9 +10543,19 @@ function AdminPanel() {
         ];
     }
 
-    const editSelectedService = adminServices.find(
-        (service) => service.name === editAppointmentService,
-    );
+    const editSelectedService =
+        adminServices.find((service) => service.name === editAppointmentService) ??
+        (selectedAdminAppointment &&
+        selectedAdminAppointment.service_name === editAppointmentService
+            ? {
+                id: -1,
+                name: selectedAdminAppointment.service_name,
+                description: "",
+                duration_minutes: selectedAdminAppointment.duration_minutes,
+                price_cents: selectedAdminAppointment.price_cents ?? 0,
+                display_order: 0,
+            } satisfies AdminServiceSetting
+            : undefined);
 
     const editAppointmentAvailableTimes = useMemo(() => {
         if (
@@ -10652,7 +10628,7 @@ function AdminPanel() {
 
     async function saveAppointmentChanges() {
         if (!selectedAdminAppointment) return;
-        const service = adminServices.find((item) => item.name === editAppointmentService);
+        const service = editSelectedService;
         if (!service) {
             setAppointmentEditError("Escolha um serviço válido.");
             return;
