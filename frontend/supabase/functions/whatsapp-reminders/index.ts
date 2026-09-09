@@ -248,6 +248,9 @@ Deno.serve(async (request) => {
         let updated = 0;
         let cancelled = 0;
         let skipped = 0;
+        const pendingInserts: Record<string, unknown>[] = [];
+        const pendingUpdates: Array<{id: number; values: Record<string, unknown>}> = [];
+        const pendingCancellations: number[] = [];
 
         for (const appointment of appointments) {
             const canReceiveWhatsapp = ACTIVE_APPOINTMENT_STATUSES.has(appointment.status);
@@ -279,8 +282,7 @@ Deno.serve(async (request) => {
                         existing.status !== "sent" &&
                         existing.status !== "cancelled"
                     ) {
-                        await cancelNotification(existing.id);
-                        cancelled++;
+                        pendingCancellations.push(existing.id);
                     }
 
                     skipped++;
@@ -289,7 +291,7 @@ Deno.serve(async (request) => {
 
                 const timing = scheduleFor(rule.notificationType, appointment);
                 if (!timing || now.getTime() < timing.prepareAt || now.getTime() >= timing.expiresAt || !Number.isFinite(appointmentAt.getTime())) {
-                    if (existing?.status === 'pending') { await cancelNotification(existing.id); cancelled++; }
+                    if (existing?.status === 'pending') pendingCancellations.push(existing.id);
                     skipped++;
                     continue;
                 }
@@ -314,7 +316,7 @@ Deno.serve(async (request) => {
                     );
 
                 if (!recipientPhone) {
-                    if (existing?.status === 'pending') { await cancelNotification(existing.id); cancelled++; }
+                    if (existing?.status === 'pending') pendingCancellations.push(existing.id);
                     skipped++;
                     continue;
                 }
@@ -351,10 +353,7 @@ Deno.serve(async (request) => {
                 }
 
                 if (existing) {
-                    const {error: updateError} =
-                        await supabase
-                            .from("whatsapp_notifications")
-                            .update({
+                    pendingUpdates.push({id: existing.id, values: {
                                 recipient_phone: recipientPhone,
                                 template_name: rule.templateName,
                                 template_language: "pt_BR",
@@ -364,24 +363,11 @@ Deno.serve(async (request) => {
                                 failed_at: null,
                                 error_message: null,
                                 updated_at: new Date().toISOString(),
-                            })
-                            .eq("id", existing.id)
-                            .in("status", ["pending", "cancelled"])
-                            .eq("attempts", 0)
-                            .is("provider_message_id", null);
-
-                    if (updateError) {
-                        throw updateError;
-                    }
-
-                    updated++;
+                            }});
                     continue;
                 }
 
-                const {error: insertError} =
-                    await supabase
-                        .from("whatsapp_notifications")
-                        .insert({
+                pendingInserts.push({
                             appointment_id: appointment.id,
                             notification_type:
                             rule.notificationType,
@@ -393,22 +379,27 @@ Deno.serve(async (request) => {
                             scheduled_for:
                                 scheduledFor.toISOString(),
                         });
-
-                /*
-                 * 23505 = outro processo já criou a mesma mensagem.
-                 * O índice único do banco protege contra duplicidade.
-                 */
-                if (
-                    insertError &&
-                    insertError.code !== "23505"
-                ) {
-                    throw insertError;
-                }
-
-                if (!insertError) {
-                    created++;
-                }
             }
+        }
+
+        if (pendingInserts.length) {
+            const {error} = await supabase.from("whatsapp_notifications").insert(pendingInserts);
+            if (error && error.code !== "23505") throw error;
+            if (!error) created += pendingInserts.length;
+        }
+        await Promise.all(pendingUpdates.map(async ({id, values}) => {
+            const {error} = await supabase.from("whatsapp_notifications").update(values)
+                .eq("id", id).in("status", ["pending", "cancelled"])
+                .eq("attempts", 0).is("provider_message_id", null);
+            if (error) throw error;
+        }));
+        updated += pendingUpdates.length;
+        if (pendingCancellations.length) {
+            const {error} = await supabase.from("whatsapp_notifications")
+                .update({status: "cancelled", updated_at: new Date().toISOString()})
+                .in("id", pendingCancellations).eq("status", "pending").eq("attempts", 0);
+            if (error) throw error;
+            cancelled += pendingCancellations.length;
         }
 
         return new Response(

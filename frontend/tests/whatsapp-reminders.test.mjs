@@ -27,7 +27,7 @@ function fixture({status = 'pending', enabled = false, notificationType = 'remin
             const query = {
                 select(){return query;}, eq(){return query;}, neq(){return query;}, in(){return query;},
                 is(){return query;}, gte(){return query;}, lte(){return query;},
-                insert(data){update=data;writes.push(data);return query;},
+                insert(data){update=data;writes.push(...(Array.isArray(data) ? data : [data]));return query;},
                 update(data){update=data;writes.push(data);return query;},
 
                 then(resolve,reject) {
