@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {browserTransport} from '../worker/whatsapp-web.mjs';
+import {browserTransport,hasHumanDraftContent} from '../worker/whatsapp-web.mjs';
 
 function pageHtml({button='legacy', oldText='', createsMessage=true}={}) {
  const buttonMarkup=button==='current' ? '<button aria-label="Enviar">Enviar</button>' : '<button data-icon="send">Enviar</button>';
@@ -31,4 +31,21 @@ test('rascunho humano impede qualquer clique',async()=>withBrowser(async page=>{
 test('fallback legado continua enviando texto multilinha exato',async()=>withBrowser(async page=>{
  const html=pageHtml({button:'legacy'});await page.setContent(html);const text='Oie Ana! 💅\\n\\n✅ Confirmar horário\\nhttps://wa.me/5548999999999?text=Teste';
  await makeTransport(page,html).send('5548999999999',text);assert.equal(await page.locator('.selectable-text').last().innerText(),text);
+}));
+
+test('detecção de rascunho ignora estruturas vazias e UI externa',async()=>withBrowser(async page=>{
+ for (const html of ['', '<br>', '<div><br></div>', '   ', '\u200b\u200c\ufeff']) {
+  await page.setContent(`<footer><div role="textbox" contenteditable="true">${html}</div><img alt="ícone da UI"></footer>`);
+  assert.equal(await hasHumanDraftContent({evaluate:(...args)=>page.evaluate(...args)}),false);
+ }
+}));
+test('detecção de rascunho reconhece texto, emoji, reply e anexo',async()=>withBrowser(async page=>{
+ for (const html of ['rascunho de teste','<img alt="✅">','<p>linha 1</p><p>linha 2</p>']) {
+  await page.setContent(`<footer><div role="textbox" contenteditable="true">${html}</div></footer>`);
+  assert.equal(await hasHumanDraftContent({evaluate:(...args)=>page.evaluate(...args)}),true);
+ }
+ for (const marker of ['quoted-message','reply','media-preview','attachment']) {
+  await page.setContent(`<footer><div role="textbox" contenteditable="true"></div><div data-testid="${marker}"></div></footer>`);
+  assert.equal(await hasHumanDraftContent({evaluate:(...args)=>page.evaluate(...args)}),true);
+ }
 }));

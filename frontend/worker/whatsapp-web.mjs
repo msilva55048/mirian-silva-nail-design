@@ -3,6 +3,23 @@ import {resolve} from 'node:path';
 
 import {eligibleAt} from '../supabase/functions/_shared/whatsapp-schedule.mjs';
 export {eligibleAt};
+export async function hasHumanDraftContent(page) {
+    return page.evaluate(() => {
+        const editor = document.querySelector('footer [contenteditable="true"][role="textbox"]');
+        if (!editor) return false;
+        const ignored = new Set(['BR','SCRIPT','STYLE']);
+        const walk = node => [...node.childNodes].map(child => {
+            if (child.nodeType === Node.TEXT_NODE) return child.nodeValue || '';
+            if (child.nodeType !== Node.ELEMENT_NODE || ignored.has(child.nodeName)) return '';
+            if (child.nodeName === 'IMG') return child.getAttribute('alt') || '';
+            return walk(child);
+        }).join('');
+        const text = walk(editor).replace(/[\u200B\u200C\u200D\uFEFF\s]/g, '');
+        const media = editor.querySelector('img[alt]:not([alt=""])') || document.querySelector('footer [data-testid*="media-preview"], footer [data-testid*="attachment"]');
+        const reply = document.querySelector('footer [data-testid*="quoted"], footer [data-testid*="reply"]');
+        return Boolean(text || media || reply);
+    });
+}
 const allowedTypes = new Set(['reminder_40h','reminder_2h']);
 function unwrap(result) { if (result.error) throw new Error('Falha de acesso ao banco'); return result.data; }
 
@@ -44,7 +61,7 @@ export function browserTransport(page, {confirmationTimeoutMs = 30000} = {}) {
             const editor = page.locator('footer [contenteditable="true"][role="textbox"]');
             await editor.waitFor({state:'visible',timeout:60000});
             // Never overwrite an existing human draft.
-            if ((await editor.innerText()).trim()) throw new Error('Conversa com rascunho');
+            if (await hasHumanDraftContent(page)) throw new Error('Conversa com rascunho');
             // Only outgoing element identifiers are inspected; no incoming text.
             const messageNodes = page.locator('[data-testid="msg-container"], .message-out');
             const before = await messageNodes.evaluateAll(els=>els.filter(el=>
@@ -76,13 +93,20 @@ export function browserTransport(page, {confirmationTimeoutMs = 30000} = {}) {
                 return {count: collect().length};
             }, {message, beforeIds:[...beforeIds]});
             console.log(`[whatsapp] saídas antes=${observation.count}; observer iniciado`);
-            const lines = message.split('\n');
-            await editor.fill(lines[0]);
-            for (const line of lines.slice(1)) {
-                await editor.press('Shift+Enter');
-                if (line) await editor.pressSequentially(line);
-            }
-            if (await editor.innerText() !== message) throw new Error('Texto diverge do payload');
+            await editor.fill(message);
+            const composerText = await page.evaluate(() => {
+                const editorNode = document.querySelector('footer [contenteditable="true"][role="textbox"]');
+                const walk = node => [...node.childNodes].map(child => {
+                    if (child.nodeType === Node.TEXT_NODE) return child.nodeValue || '';
+                    if (child.nodeName === 'BR') return '\n';
+                    if (child.nodeName === 'IMG') return child.getAttribute('alt') || '';
+                    const value = walk(child);
+                    return ['P','DIV','LI'].includes(child.nodeName) ? `${value}\n` : value;
+                }).join('');
+                return String(walk(editorNode || '')).normalize('NFC').replace(/\u200b/g, '').replace(/\r\n?/g, '\n').split('\n').map(line => line.trimEnd()).join('\n').trim();
+            });
+            const expectedText = message.normalize('NFC').replace(/\r\n?/g, '\n').split('\n').map(line => line.trimEnd()).join('\n').trim();
+            if (composerText !== expectedText) throw new Error('Texto diverge do payload');
             const sendButton = page.locator('footer button[aria-label="Enviar"]');
             if (await sendButton.count()) await sendButton.first().click({timeout:10000});
             else await page.locator('footer [data-testid="send"], footer [data-icon="wds-ic-send-filled"], footer [data-icon="send"]').first().click({timeout:10000});
