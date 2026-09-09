@@ -1,3 +1,4 @@
+import {getClientBookingStartContext, canServiceUseClientStart, getAgendaDurationMinutes} from "../../shared/dynamicSchedule";
 import {isClientBookingDateBlocked} from "./bookingDateRules";
 import {useEffect, useMemo, useState} from "react";
 import {supabase} from "../../lib/supabase";
@@ -11,7 +12,6 @@ import {
     formatCurrency,
     formatDateForInput,
     formatDuration,
-    getConfiguredClientStartMinutes,
     intervalsOverlap,
     MIRIAN_ADMIN_EMAIL,
     mergeIntervals,
@@ -1122,7 +1122,7 @@ export default function PublicSite() {
             )
             .map((appointment) => {
                 const start = timeToMinutes(appointment.startTime);
-                return {start, end: start + appointment.durationMinutes};
+                return {start, end: start + getAgendaDurationMinutes(appointment.durationMinutes)};
             });
 
         const blockedIntervals = scheduleBlocks
@@ -1143,20 +1143,18 @@ export default function PublicSite() {
         return startMinutes <= currentMinutes;
     }
 
-    function getConfiguredPublicStartMinutes(date: string) {
-        if (isClientBookingDateBlocked(date)) return [];
-        return getConfiguredClientStartMinutes(date, scheduleTimeOverrides);
-    }
 
     function getAvailableTimes(date: string, serviceDurationMinutes: number) {
         if (!date) return [];
 
         const occupiedIntervals = getOccupiedIntervals(date);
-        const generatedTimes = getConfiguredPublicStartMinutes(date);
+        const context = getClientBookingStartContext(date, appointments, scheduleTimeOverrides, editingClientAppointment?.id);
+        const generatedTimes = context.allStarts;
 
         return generatedTimes
             .filter((start) => {
-                const end = start + serviceDurationMinutes;
+                if (!canServiceUseClientStart(start, serviceDurationMinutes, context)) return false;
+                const end = start + getAgendaDurationMinutes(serviceDurationMinutes);
 
                 const hasConflict = occupiedIntervals.some((interval) =>
                     intervalsOverlap(start, end, interval.start, interval.end),
@@ -1299,13 +1297,11 @@ export default function PublicSite() {
 
             const selectedStart = timeToMinutes(selectedTime);
             const selectedEnd =
-                selectedStart + selectedServiceInformation.durationMinutes;
+                selectedStart + getAgendaDurationMinutes(selectedServiceInformation.durationMinutes);
 
-            const allowedPublicStarts = overrideLoadError
-                ? getConfiguredPublicStartMinutes(selectedDate)
-                : getConfiguredClientStartMinutes(selectedDate, latestDateOverrides);
-
-            if (!allowedPublicStarts.includes(selectedStart)) {
+            const context = getClientBookingStartContext(selectedDate, appointmentsForSelectedDate,
+                overrideLoadError ? scheduleTimeOverrides : latestDateOverrides, editingClientAppointment?.id);
+            if (!canServiceUseClientStart(selectedStart, selectedServiceInformation.durationMinutes, context)) {
                 setSelectedTime("");
                 setBookingStep(3);
                 setBookingError(
@@ -1324,7 +1320,7 @@ export default function PublicSite() {
                         appointment.startTime,
                     );
                     const appointmentEnd =
-                        appointmentStart + appointment.durationMinutes;
+                        appointmentStart + getAgendaDurationMinutes(appointment.durationMinutes);
 
                     return intervalsOverlap(
                         selectedStart,

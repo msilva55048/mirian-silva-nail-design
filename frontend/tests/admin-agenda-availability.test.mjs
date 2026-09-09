@@ -1,3 +1,4 @@
+import {getClientBookingStartContext,canServiceUseClientStart,getAgendaDurationMinutes} from '../src/shared/dynamicSchedule.ts';
 import {getPublicBaseStartMinutes,isPublicBookingDateClosed} from '../src/shared/publicSchedule.ts';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
@@ -8,9 +9,9 @@ const source=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const tree=ts.createSourceFile('App.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
 const nodes=[];function visit(n){nodes.push(n);ts.forEachChild(n,visit);}visit(tree);
 const declaration=name=>nodes.find(n=>(ts.isFunctionDeclaration(n)||ts.isVariableDeclaration(n))&&n.name?.getText(tree)===name);
-const fnNames=['timeToMinutes','minutesToTime','getMinutesFromTime','formatDateForInput','getAgendaDurationMinutes','isRepairAppointment','mergeIntervals','intervalsOverlap','isWeekendDate','getFixedClientStartMinutes','getFixedAdminManualStartMinutes','getFixedAdminNewAppointmentStartMinutes','getConfiguredClientStartMinutes','getConfiguredClientBlockEndMinutes','getClientBookingStartContext','canServiceUseClientStart'];
+const fnNames=['timeToMinutes','minutesToTime','getMinutesFromTime','formatDateForInput','getAgendaDurationMinutes','mergeIntervals','intervalsOverlap','isWeekendDate','getFixedClientStartMinutes','getFixedAdminManualStartMinutes','getFixedAdminNewAppointmentStartMinutes','getConfiguredClientStartMinutes','getConfiguredClientBlockEndMinutes','getClientBookingStartContext','canServiceUseClientStart'];
 const constants=tree.statements.filter(ts.isVariableStatement).filter(n=>n.declarationList.declarations.some(d=>/^(CLIENT_|ADMIN_(WEEKDAY|WEEKEND)|REPAIR_|LAST_GENERATED_|OCTOBER_2026_)/.test(d.name.getText(tree))));
-const defs="const isPublicBookingDateClosed = "+isPublicBookingDateClosed.toString()+"; const isClientBookingDateBlocked = isPublicBookingDateClosed; const getPublicBaseStartMinutes = "+getPublicBaseStartMinutes.toString()+";\n"+[...constants.map(n=>n.getText(tree)),...fnNames.map(n=>declaration(n).getText(tree))].join('\n');
+const defs="const REPAIR_AGENDA_SLOT_MINUTES=30; const LAST_GENERATED_CLIENT_START_MINUTES=1170; const isPublicBookingDateClosed = "+isPublicBookingDateClosed.toString()+"; const isClientBookingDateBlocked = isPublicBookingDateClosed; const getPublicBaseStartMinutes = "+getPublicBaseStartMinutes.toString()+";\n"+[...constants.map(n=>n.getText(tree)),...fnNames.map(n=>({getClientBookingStartContext,canServiceUseClientStart,getAgendaDurationMinutes}[n]?.toString() ?? declaration(n).getText(tree)))].join('\n');
 const compile=text=>ts.transpileModule(text,{compilerOptions:{target:ts.ScriptTarget.ES2023,module:ts.ModuleKind.None}}).outputText;
 function runMemo(name,vars){const body=declaration(name).initializer.arguments[0].getText(tree);return new Function(...Object.keys(vars),'hasScheduleBlockConflict',compile(defs+`\nreturn (${body})();`))(...Object.values(vars),hasScheduleBlockConflict);}
 const helpers=new Function(compile(defs+'\nreturn {getClientBookingStartContext,canServiceUseClientStart,getConfiguredClientStartMinutes,getFixedAdminManualStartMinutes,getAgendaDurationMinutes};'))();
@@ -36,18 +37,18 @@ async function save(times,overrides=[],appointments=[],blocks=[]){
  await call(...Object.values(scope));return inserted;
 }
 test('top panel uses only public starts and hides occupied 09:00',()=>{assert.deepEqual(agenda(),base);assert.deepEqual(agenda([appt('09:00')]),base.filter(t=>t!=='09:00'));});
-test('all configured anchors occupied leaves no administrative 30-minute false slots',()=>{assert.deepEqual(agenda(base.map(t=>appt(t))),[]);});
+test('occupied anchors retain only the real 15:00 ending',()=>{assert.deepEqual(agenda(base.map(t=>appt(t))),['15:00']);});
 test('blocked anchor and partial overlap disappear immediately',()=>{assert.ok(!agenda([],[{block_date:date,start_time:'09:00',end_time:'11:00'}]).includes('09:00'));assert.ok(!agenda([appt('09:15', 'confirmed',30)]).includes('09:00'));});
 test('only cancelled and no-show are ignored; completed still occupies',()=>{assert.deepEqual(agenda([appt('09:00','cancelled'),appt('11:00','no-show')]),base);assert.ok(!agenda([appt('09:00','completed')]).includes('09:00'));});
 test('configured additions and removals are respected in both panels',()=>{const changes=[override('10:00'),override('11:00',false)];for(const list of [agenda([],[],changes),blockTimes([],[],changes)]){assert.ok(list.includes('10:00'));assert.ok(!list.includes('11:00'));}});
 for(const [start,end] of [['09:00','11:00'],['11:00','13:00'],['13:00','17:00'],['19:00','19:30']])test(`saveSelectedBlocks inserts ${start}–${end}`,async()=>{assert.deepEqual((await save([start])).map(r=>[r.start_time,r.end_time]),[[start,end]]);});
 test('added 10:00 becomes next boundary; removed anchor is never a boundary',async()=>{assert.deepEqual((await save(['09:00','10:00'],[override('10:00')])).map(r=>[r.start_time,r.end_time]),[['09:00','10:00'],['10:00','11:00']]);assert.equal((await save(['09:00'],[override('11:00',false)]))[0].end_time,'13:00');});
 test('block selection checks entire interval and rejects stale selection',async()=>{assert.ok(!blockTimes([appt('10:00','confirmed',30)]).includes('09:00'));assert.deepEqual(await save(['09:00'],[],[appt('10:00','confirmed',30)]),[]);});
-test('repair chains preserved, 20 minutes occupies 30, normal service never generates starts',()=>{
+test('repair chains preserved, 20 minutes occupies 30, normal services also generate their endings',()=>{
  const repair=t=>appt(t,'confirmed',20,'Reparo de Unha (Unitário)');
  assert.ok(agenda([repair('09:00')]).includes('09:30'));
  assert.ok(agenda([repair('09:00'),repair('09:30')]).includes('10:00'));
- assert.ok(!agenda([appt('09:00','confirmed',30)]).includes('09:30'));
+ assert.ok(agenda([appt('09:00','confirmed',30)]).includes('09:30'));
  assert.ok(agenda([repair('19:00')]).includes('19:30'));
  assert.ok(!agenda([repair('19:00'),repair('19:30')]).includes('20:00'));
  assert.equal(helpers.getAgendaDurationMinutes(20),30);
@@ -115,4 +116,14 @@ test('ADM submits Sunday creation and edit successfully with simulated persisten
  for(const name of ['createManualAppointment','saveAppointmentChanges']) await new Function(...Object.keys(scope),compile(declaration(name).getText(tree)+'; return '+name+'({preventDefault(){}});'))(...Object.values(scope));
  assert.deepEqual(errors,[]);
  assert.deepEqual(calls,[['admin_create_client_appointment',sunday],['appointments',sunday]]);
+});
+
+test('long anchor booking hides occupied anchor but exposes real ending and later anchor',()=>{
+ const common={appointments:[{id:'long',date,startTime:'07:00',durationMinutes:150,serviceName:'Futuro',status:'confirmed'}],editingClientAppointment:null,scheduleBlocks:[],scheduleTimeOverrides:[],today:'2030-01-06'};
+ const publicFns=['getOccupiedIntervals','isPastTime','getAvailableTimes'].map(n=>declaration(n).getText(tree)).join('\n');
+ const get=new Function(...Object.keys(common),compile(defs+'\n'+publicFns+'\nreturn getAvailableTimes;'))(...Object.values(common));
+ assert.ok(!get(date,90).includes('09:00'));
+ assert.ok(get(date,90).includes('09:30'));
+ assert.ok(get(date,90).includes('11:00'));
+ assert.ok(!get(date,120).includes('09:30'));
 });

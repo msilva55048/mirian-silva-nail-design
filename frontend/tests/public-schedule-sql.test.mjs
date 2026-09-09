@@ -21,6 +21,7 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
   await db.exec(old.replaceAll('now()',"timestamptz '2026-09-08T12:00:00Z'"));
   await db.exec(await readFile(new URL('../supabase/migrations/20260908200000_correct_public_booking_schedule.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20260908220000_final_public_booking_schedule.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20260908230000_dynamic_appointment_end_slots.sql',import.meta.url),'utf8'));
   const allowed=async(date,time,duration=30,name='Normal')=>(await db.query('select client_booking_start_allowed($1,$2,$3,$4,null) as ok',[date,time,name,duration])).rows[0].ok;
   const create=async(date,time,name='Normal')=>(await db.query('select create_my_appointment($1,$2,$3) as id',[name,date,time])).rows[0].id;
   let lastId;
@@ -28,6 +29,7 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
    const expected=getPublicBaseStartMinutes(date);
    assert.deepEqual((await db.query('select client_booking_base_start_minutes($1) as starts',[date])).rows[0].starts,expected);
    for(const min of [420,540,660,780,1020,1140,1170,1260]){
+    await db.exec('truncate appointments');
     const time=String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0');
     assert.equal(await allowed(date,time),expected.includes(min),`${date} ${time}`);
     if(expected.includes(min)){
@@ -36,6 +38,7 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
     } else await assert.rejects(create(date,time));
    }
   }
+  lastId=await create('2026-10-27','07:00');
   for (const closedDate of ['2026-10-21','2026-10-22','2026-10-23','2026-10-24','2026-10-25','2026-10-26','2026-11-01','2026-11-08']) {
    await db.query('insert into schedule_time_overrides values($1,$2,true)',[closedDate,'09:00']);
    await db.query("insert into appointments(service_name,appointment_date,start_time,duration_minutes,status) values('Reparo de Unha (Unitário)',$1,'09:00',20,'confirmed')",[closedDate]);
@@ -65,5 +68,29 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
   await db.exec("insert into schedule_time_overrides values('2026-10-31','10:30',true)");
   assert.equal(await allowed('2026-10-31','10:00',60),false);
   assert.equal(await allowed('2026-10-31','10:00',30),true);
+
+  await db.exec("insert into services values(3,'Esmaltação',90,100),(4,'Longo',150,100),(5,'Futuro',180,100),(6,'Duas horas',120,100),(7,'Uma hora',60,100)");
+  for (const [name,end,fit,tooLong] of [['Esmaltação','08:30','Normal','Esmaltação'],['Longo','09:30','Esmaltação','Duas horas'],['Futuro','10:00','Uma hora','Esmaltação']]) {
+   await db.exec('truncate appointments,schedule_time_overrides');
+   await create('2026-10-27','07:00',name);
+   assert.equal(await allowed('2026-10-27',end),true);
+   await assert.rejects(create('2026-10-27',end,tooLong));
+   const moved=await create('2026-10-27','13:00',tooLong);
+   await assert.rejects(db.query('select reschedule_my_appointment($1,$2,$3)',[moved,'2026-10-27',end]));
+   await create('2026-10-27',end,fit);
+   if (end!=='08:30') await assert.rejects(create('2026-10-27','09:00'));
+   await create('2026-10-27','11:00');
+  }
+  await db.exec('truncate appointments,schedule_time_overrides');
+  await create('2026-10-27','09:00');
+  await create('2026-10-27','09:30','Uma hora');
+  assert.equal(await allowed('2026-10-27','10:30',30),true);
+  assert.equal(await allowed('2026-10-27','10:30',60),false);
+  const movable=await create('2026-10-27','17:00');
+  await db.query('select reschedule_my_appointment($1,$2,$3)',[movable,'2026-10-27','10:30']);
+  await db.exec("insert into schedule_time_overrides values('2026-10-27','10:30',true)");
+  assert.equal(await allowed('2026-10-27','10:30',120),true);
+  await db.exec("update schedule_time_overrides set is_available=false");
+  assert.equal(await allowed('2026-10-27','10:30',30),false);
  } finally {await db.close();}
 });

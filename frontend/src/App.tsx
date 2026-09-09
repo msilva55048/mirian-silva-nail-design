@@ -1,3 +1,4 @@
+import {getClientBookingStartContext, canServiceUseClientStart, getAgendaDurationMinutes} from "./shared/dynamicSchedule";
 import {getPublicBaseStartMinutes} from "./shared/publicSchedule";
 import {isClientBookingDateBlocked} from "./features/public/bookingDateRules";
 import {getSingleWaitingPreference} from "./features/admin/waitingPreferences";
@@ -300,26 +301,6 @@ function minutesToTime(totalMinutes: number) {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-const REPAIR_SERVICE_NAME = "Reparo de Unha (Unitário)";
-const REPAIR_AGENDA_SLOT_MINUTES = 30;
-const LAST_GENERATED_CLIENT_START_MINUTES = 19 * 60 + 30;
-
-function getAgendaDurationMinutes(durationMinutes: number) {
-    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 0;
-
-    return durationMinutes <= REPAIR_AGENDA_SLOT_MINUTES
-        ? REPAIR_AGENDA_SLOT_MINUTES
-        : durationMinutes;
-}
-
-function isRepairAppointment(serviceName: string, durationMinutes: number) {
-    return (
-        serviceName === REPAIR_SERVICE_NAME &&
-        durationMinutes > 0 &&
-        durationMinutes <= REPAIR_AGENDA_SLOT_MINUTES
-    );
-}
-
 function mergeIntervals(intervals: TimeInterval[]) {
     const sorted = [...intervals].sort((a, b) => a.start - b.start);
 
@@ -446,121 +427,6 @@ function getConfiguredClientStartMinutes(
 function getConfiguredClientBlockEndMinutes(start: number, configuredStarts: number[]) {
     // O último horário preserva o fallback de 30 minutos, sem criar fechamento.
     return configuredStarts.find((candidate) => candidate > start) ?? start + 30;
-}
-
-type ClientBookingStartContext = {
-    fixedStarts: number[];
-    generatedStarts: number[];
-    allStarts: number[];
-};
-
-function getClientBookingStartContext(
-    date: string,
-    sourceAppointments: Appointment[],
-    overrides: ScheduleTimeOverride[] = [],
-    excludedAppointmentId?: string,
-): ClientBookingStartContext {
-    const fixedStarts = getConfiguredClientStartMinutes(date, overrides);
-    const fixedStartSet = new Set(fixedStarts);
-
-    const removedStarts = new Set(
-        overrides
-            .filter(
-                (item) =>
-                    item.override_date === date &&
-                    !item.is_available,
-            )
-            .map((item) => timeToMinutes(String(item.start_time).slice(0, 5))),
-    );
-
-    const repairStarts = new Set(
-        sourceAppointments
-            .filter(
-                (appointment) =>
-                    appointment.date === date &&
-                    appointment.id !== excludedAppointmentId &&
-                    appointment.status !== "cancelled" &&
-                    appointment.status !== "no-show" &&
-                    isRepairAppointment(
-                        appointment.serviceName,
-                        appointment.durationMinutes,
-                    ),
-            )
-            .map((appointment) => timeToMinutes(appointment.startTime)),
-    );
-
-    const reachableStarts = new Set(fixedStarts);
-    const generatedStarts = new Set<number>();
-
-    let generatedSomething = true;
-
-    while (generatedSomething) {
-        generatedSomething = false;
-
-        for (const start of [...reachableStarts].sort((a, b) => a - b)) {
-            if (!repairStarts.has(start)) continue;
-
-            const candidate = start + REPAIR_AGENDA_SLOT_MINUTES;
-
-            if (candidate > LAST_GENERATED_CLIENT_START_MINUTES) continue;
-            if (candidate === LAST_GENERATED_CLIENT_START_MINUTES && fixedStarts.at(-1) !== 19 * 60) continue;
-            if (removedStarts.has(candidate)) continue;
-
-            const nextFixedStart = fixedStarts.find((fixedStart) => fixedStart > start);
-
-            if (nextFixedStart !== undefined) {
-                if (candidate > nextFixedStart) continue;
-            } else {
-                // Fora de um intervalo entre âncoras, a única exceção permitida
-                // é 19:00 -> 19:30. Nenhum horário após 19:30 é gerado.
-                if (
-                    start !== 19 * 60 ||
-                    candidate !== LAST_GENERATED_CLIENT_START_MINUTES
-                ) {
-                    continue;
-                }
-            }
-
-            if (fixedStartSet.has(candidate) || reachableStarts.has(candidate)) {
-                continue;
-            }
-
-            generatedStarts.add(candidate);
-            reachableStarts.add(candidate);
-            generatedSomething = true;
-        }
-    }
-
-    return {
-        fixedStarts,
-        generatedStarts: [...generatedStarts].sort((a, b) => a - b),
-        allStarts: [...reachableStarts].sort((a, b) => a - b),
-    };
-}
-
-function canServiceUseClientStart(
-    start: number,
-    serviceDurationMinutes: number,
-    context: ClientBookingStartContext,
-) {
-    if (context.fixedStarts.includes(start)) {
-        return true;
-    }
-
-    if (!context.generatedStarts.includes(start)) {
-        return false;
-    }
-
-    const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
-    const nextFixedStart = context.fixedStarts.find((fixedStart) => fixedStart > start);
-
-    if (nextFixedStart !== undefined) {
-        return start + agendaDuration <= nextFixedStart;
-    }
-
-    // 19:30 é o último horário gerado. Quando não há outra âncora fixa
-    // depois dele, qualquer duração de serviço pode começar nesse horário.
-    return start === LAST_GENERATED_CLIENT_START_MINUTES;
 }
 
 function normalizeBrazilianPhoneDigits(value: string) {
