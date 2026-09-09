@@ -80,12 +80,18 @@ export function browserTransport(page, {confirmationTimeoutMs = 30000} = {}) {
                     const walk = node => [...node.childNodes].map(child => child.nodeType === Node.TEXT_NODE ? child.nodeValue : child.nodeName === 'IMG' ? (child.getAttribute('alt') || '') : walk(child)).join('');
                     return normalize(walk(el.querySelector('.selectable-text') || el));
                 };
-                const collect = () => [...root.querySelectorAll('[data-testid="msg-container"], .message-out')].filter(el => el.matches('.message-out') || el.querySelector('[data-testid="tail-out"], [data-icon="tail-out"], span[aria-label="Você:"]')).map((el,index) => ({id: el.closest('[data-id]')?.getAttribute('data-id') || el.closest('[data-testid^="conv-msg-"]')?.getAttribute('data-testid') || null,index,text:extract(el)}));
+                const collect = () => [...root.querySelectorAll('[data-testid="msg-container"], .message-out')].filter(el => el.matches('.message-out') || el.querySelector('[data-testid="tail-out"], [data-icon="tail-out"], span[aria-label="Você:"]')).map((el,index) => {
+                    const statuses = [...el.querySelectorAll('[aria-label]')].map(node => normalize(node.getAttribute('aria-label'))).filter(Boolean);
+                    const statusText = statuses.join(' ');
+                    const rejected = /erro|falha|pendente|aguardando|relógio|clock|sending|pending/i.test(statusText);
+                    const accepted = /enviado|entregue|lido|sent|delivered|read/i.test(statusText);
+                    return {id: el.closest('[data-id]')?.getAttribute('data-id') || el.closest('[data-testid^="conv-msg-"]')?.getAttribute('data-testid') || null,index,text:extract(el),accepted:accepted && !rejected};
+                });
                 let resolveResult;
                 const promise = new Promise(resolve => { resolveResult = resolve; });
                 const observer = new MutationObserver(() => {
                     const items = collect();
-                    const match = items.find(item => (item.id && !beforeIds.includes(item.id) || item.index >= beforeIds.length) && (item.text === normalize(message) || (message.endsWith('✅') && item.text === normalize(message.slice(0,-1)))));
+                    const match = items.find(item => (item.id && !beforeIds.includes(item.id) || item.index >= beforeIds.length) && item.accepted && (item.text === normalize(message) || (message.endsWith('✅') && item.text === normalize(message.slice(0,-1)))));
                     if (match) { observer.disconnect(); resolveResult({match, elapsedMs: Date.now() - window.__waSendObservation.startedAt, mutations:true}); }
                 });
                 window.__waSendObservation = {startedAt:Date.now(), promise, observer};
