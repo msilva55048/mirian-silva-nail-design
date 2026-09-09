@@ -29,3 +29,6 @@ supabase/.temp/
 worker/.session/
 worker/.session-worker/
 worker/.env
+worker/.worker.lock
+worker/.worker.pid
+worker/logs/

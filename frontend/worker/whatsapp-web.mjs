@@ -1,5 +1,6 @@
-import {pathToFileURL} from 'node:url';
-import {resolve} from 'node:path';
+import {pathToFileURL, fileURLToPath} from 'node:url';
+import {resolve, dirname} from 'node:path';
+import {mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync, closeSync, appendFileSync} from 'node:fs';
 
 import {eligibleAt} from '../supabase/functions/_shared/whatsapp-schedule.mjs';
 export {eligibleAt};
@@ -21,6 +22,57 @@ export async function hasHumanDraftContent(page) {
     });
 }
 const allowedTypes = new Set(['reminder_40h','reminder_2h']);
+const workerDir = dirname(fileURLToPath(import.meta.url));
+const runtimeDir = resolve(workerDir);
+const lockPath = resolve(runtimeDir, '.worker.lock');
+const pidPath = resolve(runtimeDir, '.worker.pid');
+const logPath = resolve(runtimeDir, 'logs', 'worker.log');
+let lockFd;
+
+function startFileLogging() {
+    mkdirSync(resolve(runtimeDir, 'logs'), {recursive:true});
+    const originalLog = console.log.bind(console);
+    const originalError = console.error.bind(console);
+    const persist = (original, args) => {
+        const line = `[${new Date().toISOString()}] ${args.map(value => typeof value === 'string' ? value : JSON.stringify(value)).join(' ')}`;
+        try { appendFileSync(logPath, `${line}\n`); } catch {}
+        original(...args);
+    };
+    console.log = (...args) => persist(originalLog, args);
+    console.error = (...args) => persist(originalError, args);
+}
+
+function acquireWorkerLock() {
+    mkdirSync(runtimeDir, {recursive:true});
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            lockFd = openSync(lockPath, 'wx');
+            writeFileSync(lockFd, JSON.stringify({pid:process.pid,started_at:new Date().toISOString()}));
+            writeFileSync(pidPath, String(process.pid));
+            return true;
+        } catch (error) {
+            if (error.code !== 'EEXIST') throw error;
+            let stale = true;
+            try {
+                const pid = Number(JSON.parse(readFileSync(lockPath, 'utf8')).pid);
+                if (Number.isInteger(pid) && pid > 0) { process.kill(pid, 0); stale = false; }
+            } catch (probeError) {
+                if (probeError.code !== 'ESRCH') stale = false;
+            }
+            if (!stale) return false;
+            try { unlinkSync(lockPath); } catch (unlinkError) { if (unlinkError.code !== 'ENOENT') throw unlinkError; }
+        }
+    }
+    return false;
+}
+
+function releaseWorkerLock() {
+    try { if (lockFd !== undefined) closeSync(lockFd); } catch {}
+    lockFd = undefined;
+    try { unlinkSync(lockPath); } catch (error) { if (error.code !== 'ENOENT') console.error('[worker] não foi possível remover lock:', error.message); }
+    try { unlinkSync(pidPath); } catch (error) { if (error.code !== 'ENOENT') console.error('[worker] não foi possível remover PID:', error.message); }
+}
+
 function unwrap(result) { if (result.error) throw new Error('Falha de acesso ao banco'); return result.data; }
 
 export async function processOne(db, transport, now = () => Date.now()) {
@@ -125,7 +177,13 @@ export function browserTransport(page, {confirmationTimeoutMs = 30000} = {}) {
 }
 
 async function main() {
-    if (process.env.WHATSAPP_WEB_SENDING_ENABLED !== 'true') { console.log('Envio desabilitado. Nenhuma conexão iniciada.'); return; }
+    if (!acquireWorkerLock()) { console.log('[worker] já existe uma instância ativa; encerrando com segurança.'); return; }
+    startFileLogging();
+    process.once('SIGINT', () => { console.log('[worker] encerramento solicitado.'); releaseWorkerLock(); process.exit(0); });
+    process.once('SIGTERM', () => { console.log('[worker] encerramento solicitado.'); releaseWorkerLock(); process.exit(0); });
+    process.once('exit', releaseWorkerLock);
+    console.log(`[worker] iniciado; pid=${process.pid}; diretório=${runtimeDir}`);
+    if (process.env.WHATSAPP_WEB_SENDING_ENABLED !== 'true') { console.log('[worker] envio desabilitado; nenhuma conexão iniciada.'); return; }
     for (const key of ['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY']) if (!process.env[key]) throw new Error(`Configure ${key}`);
     const {chromium} = await import('playwright');
     const {createClient} = await import('@supabase/supabase-js');
@@ -136,8 +194,11 @@ async function main() {
         const page = context.pages()[0] ?? await context.newPage();
         await page.goto('https://web.whatsapp.com');
         const transport = browserTransport(page);
+        await transport.ready();
+        console.log('[worker] sessão WhatsApp carregada; polling a cada 30s.');
         do {
             const processed = await processOne(db,transport);
+            if (!processed) console.log('[worker] polling: nenhuma notificação elegível.');
             if (process.argv.includes('--once')) break;
             if (!processed) await new Promise(r=>setTimeout(r,30000));
         } while (true);
