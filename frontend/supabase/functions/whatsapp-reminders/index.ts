@@ -4,7 +4,6 @@ import {createClient} from "npm:@supabase/supabase-js@2.57.4";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const REMINDERS_SECRET = Deno.env.get("WHATSAPP_REMINDERS_SECRET")!;
-const MIRIAN_WHATSAPP_PHONE = Deno.env.get("MIRIAN_WHATSAPP_PHONE") || "";
 
 const supabase = createClient(
     SUPABASE_URL,
@@ -104,18 +103,8 @@ function buildMessage(type: string, appointment: Appointment) {
  const time = String(appointment.start_time).slice(0,5);
  if (type === "reminder_2h") return `Oie ${name}! Tudo bem? Passando pra te lembrar que seu horário comigo é hoje, dia ${date}, às ${time}. Te espero! 💅`;
  if (type !== "reminder_40h") throw new Error("Tipo não permitido");
- if (!/^55\d{10,11}$/.test(MIRIAN_WHATSAPP_PHONE)) throw new Error("Configure MIRIAN_WHATSAPP_PHONE em formato internacional");
- const link = (text: string) => `https://wa.me/${MIRIAN_WHATSAPP_PHONE}?text=${encodeURIComponent(text)}`;
- return `Oie ${name}! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia ${date}, às ${time}. Posso confirmar sua presença? 💅
+ return `Oie ${name}! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia ${date}, às ${time}. Posso confirmar sua presença? 💅`;
 
-✅ Confirmar horário
-${link(`Oie Mirian! Confirmo meu horário do dia ${date} às ${time}. 💅`)}
-
-✏️ Editar horário
-${link(`Oie Mirian! Quero editar meu horário do dia ${date} às ${time}. Podemos ver outro horário?`)}
-
-❌ Cancelar horário
-${link(`Oie Mirian! Quero cancelar meu horário do dia ${date} às ${time}.`)}`;
 }
 
 async function cancelNotification(notificationId: number) {

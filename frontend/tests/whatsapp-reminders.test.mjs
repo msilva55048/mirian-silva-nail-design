@@ -58,15 +58,13 @@ test('queue-only never claims or sends',async()=>{
 });
 
 const build = new Function('MIRIAN_WHATSAPP_PHONE', compiled.slice(compiled.indexOf('function brazilianDate'), compiled.indexOf('async function cancelNotification')) + ';return buildMessage;')('5548999999999');
-test('exact texts, first name and encoded links',()=>{
+test('exact texts without confirmation links',()=>{
  const a={client_name:' Ana Silva ',appointment_date:'2026-09-12',start_time:'14:30:00'};
  const short=build('reminder_2h',a);
  assert.equal(short,'Oie Ana! Tudo bem? Passando pra te lembrar que seu horário comigo é hoje, dia 12/09/2026, às 14:30. Te espero! 💅');
  const long=build('reminder_40h',a);
- assert.ok(long.startsWith('Oie Ana! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia 12/09/2026, às 14:30. Posso confirmar sua presença? 💅'));
- const links=long.split('\n').filter(x=>x.startsWith('https://'));
- assert.equal(links.length,3);
- assert.deepEqual(links.map(x=>new URL(x).searchParams.get('text')),['Oie Mirian! Confirmo meu horário do dia 12/09/2026 às 14:30. 💅','Oie Mirian! Quero editar meu horário do dia 12/09/2026 às 14:30. Podemos ver outro horário?','Oie Mirian! Quero cancelar meu horário do dia 12/09/2026 às 14:30.']);
+ assert.equal(long,'Oie Ana! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia 12/09/2026, às 14:30. Posso confirmar sua presença? 💅');
+ assert.doesNotMatch(long,/wa\.me|Confirmar horário|Editar horário|Cancelar horário/);
  assert.throws(()=>build('other',a));
 });
 test('backend prepares payload and never sends even with legacy flag enabled',async()=>{
