@@ -2,7 +2,7 @@
 
 Execute dentro de frontend com Node.js 22+. Playwright e Chromium foram instalados localmente. Copie worker/.env.example para worker/.env. A trava própria WHATSAPP_WEB_SENDING_ENABLED=false não abre navegador nem conecta ao banco. O secret antigo WHATSAPP_SENDING_ENABLED não habilita este worker.
 
-Quando autorizado, npm run worker abre um navegador visível com perfil exclusivo worker/.session e login por QR Code. Uma única instância usa o perfil; computador ligado, conectado e sem suspensão. npm run worker -- --once processa no máximo um item elegível. Nunca use esse modo numa fila de produção para escolher um destinatário: ele pega o próximo item.
+Quando autorizado, npm run worker abre um navegador visível com Chrome instalado e perfil exclusivo worker/.session-worker; WHATSAPP_WEB_PROFILE_DIR pode apontar para outro perfil local. Uma única instância usa o perfil; computador ligado, conectado e sem suspensão. npm run worker -- --once processa no máximo um item elegível. Nunca use esse modo numa fila de produção para escolher um destinatário: ele pega o próximo item.
 
 O backend gera payload.version=2, phone e message completos, com MIRIAN_WHATSAPP_PHONE configurado exclusivamente no gerador. Campos legados template_name/template_language ainda são preenchidos para compatibilidade do esquema não revalidado; não existe envio de template Meta.
 

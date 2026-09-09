@@ -36,7 +36,7 @@ export async function processOne(db, transport, now = () => Date.now()) {
     return true;
 }
 
-export function browserTransport(page) {
+export function browserTransport(page, {confirmationTimeoutMs = 30000} = {}) {
     return {
         async ready() { await page.locator('#pane-side').waitFor({state:'visible',timeout:120000}); },
         async send(number,message) {
@@ -46,8 +46,36 @@ export function browserTransport(page) {
             // Never overwrite an existing human draft.
             if ((await editor.innerText()).trim()) throw new Error('Conversa com rascunho');
             // Only outgoing element identifiers are inspected; no incoming text.
-            const outgoing = page.locator('.message-out');
-            const ids = await outgoing.evaluateAll(els=>els.map(el=>el.closest('[data-id]')?.getAttribute('data-id')).filter(Boolean));
+            const messageNodes = page.locator('[data-testid="msg-container"], .message-out');
+            const before = await messageNodes.evaluateAll(els=>els.filter(el=>
+                el.matches('.message-out') || el.querySelector('[data-testid="tail-out"], [data-icon="tail-out"], span[aria-label="Você:"]')
+            ).map((el,index)=>({
+                id: el.closest('[data-id]')?.getAttribute('data-id') || el.closest('[data-testid^="conv-msg-"]')?.getAttribute('data-testid') || null,
+                index,
+                text: String(el.querySelector('.selectable-text')?.innerText ?? el.innerText ?? '').replace(/\u200b/g, '').trim(),
+            })));
+            const beforeIds = new Set(before.map(item=>item.id).filter(Boolean));
+            const observation = await page.evaluate(({message, beforeIds}) => {
+                const root = document.querySelector('#main') || document.querySelector('#chat');
+                if (!root) throw new Error('Painel da conversa não encontrado');
+                const normalize = value => String(value ?? '').normalize('NFC').replace(/\u200b/g, '').trim();
+                const extract = el => {
+                    const walk = node => [...node.childNodes].map(child => child.nodeType === Node.TEXT_NODE ? child.nodeValue : child.nodeName === 'IMG' ? (child.getAttribute('alt') || '') : walk(child)).join('');
+                    return normalize(walk(el.querySelector('.selectable-text') || el));
+                };
+                const collect = () => [...root.querySelectorAll('[data-testid="msg-container"], .message-out')].filter(el => el.matches('.message-out') || el.querySelector('[data-testid="tail-out"], [data-icon="tail-out"], span[aria-label="Você:"]')).map((el,index) => ({id: el.closest('[data-id]')?.getAttribute('data-id') || el.closest('[data-testid^="conv-msg-"]')?.getAttribute('data-testid') || null,index,text:extract(el)}));
+                let resolveResult;
+                const promise = new Promise(resolve => { resolveResult = resolve; });
+                const observer = new MutationObserver(() => {
+                    const items = collect();
+                    const match = items.find(item => (item.id && !beforeIds.includes(item.id) || item.index >= beforeIds.length) && (item.text === normalize(message) || (message.endsWith('✅') && item.text === normalize(message.slice(0,-1)))));
+                    if (match) { observer.disconnect(); resolveResult({match, elapsedMs: Date.now() - window.__waSendObservation.startedAt, mutations:true}); }
+                });
+                window.__waSendObservation = {startedAt:Date.now(), promise, observer};
+                observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','data-id']});
+                return {count: collect().length};
+            }, {message, beforeIds:[...beforeIds]});
+            console.log(`[whatsapp] saídas antes=${observation.count}; observer iniciado`);
             const lines = message.split('\n');
             await editor.fill(lines[0]);
             for (const line of lines.slice(1)) {
@@ -55,14 +83,12 @@ export function browserTransport(page) {
                 if (line) await editor.pressSequentially(line);
             }
             if (await editor.innerText() !== message) throw new Error('Texto diverge do payload');
-            await page.locator('footer [data-icon="send"]').click({timeout:10000});
-            const deadline = Date.now()+30000;
-            while (Date.now()<deadline) {
-                const candidates = await outgoing.evaluateAll((els,oldIds)=>els.filter(el=>!oldIds.includes(el.closest('[data-id]')?.getAttribute('data-id'))).map(el=>({id:el.closest('[data-id]')?.getAttribute('data-id'),text:el.querySelector('.selectable-text')?.innerText,ack:!!el.querySelector('[data-icon="msg-check"], [data-icon="msg-dblcheck"]')})),ids);
-                const match = candidates.find(x=>x.id && !ids.includes(x.id) && x.text===message && x.ack);
-                if (match) return match.id;
-                await new Promise(r=>setTimeout(r,500));
-            }
+            const sendButton = page.locator('footer button[aria-label="Enviar"]');
+            if (await sendButton.count()) await sendButton.first().click({timeout:10000});
+            else await page.locator('footer [data-testid="send"], footer [data-icon="wds-ic-send-filled"], footer [data-icon="send"]').first().click({timeout:10000});
+            console.log('[whatsapp] clique realizado; aguardando nova saída');
+            const result = await page.evaluate(timeout => Promise.race([window.__waSendObservation.promise, new Promise(resolve => setTimeout(() => resolve(null), timeout))]), confirmationTimeoutMs);
+            if (result?.match) { console.log(`[whatsapp] mutação detectada; id=${result.match.id || 'sem-id'}; tempo=${result.elapsedMs}ms`); return result.match.id || `waweb-${Date.now()}-${result.match.index}`; }
             throw new Error('Envio incerto');
         },
     };
@@ -74,7 +100,8 @@ async function main() {
     const {chromium} = await import('playwright');
     const {createClient} = await import('@supabase/supabase-js');
     const db = createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
-    const context = await chromium.launchPersistentContext(resolve('worker/.session'),{headless:false});
+    const profileDir = process.env.WHATSAPP_WEB_PROFILE_DIR || 'worker/.session-worker';
+    const context = await chromium.launchPersistentContext(resolve(profileDir),{headless:false,channel:'chrome'});
     try {
         const page = context.pages()[0] ?? await context.newPage();
         await page.goto('https://web.whatsapp.com');

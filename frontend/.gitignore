@@ -27,4 +27,5 @@ dist-ssr
 supabase/.temp/
 
 worker/.session/
+worker/.session-worker/
 worker/.env
