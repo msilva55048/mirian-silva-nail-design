@@ -81,11 +81,38 @@ test('public client availability still respects repair fit, occupancy and schedu
 });
 
 test('19:30 is generated only with 19:00 as the last configured anchor',()=>{
- const date='2026-10-25';
+ const date='2026-10-27';
  const repair={id:'r',date,startTime:'19:00',serviceName:'Reparo de Unha (Unitário)',durationMinutes:20,status:'confirmed'};
- assert.ok(!helpers.getClientBookingStartContext(date,[repair]).generatedStarts.includes(1170));
+ assert.ok(helpers.getClientBookingStartContext(date,[repair]).generatedStarts.includes(1170));
  const removed=[{override_date:date,start_time:'21:00',is_available:false}];
  assert.ok(helpers.getClientBookingStartContext(date,[repair],removed).generatedStarts.includes(1170));
  const extra=[...removed,{override_date:date,start_time:'20:00',is_available:true}];
  assert.ok(!helpers.getClientBookingStartContext(date,[repair],extra).generatedStarts.includes(1170));
+});
+
+for (const closedDate of ['2026-10-24','2026-10-26','2026-11-01','2026-11-08']) test('public closure preserves ADM creation/edit: '+closedDate,()=>{
+ const common={...vars(),adminNow:new Date('2026-09-08T12:00:00')};
+ assert.ok(runMemo('manualAvailableTimes',{...common,manualDate:closedDate,manualSelectedService:{duration_minutes:30}}).includes('09:00'));
+ assert.ok(runMemo('editAppointmentAvailableTimes',{...common,editAppointmentDate:closedDate,selectedAdminAppointment:{id:'existing'},editSelectedService:{duration_minutes:30}}).includes('09:00'));
+ const repair={id:'r',date:closedDate,startTime:'09:00',serviceName:'Reparo de Unha (Unitário)',durationMinutes:20,status:'confirmed'};
+ assert.deepEqual(helpers.getClientBookingStartContext(closedDate,[repair],[{override_date:closedDate,start_time:'09:00',is_available:true}]).allStarts,[]);
+});
+test('old 19:30 is fixed and Saturday has no final evening repair slot',()=>{
+ assert.ok(helpers.getClientBookingStartContext('2026-10-20',[]).fixedStarts.includes(1170));
+ const date='2026-10-31';
+ const repair={id:'r',date,startTime:'13:00',serviceName:'Reparo de Unha (Unitário)',durationMinutes:20,status:'confirmed'};
+ assert.deepEqual(helpers.getClientBookingStartContext(date,[repair]).generatedStarts,[]);
+});
+
+test('ADM submits Sunday creation and edit successfully with simulated persistence',async()=>{
+ const sunday='2030-01-06',calls=[],errors=[];
+ const noop=()=>{};
+ const scope={isSavingManualAppointment:false,waitingBooking:null,selectedManualClient:{profileId:'client',name:'Teste Cliente',phone:'48999999999'},manualDate:sunday,manualTime:'09:00',manualServiceName:'Normal',adminServices:[{name:'Normal',duration_minutes:30,price_cents:100}],manualAppointmentConflicts:()=>false,
+ Date:class extends Date {constructor(...args){super(...(args.length?args:['2026-09-08T12:00:00']));}},
+ setManualError:e=>{if(e)errors.push(e);},setManualSuccess:noop,setIsSavingManualAppointment:noop,setAppointments:noop,setAgendaDate:noop,setManualTime:noop,
+ selectedAdminAppointment:{id:'saved'},editSelectedService:{name:'Normal',duration_minutes:30},editAppointmentDate:sunday,editAppointmentTime:'09:30',editAppointmentName:'Teste Cliente',editAppointmentPhone:'48999999999',editAppointmentEmail:'',editAppointmentMusicTaste:'',appointmentConflicts:()=>false,formatBrazilianPhone:v=>v,setAppointmentEditError:e=>{if(e)errors.push(e);},setIsSavingAppointment:noop,setSelectedAdminAppointment:noop,
+ supabase:{async rpc(name,args){calls.push([name,args.p_appointment_date]);return {data:{id:'saved',client_name:'Teste Cliente'},error:null};},from(table){return {update(data){calls.push([table,data.appointment_date]);return {async eq(){return {error:null};}};}};}}};
+ for(const name of ['createManualAppointment','saveAppointmentChanges']) await new Function(...Object.keys(scope),compile(declaration(name).getText(tree)+'; return '+name+'({preventDefault(){}});'))(...Object.values(scope));
+ assert.deepEqual(errors,[]);
+ assert.deepEqual(calls,[['admin_create_client_appointment',sunday],['appointments',sunday]]);
 });

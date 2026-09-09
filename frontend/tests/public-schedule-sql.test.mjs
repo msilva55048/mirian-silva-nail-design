@@ -20,14 +20,15 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
   // Only this synthetic database freezes the clock for repeatable 2026 fixtures.
   await db.exec(old.replaceAll('now()',"timestamptz '2026-09-08T12:00:00Z'"));
   await db.exec(await readFile(new URL('../supabase/migrations/20260908200000_correct_public_booking_schedule.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20260908220000_final_public_booking_schedule.sql',import.meta.url),'utf8'));
   const allowed=async(date,time,duration=30,name='Normal')=>(await db.query('select client_booking_start_allowed($1,$2,$3,$4,null) as ok',[date,time,name,duration])).rows[0].ok;
   const create=async(date,time,name='Normal')=>(await db.query('select create_my_appointment($1,$2,$3) as id',[name,date,time])).rows[0].id;
   let lastId;
-  for(const date of ['2026-10-25','2026-10-26','2026-10-31','2026-11-01','2026-11-02']){
+  for(const date of ['2026-10-18','2026-10-19','2026-10-20','2026-10-21','2026-10-22','2026-10-23','2026-10-24','2026-10-25','2026-10-26','2026-10-27','2026-10-31','2026-11-01','2026-11-02','2026-11-07','2026-11-08']){
    const expected=getPublicBaseStartMinutes(date);
    assert.deepEqual((await db.query('select client_booking_base_start_minutes($1) as starts',[date])).rows[0].starts,expected);
-   for(const min of [420,540,660,780,1020,1140,1260]){
-    const time=String(Math.floor(min/60)).padStart(2,'0')+':00';
+   for(const min of [420,540,660,780,1020,1140,1170,1260]){
+    const time=String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0');
     assert.equal(await allowed(date,time),expected.includes(min),`${date} ${time}`);
     if(expected.includes(min)){
      lastId=await create(date,time);
@@ -35,18 +36,24 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
     } else await assert.rejects(create(date,time));
    }
   }
+  for (const closedDate of ['2026-10-21','2026-10-22','2026-10-23','2026-10-24','2026-10-25','2026-10-26','2026-11-01','2026-11-08']) {
+   await db.query('insert into schedule_time_overrides values($1,$2,true)',[closedDate,'09:00']);
+   await db.query("insert into appointments(service_name,appointment_date,start_time,duration_minutes,status) values('Reparo de Unha (Unitário)',$1,'09:00',20,'confirmed')",[closedDate]);
+   assert.equal(await allowed(closedDate,'09:00'),false);
+   assert.equal(await allowed(closedDate,'09:30',20,'Reparo de Unha (Unitário)'),false);
+   await assert.rejects(create(closedDate,'09:00'));
+   await assert.rejects(db.query('select reschedule_my_appointment($1,$2,$3)',[lastId,closedDate,'09:00']));
+  }
   await assert.rejects(db.query('select reschedule_my_appointment($1,$2,$3)',[lastId,'2026-11-01','07:00']));
   await db.exec("insert into schedule_time_overrides values('2026-11-01','07:00',true)");
   assert.equal(await allowed('2026-11-01','07:00'),false);
   await db.exec('truncate appointments,schedule_time_overrides');
-  await create('2026-10-25','19:00','Reparo de Unha (Unitário)');
-  assert.equal(await allowed('2026-10-25','19:30'),false); // 21:00 still an anchor
-  await db.exec("insert into schedule_time_overrides values('2026-10-25','21:00',false)");
-  assert.equal(await allowed('2026-10-25','19:30',120),true);
-  await create('2026-10-25','19:30','Reparo de Unha (Unitário)');
-  assert.equal(await allowed('2026-10-25','20:00'),false);
-  await db.exec("insert into schedule_time_overrides values('2026-10-25','20:00',true)");
-  assert.equal(await allowed('2026-10-25','19:30'),false);
+  await create('2026-10-27','19:00','Reparo de Unha (Unitário)');
+  assert.equal(await allowed('2026-10-27','19:30',120),true);
+  await create('2026-10-27','19:30','Reparo de Unha (Unitário)');
+  assert.equal(await allowed('2026-10-27','20:00'),false);
+  await db.exec("insert into schedule_time_overrides values('2026-10-27','20:00',true)");
+  assert.equal(await allowed('2026-10-27','19:30'),false);
   await db.exec('truncate appointments,schedule_time_overrides');
   const repair=await create('2026-10-31','09:00','Reparo de Unha (Unitário)');
   assert.equal((await db.query('select duration_minutes from appointments where id=$1',[repair])).rows[0].duration_minutes,20);
