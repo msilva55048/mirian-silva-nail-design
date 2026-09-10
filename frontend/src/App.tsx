@@ -10,6 +10,7 @@ import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin
 import {useWaitingList, type WaitingListEntry} from "./features/admin/useWaitingList";
 import {WaitingList} from "./features/admin/WaitingList";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
+import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -6580,29 +6581,6 @@ type AppointmentMessageDispatch = {
     sent_at: string;
     sent_by: string;
 };
-
-function formatAppointmentDateForMessage(date: string) {
-    return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-    });
-}
-
-function buildWhatsAppMessage(
-    appointment: AdminAppointment,
-    type: WhatsAppNotificationType,
-) {
-    const firstName = appointment.client_name.trim().split(/\s+/)[0] || appointment.client_name;
-    const date = formatAppointmentDateForMessage(appointment.appointment_date);
-    const time = String(appointment.start_time).slice(0, 5);
-
-    if (type === "attendance-confirmation") {
-        return `Oie ${firstName}! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia ${date}, às ${time}. Posso confirmar sua presença? 💅`;
-    }
-
-    return `Oie ${firstName}! Tudo bem? Passando para lembrar do nosso horário de hoje, às ${time}. Estarei te esperando. 💅`;
-}
 
 function getWhatsAppNotificationLabel(type: WhatsAppNotificationType) {
     if (type === "attendance-confirmation") return "Solicitar confirmação";

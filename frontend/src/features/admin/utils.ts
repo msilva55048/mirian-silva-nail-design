@@ -47,34 +47,10 @@ export function getAppointmentEndDateTime(appointment: AdminAppointment) {
 
 
 export type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
-
-export function formatAppointmentDateForMessage(date: string) {
-    return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-    });
-}
-
-export function buildWhatsAppMessage(
-    appointment: AdminAppointment,
-    type: WhatsAppNotificationType,
-) {
-    const firstName = appointment.client_name.trim().split(/\s+/)[0] || appointment.client_name;
-    const date = formatAppointmentDateForMessage(appointment.appointment_date);
-    const time = String(appointment.start_time).slice(0, 5);
-
-    if (type === "attendance-confirmation") {
-        return `Oie ${firstName}! Tudo bem? Passando pra lembrar do seu horário comigo amanhã, dia ${date}, às ${time}. Posso confirmar sua presença? 💅`;
-    }
-
-    return `Oie ${firstName}! Tudo bem? Passando para lembrar do nosso horário de hoje, às ${time}. Estarei te esperando. 💅`;
-}
+export {buildWhatsAppMessage, formatAppointmentDateForMessage} from "./whatsappMessage";
 
 export function getWhatsAppNotificationLabel(type: WhatsAppNotificationType) {
     if (type === "attendance-confirmation") return "Solicitar confirmação";
     return "Enviar lembrete";
 }
-
-
 
