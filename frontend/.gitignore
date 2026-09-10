@@ -25,10 +25,3 @@ dist-ssr
 .env
 # Arquivos locais do Supabase CLI
 supabase/.temp/
-
-worker/.session/
-worker/.session-worker/
-worker/.env
-worker/.worker.lock
-worker/.worker.pid
-worker/logs/
