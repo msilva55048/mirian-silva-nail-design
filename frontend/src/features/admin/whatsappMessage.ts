@@ -15,5 +15,5 @@ export function buildWhatsAppMessage(appointment: WhatsAppConfirmationAppointmen
     const date = formatAppointmentDateForMessage(appointment.appointment_date);
     const time = String(appointment.start_time).slice(0, 5);
     if (type !== "attendance-confirmation") return `Oie ${firstName}! Tudo bem? Passando para lembrar do nosso horário de hoje, às ${time}. Estarei te esperando. 💅`;
-    return ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "          Mirian Silva", "           Nail Design", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "", `Olá, ${firstName}! ✨`, "", "Gostaria de confirmar seu", "agendamento comigo amanhã.", "", `💅 Serviço: ${appointment.service_name}`, `📅 Data: ${date}`, `🕐 Horário: ${time}`, "", "Posso confirmar sua presença?", "", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"].join("\n");
+    return [`Olá, ${firstName}! ✨`, "", "Gostaria de confirmar seu", "*agendamento* comigo amanhã.", "", `💅 Serviço: ${appointment.service_name}`, `🗓️ Data: ${date}`, `🕐 Horário: ${time}`, "", "Posso confirmar sua presença?"].join("\n");
 }

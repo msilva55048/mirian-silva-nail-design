@@ -10,16 +10,14 @@ const appointment = {
     start_time: "07:00:00",
 };
 
-test("mensagem de confirmação mantém dados dinâmicos e separadores iguais", () => {
+test("mensagem de confirmação mantém dados dinâmicos e negrito nativo", () => {
     const message = buildWhatsAppMessage(appointment, "attendance-confirmation");
-    const separator = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-    assert.equal(message.split(separator).length - 1, 3);
-    assert.match(message, /Mirian Silva\n           Nail Design/);
     assert.match(message, /Olá, Moisés! ✨/);
+    assert.match(message, /Gostaria de confirmar seu\n\*agendamento\* comigo amanhã\./);
     assert.match(message, /💅 Serviço: Esmaltação em Gel com Blindagem/);
-    assert.match(message, /📅 Data: 25\/12\/2026/);
+    assert.match(message, /🗓️ Data: 25\/12\/2026/);
     assert.match(message, /🕐 Horário: 07:00/);
-    assert.match(message, /Gostaria de confirmar seu\nagendamento comigo amanhã\./);
+    assert.doesNotMatch(message, /━|Mirian Silva|Nail Design/);
 });
 
 test("URL manual preserva telefone e codifica a mensagem", () => {
@@ -27,7 +25,7 @@ test("URL manual preserva telefone e codifica a mensagem", () => {
     const phone = "5548998074518";
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     assert.match(url, /^https:\/\/wa\.me\/5548998074518\?text=/);
-    assert.match(decodeURIComponent(url.split("?text=")[1]), /━━━━━━━━/);
+    assert.doesNotMatch(decodeURIComponent(url.split("?text=")[1]), /━/);
     assert.match(decodeURIComponent(url.split("?text=")[1]), /Olá, Moisés! ✨/);
 });
 
