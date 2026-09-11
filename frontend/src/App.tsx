@@ -3301,6 +3301,8 @@ function PublicSite() {
                     display: flex;
                     align-items: center;
                     gap: 11px;
+                    min-width: 0;
+                    flex: 1 1 auto;
                 }
                 .client-logged-header__brand img {
                     width: 44px;
@@ -3321,6 +3323,9 @@ function PublicSite() {
                     color: #8a7078;
                     font-size: .76rem;
                 }
+                .client-logged-header__brand > div { min-width: 0; }
+                .client-logged-header__brand strong,
+                .client-logged-header__brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .client-logged-header__actions {
                     display: flex;
                     width: auto;
@@ -3375,14 +3380,11 @@ function PublicSite() {
                 }
                 @media (max-width: 700px) {
                     .client-logged-header {
-                        align-items: flex-start;
-                        flex-direction: column;
+                        align-items: center;
+                        flex-direction: row;
                     }
                     .client-logged-header__actions {
-                        width: 100%;
-                    }
-                    .client-logged-header__actions button {
-                        width: 100%;
+                        width: auto;
                     }
                 }
             `}</style>
@@ -3405,13 +3407,6 @@ function PublicSite() {
                                 title={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
                             >
                                 {clientPushState === "enabled" ? "🔔" : "🔕"}
-                            </button>
-                            <button
-                                type="button"
-                                className="client-logged-header__appointments"
-                                onClick={() => void logoutClient()}
-                            >
-                                Sair
                             </button>
                             <button
                                 className="client-logged-header__appointments"
