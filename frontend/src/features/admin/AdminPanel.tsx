@@ -2387,6 +2387,15 @@ export default function AdminPanel() {
         mergeSavedTimeOverrides((data ?? []) as ScheduleTimeOverride[]);
     }
 
+    async function addScheduleTimeOverride(time: string) {
+        // Criar ou reativar sempre grava explicitamente como disponível.
+        await saveScheduleTimeOverride(time, true);
+    }
+
+    async function removeScheduleTimeOverride(time: string) {
+        await saveScheduleTimeOverride(time, false);
+    }
+
     async function addScheduleConfigTime() {
         setScheduleConfigError("");
         setScheduleConfigSuccess("");
@@ -2406,7 +2415,7 @@ export default function AdminPanel() {
         setIsSavingScheduleConfig(true);
 
         try {
-            await saveScheduleTimeOverride(normalizedTime, true);
+            await addScheduleTimeOverride(normalizedTime);
             setScheduleConfigNewTime("");
             setScheduleConfigSuccess(
                 `Horário ${normalizedTime} adicionado somente em ${new Date(`${scheduleConfigDate}T12:00:00`).toLocaleDateString("pt-BR")}.`,
@@ -2431,7 +2440,7 @@ export default function AdminPanel() {
         setIsSavingScheduleConfig(true);
 
         try {
-            await saveScheduleTimeOverride(time, false);
+            await removeScheduleTimeOverride(time);
             setScheduleConfigEditingTime(null);
             setScheduleConfigEditedTime("");
             setScheduleConfigSuccess(
