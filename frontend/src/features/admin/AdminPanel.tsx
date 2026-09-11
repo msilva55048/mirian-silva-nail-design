@@ -10,7 +10,6 @@ import {
     formatDuration,
     getConfiguredClientStartMinutes,
     getConfiguredAdminStartMinutes,
-    getFixedClientStartMinutes,
     intervalsOverlap,
     MIRIAN_ADMIN_EMAIL,
     mergeIntervals,
@@ -47,29 +46,6 @@ import {
     adminServiceManagerStyles,
     adminStyles,
 } from "./styles";
-
-function getAdminNewAppointmentStartMinutes(date: string) {
-    if (!date) return [] as number[];
-
-    const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-    const morning = Array.from(
-        {length: 13},
-        (_, index) => 7 * 60 + index * 30,
-    ); // 07:00 até 13:00
-
-    if (isWeekend) {
-        return morning;
-    }
-
-    const evening = Array.from(
-        {length: 9},
-        (_, index) => 17 * 60 + index * 30,
-    ); // 17:00 até 21:00
-
-    return [...morning, ...evening];
-}
 
 export default function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -1662,9 +1638,8 @@ export default function AdminPanel() {
     const manualAvailableTimes = useMemo(() => {
         if (!manualDate || !manualSelectedService) return [] as string[];
 
-        // Grade exclusiva do Novo agendamento ADM.
-        // Não usa horários/configurações do painel da cliente.
-        const candidateStarts = getAdminNewAppointmentStartMinutes(manualDate);
+        // A configuração por data é a fonte única também no fluxo administrativo.
+        const candidateStarts = getConfiguredAdminStartMinutes(manualDate, adminTimeOverrides);
 
         const longestServiceDurationMinutes = Math.max(
             30,
@@ -1741,6 +1716,7 @@ export default function AdminPanel() {
         appointments,
         adminBlocks,
         adminServices,
+        adminTimeOverrides,
     ]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
@@ -2581,7 +2557,7 @@ export default function AdminPanel() {
     }, [blockDate]);
 
     const blockAvailableTimes = useMemo(() => {
-        const candidateStarts = getFixedClientStartMinutes(blockDate);
+        const candidateStarts = getConfiguredAdminStartMinutes(blockDate, adminTimeOverrides);
 
         const occupied = appointments
             .filter(
@@ -2610,7 +2586,7 @@ export default function AdminPanel() {
                 return !isOccupied;
             })
             .map(minutesToTime);
-    }, [appointments, adminBlocks, blockDate]);
+    }, [appointments, adminBlocks, blockDate, adminTimeOverrides]);
 
     useEffect(() => {
         setSelectedBlockTimes((current) => current.filter((time) => blockAvailableTimes.includes(time)));
