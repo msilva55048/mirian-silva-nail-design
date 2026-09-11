@@ -1,6 +1,6 @@
 import {supabase} from "./supabase";
 
-export type ClientPushState = "unsupported" | "disabled" | "enabled" | "blocked";
+export type ClientPushState = "loading" | "active" | "inactive";
 
 const vapidPublicKey = import.meta.env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
 
@@ -35,11 +35,10 @@ export async function isClientPushRegistered() {
 }
 
 export async function getClientPushState(): Promise<ClientPushState> {
-    if (!supported() || !vapidPublicKey) return "unsupported";
-    if (Notification.permission === "denied") return "blocked";
-    if (Notification.permission !== "granted") return "disabled";
+    if (!supported() || !vapidPublicKey) return "inactive";
+    if (Notification.permission !== "granted") return "inactive";
     const subscription = await (await registration()).pushManager.getSubscription();
-    return subscription ? "enabled" : "disabled";
+    return subscription ? "active" : "inactive";
 }
 
 export async function enableClientPush() {

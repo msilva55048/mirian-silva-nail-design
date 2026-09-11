@@ -1586,7 +1586,7 @@ function PublicSite() {
     const [authError, setAuthError] = useState("");
     const [authSuccess, setAuthSuccess] = useState("");
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
-    const [clientPushState, setClientPushState] = useState<ClientPushState>("unsupported");
+    const [clientPushState, setClientPushState] = useState<ClientPushState>("loading");
     const [clientPushError, setClientPushError] = useState("");
 
     const [showPasswordRecoveryRequest, setShowPasswordRecoveryRequest] = useState(false);
@@ -1613,15 +1613,16 @@ function PublicSite() {
     });
 
     useEffect(() => {
-        if (!clientProfile) { setClientPushState("unsupported"); return; }
-        void (async () => { try { const state = await getClientPushState(); setClientPushState(state === "enabled" && await isClientPushRegistered() ? "enabled" : state === "blocked" ? "blocked" : "disabled"); } catch { setClientPushState("disabled"); } })();
+        if (!clientProfile) { setClientPushState("inactive"); return; }
+        setClientPushState("loading");
+        void (async () => { try { const state = await getClientPushState(); setClientPushState(state === "active" && await isClientPushRegistered() ? "active" : "inactive"); } catch { setClientPushState("inactive"); } })();
     }, [clientProfile]);
 
     async function toggleClientPush() {
         setClientPushError("");
         try {
-            if (clientPushState === "enabled") { await disableClientPush(); setClientPushState("disabled"); }
-            else { await enableClientPush(); setClientPushState(await isClientPushRegistered() ? "enabled" : "disabled"); }
+            if (clientPushState === "active") { await disableClientPush(); setClientPushState("inactive"); }
+            else { await enableClientPush(); setClientPushState(await isClientPushRegistered() ? "active" : "inactive"); }
         } catch (error) {
             setClientPushError(error instanceof Error ? error.message : "Não foi possível ativar os lembretes.");
         }
@@ -3374,6 +3375,7 @@ function PublicSite() {
                     font-size: 1.3rem !important;
                 }
                 .client-push-bell.is-enabled { background: #f0faf2 !important; border-color: #9bcaa3 !important; color: #397348; }
+                .client-push-bell.is-loading { background: #faf7f8 !important; border-color: #ead9df !important; color: #a58d96; cursor: wait; opacity: .8; }
                 .client-push-hint { margin: 6px 0 0; color: #8a7078; font-size: .75rem; text-align: right; }
                 .client-logged-page .services {
                     padding-top: 4px;
@@ -3413,13 +3415,14 @@ function PublicSite() {
 
                           <div className="client-logged-header__actions">
                             <button
-                                className={`client-push-bell${clientPushState === "enabled" ? " is-enabled" : ""}`}
+                                className={`client-push-bell${clientPushState === "active" ? " is-enabled" : ""}${clientPushState === "loading" ? " is-loading" : ""}`}
                                 type="button"
-                                onClick={() => void toggleClientPush()}
-                                aria-label={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
-                                title={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
+                                onClick={() => { if (clientPushState !== "loading") void toggleClientPush(); }}
+                                disabled={clientPushState === "loading"}
+                                aria-label={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : "Ativar lembretes de horário"}
+                                title={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : "Ativar lembretes de horário"}
                             >
-                                {clientPushState === "enabled" ? "🔔" : "🔕"}
+                                {clientPushState === "loading" ? "…" : clientPushState === "active" ? "🔔" : "🔕"}
                             </button>
                           </div>
                         </div>
