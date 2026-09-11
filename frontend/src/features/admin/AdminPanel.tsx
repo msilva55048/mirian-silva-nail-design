@@ -9,7 +9,7 @@ import {
     formatDateForInput,
     formatDuration,
     getConfiguredClientStartMinutes,
-    getFixedAdminManualStartMinutes,
+    getConfiguredAdminStartMinutes,
     getFixedClientStartMinutes,
     intervalsOverlap,
     MIRIAN_ADMIN_EMAIL,
@@ -705,7 +705,7 @@ export default function AdminPanel() {
         }
 
         const candidateStarts =
-            getFixedAdminManualStartMinutes(editAppointmentDate);
+            getConfiguredAdminStartMinutes(editAppointmentDate, adminTimeOverrides);
 
         const occupied: TimeInterval[] = [
             ...appointments
@@ -762,6 +762,7 @@ export default function AdminPanel() {
         editSelectedService,
         appointments,
         adminBlocks,
+        adminTimeOverrides,
     ]);
 
     async function saveAppointmentChanges() {

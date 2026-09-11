@@ -174,6 +174,18 @@ export function getFixedAdminManualStartMinutes(date: string) {
         : [...ADMIN_WEEKDAY_START_MINUTES];
 }
 
+export function getConfiguredAdminStartMinutes(
+    date: string,
+    overrides: ScheduleTimeOverride[] = [],
+) {
+    if (!date) return [] as number[];
+    const baseStarts = getFixedAdminManualStartMinutes(date);
+    const dateOverrides = overrides.filter((item) => item.override_date === date);
+    const removed = new Set(dateOverrides.filter((item) => !item.is_available).map((item) => timeToMinutes(String(item.start_time).slice(0, 5))));
+    const added = dateOverrides.filter((item) => item.is_available).map((item) => timeToMinutes(String(item.start_time).slice(0, 5)));
+    return [...new Set([...baseStarts, ...added])].filter((start) => !removed.has(start)).sort((a, b) => a - b);
+}
+
 export function getConfiguredClientStartMinutes(
     date: string,
     overrides: ScheduleTimeOverride[] = [],

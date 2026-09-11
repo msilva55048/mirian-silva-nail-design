@@ -388,16 +388,6 @@ function getFixedAdminManualStartMinutes(date: string) {
         : [...ADMIN_WEEKDAY_START_MINUTES];
 }
 
-function getFixedAdminNewAppointmentStartMinutes(date: string) {
-    if (!date) return [] as number[];
-
-    // Novo agendamento ADM:
-    // Até 13/10/2026, dias úteis 07:00-21:00.
-    // A partir de 14/10/2026, dias úteis 07:00-13:00 e 17:00-19:00.
-    // A partir de 14/10/2026, sábado e domingo 07:00-13:00.
-    return getFixedAdminManualStartMinutes(date);
-}
-
 function getConfiguredClientStartMinutes(
     date: string,
     overrides: ScheduleTimeOverride[] = [],
@@ -424,6 +414,20 @@ function getConfiguredClientStartMinutes(
     return [...new Set([...baseStarts, ...addedStarts])]
         .filter((start) => !removedStarts.has(start))
         .sort((a, b) => a - b);
+}
+
+// A configuração do painel é a fonte única dos inícios administrativos.
+// Diferente do fluxo público, o Admin não aplica o bloqueio de domingo.
+function getConfiguredAdminStartMinutes(
+    date: string,
+    overrides: ScheduleTimeOverride[] = [],
+) {
+    if (!date) return [] as number[];
+    const baseStarts = getFixedAdminManualStartMinutes(date);
+    const dateOverrides = overrides.filter((item) => item.override_date === date);
+    const removed = new Set(dateOverrides.filter((item) => !item.is_available).map((item) => timeToMinutes(String(item.start_time).slice(0, 5))));
+    const added = dateOverrides.filter((item) => item.is_available).map((item) => timeToMinutes(String(item.start_time).slice(0, 5)));
+    return [...new Set([...baseStarts, ...added])].filter((start) => !removed.has(start)).sort((a, b) => a - b);
 }
 
 function getConfiguredClientBlockEndMinutes(start: number, configuredStarts: number[]) {
@@ -10446,8 +10450,7 @@ function AdminPanel() {
             return [] as string[];
         }
 
-        const candidateStarts =
-            getFixedAdminManualStartMinutes(editAppointmentDate);
+        const candidateStarts = getConfiguredAdminStartMinutes(editAppointmentDate, adminTimeOverrides);
 
         const occupied: TimeInterval[] = [
             ...appointments
@@ -10504,6 +10507,7 @@ function AdminPanel() {
         editSelectedService,
         appointments,
         adminBlocks,
+        adminTimeOverrides,
     ]);
 
     async function saveAppointmentChanges() {
@@ -11407,11 +11411,7 @@ function AdminPanel() {
 
         const candidateStarts = Array.from(
             new Set([
-                ...getFixedAdminNewAppointmentStartMinutes(manualDate),
-                ...getConfiguredClientStartMinutes(
-                    manualDate,
-                    adminTimeOverrides,
-                ),
+                ...getConfiguredAdminStartMinutes(manualDate, adminTimeOverrides),
             ]),
         ).sort((first, second) => first - second);
 
@@ -14699,7 +14699,7 @@ function AdminPanel() {
                             </div>
 
                             {adminView === "waiting" && <>
-                                <WaitingList getInterestTimes={(date) => [...new Set([...getFixedAdminNewAppointmentStartMinutes(date), ...getConfiguredClientStartMinutes(date, adminTimeOverrides)])].sort((a, b) => a - b).map(minutesToTime)} profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
+                                <WaitingList getInterestTimes={(date) => getConfiguredAdminStartMinutes(date, adminTimeOverrides).map(minutesToTime)} profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
                                     pendingWaitingPreference.current = entry;
                                     setWaitingBooking(entry);
                                     const single = getSingleWaitingPreference(entry);
