@@ -48,14 +48,12 @@ export type AdminClient = {
 export type ClientAnamnesisForm = {
     birthDate: string;
     referral: string;
-    pregnant: string;
     diabetes: string;
     bariatric: string;
     chemotherapy: string;
     thyroid: string;
     nailBiting: string;
     allergies: string;
-    mycosis: string;
     continuousMedication: string;
     cleaningProducts: string;
 };
@@ -63,14 +61,12 @@ export type ClientAnamnesisForm = {
 export const emptyClientAnamnesis: ClientAnamnesisForm = {
     birthDate: "",
     referral: "",
-    pregnant: "",
     diabetes: "",
     bariatric: "",
     chemotherapy: "",
     thyroid: "",
     nailBiting: "",
     allergies: "",
-    mycosis: "",
     continuousMedication: "",
     cleaningProducts: "",
 };

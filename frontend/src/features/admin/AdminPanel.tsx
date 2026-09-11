@@ -1780,7 +1780,7 @@ export default function AdminPanel() {
         const {data, error} = await supabase
             .from("client_anamnesis")
             .select(
-                "birth_date, referral, pregnant, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, mycosis, continuous_medication, cleaning_products",
+                "birth_date, referral, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, continuous_medication, cleaning_products",
             )
             .eq("client_id", profileId)
             .maybeSingle();
@@ -1795,14 +1795,12 @@ export default function AdminPanel() {
         setClientAnamnesis({
             birthDate: formatBirthDateForDisplay(data?.birth_date),
             referral: data?.referral ?? "",
-            pregnant: data?.pregnant ?? "",
             diabetes: data?.diabetes ?? "",
             bariatric: data?.bariatric ?? "",
             chemotherapy: data?.chemotherapy ?? "",
             thyroid: data?.thyroid ?? "",
             nailBiting: data?.nail_biting ?? "",
             allergies: data?.allergies ?? "",
-            mycosis: data?.mycosis ?? "",
             continuousMedication: data?.continuous_medication ?? "",
             cleaningProducts: data?.cleaning_products ?? "",
         });
@@ -1904,14 +1902,12 @@ export default function AdminPanel() {
                                 clientAnamnesis.birthDate,
                             ),
                             referral: clientAnamnesis.referral.trim() || null,
-                            pregnant: clientAnamnesis.pregnant.trim() || null,
                             diabetes: clientAnamnesis.diabetes.trim() || null,
                             bariatric: clientAnamnesis.bariatric.trim() || null,
                             chemotherapy: clientAnamnesis.chemotherapy.trim() || null,
                             thyroid: clientAnamnesis.thyroid.trim() || null,
                             nail_biting: clientAnamnesis.nailBiting.trim() || null,
                             allergies: clientAnamnesis.allergies.trim() || null,
-                            mycosis: clientAnamnesis.mycosis.trim() || null,
                             continuous_medication:
                                 clientAnamnesis.continuousMedication.trim() || null,
                             cleaning_products:
@@ -5362,20 +5358,6 @@ export default function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>3. É gestante?</span>
-                                            <input
-                                                value={clientAnamnesis.pregnant}
-                                                onChange={(event) =>
-                                                    updateClientAnamnesisField(
-                                                        "pregnant",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                placeholder="Ex.: Sim / Não"
-                                            />
-                                        </label>
-
-                                        <label>
                                             <span>4. Tem diabetes?</span>
                                             <input
                                                 value={clientAnamnesis.diabetes}
@@ -5456,20 +5438,6 @@ export default function AdminPanel() {
                                                     )
                                                 }
                                                 placeholder="Informe quais, se houver"
-                                            />
-                                        </label>
-
-                                        <label>
-                                            <span>10. Tem micose?</span>
-                                            <input
-                                                value={clientAnamnesis.mycosis}
-                                                onChange={(event) =>
-                                                    updateClientAnamnesisField(
-                                                        "mycosis",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                placeholder="Ex.: Sim / Não"
                                             />
                                         </label>
 
