@@ -3212,7 +3212,7 @@ function PublicSite() {
                     <style>{`.client-reminder-page{min-height:100vh;display:grid;place-items:center;background:#17191d;padding:24px;box-sizing:border-box}.client-reminder-card{width:min(520px,100%);background:#23272b;color:#f7f3f1;border:1px solid #c98e7b;border-radius:24px;padding:34px;box-shadow:0 18px 45px #0008}.client-reminder-card h1{margin:8px 0 22px;font-size:2rem}.client-reminder-card p{font-size:1.1rem;line-height:1.5}.client-reminder-card dl{margin:28px 0}.client-reminder-card dl div{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #ffffff20;padding:12px 0}.client-reminder-card dt{color:#d8b5a8}.client-reminder-card dd{margin:0;font-weight:700;text-align:right}.client-reminder-card button{border:0;border-radius:12px;background:#d49a86;color:#241b1a;padding:13px 18px;font:inherit;font-weight:700;cursor:pointer}`}</style>
                 </div>
             )}
-            {mockReminder && clientUserId && clientProfile && (
+            {mockReminder && (
                 <div className="client-reminder-page"><section className="client-reminder-card"><span className="client-modal__eyebrow">Mirian Silva Nail Design</span><h1>Lembrete de horário</h1><p>Olá, MOISÉS! ✨</p><p>Passando para te lembrar do <strong>agendamento</strong> comigo daqui a pouco.</p><dl><div><dt>Serviço</dt><dd>Esmaltação em Gel com Blindagem</dd></div><div><dt>Data</dt><dd>25/12/2026</dd></div><div><dt>Horário</dt><dd>12:00</dd></div></dl><p>Te aguardo!</p><button type="button" onClick={() => window.history.back()}>Voltar para meus agendamentos</button></section></div>
             )}
             <style>{clientAccountStyles}</style>
