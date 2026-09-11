@@ -15,7 +15,9 @@ test("notification click navigates or opens the payload route", () => {
 
 test("mock reminder route renders the fixed test card", () => {
     assert.match(edgeFunction, /url: "\/client\/reminder\?mock=1"/);
-    assert.match(app, /mockReminder && \(/);
+    assert.match(app, /const shouldShowReminderModal = mockReminder/);
+    assert.match(app, /client-reminder-overlay/);
+    assert.match(app, /client-reminder-modal/);
     assert.match(app, /Passando para te lembrar do <strong>agendamento<\/strong> comigo daqui a pouco/);
     assert.match(app, /Esmaltação em Gel com Blindagem/);
     assert.match(app, /25\/12\/2026/);

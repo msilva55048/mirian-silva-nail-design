@@ -1634,6 +1634,13 @@ function PublicSite() {
     const reminderAppointment = reminderAppointmentId
         ? clientAppointments.find((appointment) => appointment.id === reminderAppointmentId) ?? null
         : null;
+    const shouldShowReminderModal = mockReminder || Boolean(
+        reminderAppointmentId && clientUserId && clientProfile && reminderAppointment,
+    );
+
+    function closeReminderModal() {
+        window.history.back();
+    }
 
     function normalizeRpcRow<T>(data: T | T[] | null): T | null {
         if (!data) return null;
@@ -3195,26 +3202,27 @@ function PublicSite() {
 
     return (
         <main className="home">
-            {reminderAppointmentId && clientUserId && clientProfile && reminderAppointment && (
-                <div className="client-reminder-page">
-                    <section className="client-reminder-card">
-                        <span className="client-modal__eyebrow">Mirian Silva Nail Design</span>
-                        <h1>Lembrete de horário</h1>
-                        <p>Olá, {clientProfile.full_name.split(/\s+/)[0].toUpperCase()}!</p>
-                        <p>Seu <strong>agendamento</strong> está confirmado:</p>
-                        <dl>
-                            <div><dt>Serviço</dt><dd>{reminderAppointment.service_name}</dd></div>
-                            <div><dt>Data</dt><dd>{new Date(`${reminderAppointment.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}</dd></div>
-                            <div><dt>Horário</dt><dd>{String(reminderAppointment.start_time).slice(0, 5)}</dd></div>
-                        </dl>
-                        <button type="button" onClick={() => window.history.back()}>Voltar para meus agendamentos</button>
+            {shouldShowReminderModal && (
+                <div className="client-reminder-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) closeReminderModal(); }}>
+                    <section className="client-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="client-reminder-title">
+                        <header className="client-reminder-modal__header">
+                            <img src="/logo-mirian.png" alt="" />
+                            <div><strong>Mirian Silva</strong><span>Nail Design</span></div>
+                            <button type="button" className="client-reminder-modal__close" aria-label="Fechar lembrete" onClick={closeReminderModal}>×</button>
+                        </header>
+                        <div className="client-reminder-modal__body">
+                            <h1 id="client-reminder-title">Lembrete de horário</h1>
+                            {mockReminder ? (
+                                <><p>Olá, MOISÉS! ✨</p><p>Passando para te lembrar do <strong>agendamento</strong> comigo daqui a pouco.</p><dl><div><dt>💅 Serviço</dt><dd>Esmaltação em Gel com Blindagem</dd></div><div><dt>🗓️ Data</dt><dd>25/12/2026</dd></div><div><dt>🕐 Horário</dt><dd>12:00</dd></div></dl><p>Te aguardo!</p></>
+                            ) : (
+                                <><p>Olá, {clientProfile?.full_name.split(/\s+/)[0].toUpperCase()}! ✨</p><p>Passando para te lembrar do <strong>agendamento</strong> comigo daqui a pouco.</p><dl><div><dt>💅 Serviço</dt><dd>{reminderAppointment?.service_name}</dd></div><div><dt>🗓️ Data</dt><dd>{reminderAppointment && new Date(`${reminderAppointment.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}</dd></div><div><dt>🕐 Horário</dt><dd>{reminderAppointment && String(reminderAppointment.start_time).slice(0, 5)}</dd></div></dl><p>Te aguardo!</p></>
+                            )}
+                            <button type="button" className="client-reminder-modal__action" onClick={closeReminderModal}>Voltar para meus agendamentos</button>
+                        </div>
                     </section>
-                    <style>{`.client-reminder-page{min-height:100vh;display:grid;place-items:center;background:#17191d;padding:24px;box-sizing:border-box}.client-reminder-card{width:min(520px,100%);background:#23272b;color:#f7f3f1;border:1px solid #c98e7b;border-radius:24px;padding:34px;box-shadow:0 18px 45px #0008}.client-reminder-card h1{margin:8px 0 22px;font-size:2rem}.client-reminder-card p{font-size:1.1rem;line-height:1.5}.client-reminder-card dl{margin:28px 0}.client-reminder-card dl div{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #ffffff20;padding:12px 0}.client-reminder-card dt{color:#d8b5a8}.client-reminder-card dd{margin:0;font-weight:700;text-align:right}.client-reminder-card button{border:0;border-radius:12px;background:#d49a86;color:#241b1a;padding:13px 18px;font:inherit;font-weight:700;cursor:pointer}`}</style>
                 </div>
             )}
-            {mockReminder && (
-                <div className="client-reminder-page"><section className="client-reminder-card"><span className="client-modal__eyebrow">Mirian Silva Nail Design</span><h1>Lembrete de horário</h1><p>Olá, MOISÉS! ✨</p><p>Passando para te lembrar do <strong>agendamento</strong> comigo daqui a pouco.</p><dl><div><dt>Serviço</dt><dd>Esmaltação em Gel com Blindagem</dd></div><div><dt>Data</dt><dd>25/12/2026</dd></div><div><dt>Horário</dt><dd>12:00</dd></div></dl><p>Te aguardo!</p><button type="button" onClick={() => window.history.back()}>Voltar para meus agendamentos</button></section></div>
-            )}
+            <style>{`.client-reminder-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(42,30,31,.42);backdrop-filter:blur(3px)}.client-reminder-modal{width:min(560px,100%);max-height:min(760px,calc(100vh - 40px));overflow:auto;background:#fffdfc;color:#2b2423;border:1px solid #dca997;border-radius:28px;box-shadow:0 24px 70px rgba(53,30,24,.28)}.client-reminder-modal__header{display:flex;align-items:center;gap:14px;padding:20px 24px;border-bottom:1px solid #f0d9d1}.client-reminder-modal__header img{width:58px;height:58px;object-fit:contain}.client-reminder-modal__header div{display:flex;flex-direction:column;gap:2px}.client-reminder-modal__header strong{font:600 1.2rem/1.2 Georgia,serif}.client-reminder-modal__header span{color:#a56f61;font-size:.92rem;letter-spacing:.06em}.client-reminder-modal__close{margin-left:auto;border:0;background:transparent;color:#9b6d61;font-size:2rem;line-height:1;cursor:pointer;padding:4px 8px}.client-reminder-modal__body{padding:28px 30px 30px}.client-reminder-modal__body h1{margin:0 0 24px;color:#754c43;font:600 clamp(1.45rem,4vw,2rem)/1.2 Georgia,serif}.client-reminder-modal__body p{margin:0 0 16px;font-size:1.08rem;line-height:1.55}.client-reminder-modal__body p:first-of-type{font-weight:700;font-size:1.18rem}.client-reminder-modal__body dl{margin:24px 0}.client-reminder-modal__body dl div{display:flex;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid #f1e1dc}.client-reminder-modal__body dt{color:#8f6459}.client-reminder-modal__body dd{margin:0;text-align:right;font-weight:700}.client-reminder-modal__action{border:1px solid #c98e7b;border-radius:999px;background:#fff5f1;color:#754c43;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}@media(max-width:600px){.client-reminder-overlay{padding:12px}.client-reminder-modal{max-height:calc(100vh - 24px);border-radius:22px}.client-reminder-modal__header{padding:16px 18px}.client-reminder-modal__body{padding:22px 20px 24px}.client-reminder-modal__body p{font-size:1rem}.client-reminder-modal__body dl div{align-items:flex-start;flex-direction:column;gap:5px}.client-reminder-modal__body dd{text-align:left}}`}</style>
             <style>{clientAccountStyles}</style>
             <style>{`\n.client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }\n.client-month-calendar, .admin-manual-month-calendar { display: block !important; }\n.client-week-picker__calendar-button, .admin-manual-week-picker__month button { display: none !important; }\n.client-week-picker__top > .client-week-picker__navs, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display: none !important; }\n`}</style>
             <style>{`
