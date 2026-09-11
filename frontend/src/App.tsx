@@ -1540,6 +1540,7 @@ const clientAccountStyles = `
 `;
 
 function PublicSite() {
+    type ClientAccountSection = "profile" | "appointments" | "referral" | "waitlist";
     const [pendingReferralCode, setPendingReferralCode] = useState<string | null>(
         captureReferralCodeFromCurrentUrl,
     );
@@ -1566,6 +1567,7 @@ function PublicSite() {
     const [isLoadingClientAccount, setIsLoadingClientAccount] = useState(false);
     const [showClientAuth, setShowClientAuth] = useState(false);
     const [showClientAccount, setShowClientAccount] = useState(false);
+    const [clientAccountSection, setClientAccountSection] = useState<ClientAccountSection>("profile");
     const [showClientProfileEditor, setShowClientProfileEditor] = useState(false);
     const [profileEditName, setProfileEditName] = useState("");
     const [profileEditPhone, setProfileEditPhone] = useState("");
@@ -1657,17 +1659,13 @@ function PublicSite() {
         }
 
         const loaded = ((data ?? []) as PublicClientAppointment[])
-            .filter((appointment) => (
-                appointment.client_id === profileId &&
-                // O painel da cliente mostra somente agendamentos ativos.
-                // Registros concluídos, cancelados ou de não comparecimento
-                // continuam disponíveis para o controle administrativo, mas
-                // não devem aparecer no painel pessoal da cliente.
-                (appointment.status === "pending" || appointment.status === "confirmed")
-            ))
+            .filter((appointment) => appointment.client_id === profileId)
             .sort((a, b) => {
                 const first = new Date(`${a.appointment_date}T${String(a.start_time).slice(0, 5)}:00`).getTime();
                 const second = new Date(`${b.appointment_date}T${String(b.start_time).slice(0, 5)}:00`).getTime();
+                const aActive = (a.status === "pending" || a.status === "confirmed") && first > Date.now();
+                const bActive = (b.status === "pending" || b.status === "confirmed") && second > Date.now();
+                if (aActive !== bActive) return aActive ? -1 : 1;
                 return second - first;
             });
 
@@ -2508,6 +2506,7 @@ function PublicSite() {
 
     function openClientAppointments() {
         setFocusClientAppointments(true);
+        setClientAccountSection("appointments");
         setShowClientAccount(true);
         void Promise.all([
             clientProfile ? loadClientAppointments(clientProfile.id) : Promise.resolve(),
@@ -2525,7 +2524,7 @@ function PublicSite() {
 
     function getClientAppointmentStatusLabel(status: PublicClientAppointment["status"]) {
         if (status === "confirmed") return "Confirmado";
-        if (status === "completed") return "Concluído";
+        if (status === "completed") return "Realizado";
         if (status === "cancelled") return "Cancelado";
         if (status === "no-show") return "Não compareceu";
         return "Pendente";
@@ -3362,6 +3361,33 @@ function PublicSite() {
                     width: min(440px, 100%);
                     margin-top: 14px;
                 }
+                .client-account-nav {
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 10px;
+                    margin-top: 14px;
+                }
+                .client-account-nav button {
+                    min-height: 54px;
+                    border: 1px solid #ead9df;
+                    border-radius: 14px;
+                    background: #fff8fa;
+                    color: #6d3445;
+                    font: inherit;
+                    font-weight: 800;
+                    cursor: pointer;
+                }
+                .client-account-nav button:hover,
+                .client-account-nav button.is-active { background: #6d3445; color: #fff; }
+                .client-account__section-title { margin: 22px 0 12px; color: #5f3c47; }
+                .client-account__appointment { cursor: default; }
+                .client-account__appointment.is-editable { cursor: pointer; }
+                .client-account__appointment.is-history { opacity: .92; }
+                .client-account__status.status-confirmed { background: #e7f7eb; color: #397348; }
+                .client-account__status.status-pending { background: #fff5d9; color: #8a6500; }
+                .client-account__status.status-completed { background: #e8f0ff; color: #315c9b; }
+                .client-account__status.status-cancelled { background: #fff0f0; color: #a85454; }
+                .client-account__status.status-no-show { background: #f2edf4; color: #725d78; }
                 .client-logged-header__actions {
                     gap: 9px;
                 }
@@ -3426,13 +3452,26 @@ function PublicSite() {
                             </button>
                           </div>
                         </div>
-                        <button
-                            className="client-logged-header__appointments"
-                            type="button"
-                            onClick={openClientAppointments}
-                        >
-                            Meus agendamentos
-                        </button>
+                        <nav className="client-account-nav" aria-label="Área da cliente">
+                            {(["profile", "appointments", "referral", "waitlist"] as const).map((section) => (
+                                <button
+                                    key={section}
+                                    className={clientAccountSection === section ? "is-active" : ""}
+                                    type="button"
+                                    onClick={() => {
+                                        if (section === "appointments") {
+                                            openClientAppointments();
+                                            return;
+                                        }
+                                        setClientAccountSection(section);
+                                        setShowClientAccount(true);
+                                        if (section === "referral") void loadReferralSummary();
+                                    }}
+                                >
+                                    {section === "profile" ? "Perfil" : section === "appointments" ? "Agendamentos" : section === "referral" ? "Indicação" : "Lista de espera"}
+                                </button>
+                            ))}
+                        </nav>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
                     </header>
 
@@ -4254,13 +4293,15 @@ function PublicSite() {
                             <div className="client-account__empty">Carregando sua conta...</div>
                         ) : clientProfile ? (
                             <>
+                                {clientAccountSection === "profile" && (
                                 <div className="client-account__profile">
                                     <div><span>Nome</span><strong>{clientProfile.full_name}</strong></div>
                                     <div><span>Telefone</span><strong>{formatBrazilianPhone(clientProfile.phone)}</strong></div>
                                     <div><span>E-mail</span><strong>{clientProfile.email || clientUserEmail}</strong></div>
                                 </div>
+                                )}
 
-                                {referralSummary && (
+                                {clientAccountSection === "referral" && referralSummary && (
                                     <div
                                         className={`client-account__referral-summary${
                                             referralSummary.reward_status === "available"
@@ -4291,16 +4332,16 @@ function PublicSite() {
                                     </div>
                                 )}
 
-                                <button
+                                {clientAccountSection === "referral" && <button
                                     className="client-account__referral-button"
                                     type="button"
                                     disabled={isLoadingReferralSummary}
                                     onClick={() => void shareReferralOnWhatsApp()}
                                 >
                                     Indicação
-                                </button>
+                                </button>}
 
-                                <div className="client-account__actions">
+                                {clientAccountSection === "profile" && <div className="client-account__actions">
                                     <button
                                         className="client-account__edit-profile"
                                         type="button"
@@ -4313,10 +4354,10 @@ function PublicSite() {
                                         </span>
                                         <span className="client-account__edit-profile-arrow">›</span>
                                     </button>
-                                </div>
+                                </div>}
 
-                                <section className="client-account__section" id="client-account-appointments">
-                                    <h3>Meus agendamentos</h3>
+                                {clientAccountSection === "appointments" && <section className="client-account__section" id="client-account-appointments">
+                                    <h3 className="client-account__section-title">Agendamentos</h3>
                                     {clientAppointments.length > 0 ? (
                                         <div className="client-account__appointments">
                                             {clientAppointments.map((appointment) => (
@@ -4324,7 +4365,7 @@ function PublicSite() {
                                                     className={
                                                         isClientAppointmentEditable(appointment)
                                                             ? "client-account__appointment is-editable"
-                                                            : "client-account__appointment"
+                                                            : "client-account__appointment is-history"
                                                     }
                                                     key={appointment.id}
                                                     type="button"
@@ -4349,7 +4390,7 @@ function PublicSite() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span className="client-account__status">
+                                                    <span className={`client-account__status status-${appointment.status.replace("_", "-")}`}>
                                                         {getClientAppointmentStatusLabel(appointment.status)}
                                                     </span>
                                                 </button>
@@ -4360,15 +4401,22 @@ function PublicSite() {
                                             Você ainda não possui agendamentos vinculados a esta conta.
                                         </div>
                                     )}
-                                </section>
+                                </section>}
 
-                                <button
+                                {clientAccountSection === "waitlist" && (
+                                    <section className="client-account__section">
+                                        <h3 className="client-account__section-title">Lista de espera</h3>
+                                        <div className="client-account__empty">Esta área está sendo atualizada.</div>
+                                    </section>
+                                )}
+
+                                {clientAccountSection === "profile" && <button
                                     className="client-account__logout"
                                     type="button"
                                     onClick={() => void logoutClient()}
                                 >
                                     Sair da conta
-                                </button>
+                                </button>}
                             </>
                         ) : (
                             <div className="client-account__empty">
