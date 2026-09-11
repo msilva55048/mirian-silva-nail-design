@@ -17,6 +17,7 @@ import {
     getAdminPushState,
     type AdminPushState,
 } from "./lib/adminPush";
+import {enableClientPush, getClientPushState, type ClientPushState} from "./lib/clientPush";
 import "./App.css";
 
 declare global {
@@ -1581,6 +1582,8 @@ function PublicSite() {
     const [authError, setAuthError] = useState("");
     const [authSuccess, setAuthSuccess] = useState("");
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+    const [clientPushState, setClientPushState] = useState<ClientPushState>("unsupported");
+    const [clientPushError, setClientPushError] = useState("");
 
     const [showPasswordRecoveryRequest, setShowPasswordRecoveryRequest] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -1604,6 +1607,29 @@ function PublicSite() {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
     });
+
+    useEffect(() => {
+        if (!clientProfile) { setClientPushState("unsupported"); return; }
+        void getClientPushState().then(setClientPushState).catch(() => setClientPushState("disabled"));
+    }, [clientProfile]);
+
+    async function activateClientPush() {
+        setClientPushError("");
+        try {
+            await enableClientPush();
+            setClientPushState("enabled");
+        } catch (error) {
+            setClientPushError(error instanceof Error ? error.message : "Não foi possível ativar os lembretes.");
+        }
+    }
+
+    const reminderAppointmentId = typeof window !== "undefined" && window.location.pathname === "/client/reminder"
+        ? new URLSearchParams(window.location.search).get("appointment_id")
+        : null;
+    const mockReminder = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mock") === "1";
+    const reminderAppointment = reminderAppointmentId
+        ? clientAppointments.find((appointment) => appointment.id === reminderAppointmentId) ?? null
+        : null;
 
     function normalizeRpcRow<T>(data: T | T[] | null): T | null {
         if (!data) return null;
@@ -3165,6 +3191,26 @@ function PublicSite() {
 
     return (
         <main className="home">
+            {reminderAppointmentId && clientUserId && clientProfile && reminderAppointment && (
+                <div className="client-reminder-page">
+                    <section className="client-reminder-card">
+                        <span className="client-modal__eyebrow">Mirian Silva Nail Design</span>
+                        <h1>Lembrete de horário</h1>
+                        <p>Olá, {clientProfile.full_name.split(/\s+/)[0].toUpperCase()}!</p>
+                        <p>Seu <strong>agendamento</strong> está confirmado:</p>
+                        <dl>
+                            <div><dt>Serviço</dt><dd>{reminderAppointment.service_name}</dd></div>
+                            <div><dt>Data</dt><dd>{new Date(`${reminderAppointment.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}</dd></div>
+                            <div><dt>Horário</dt><dd>{String(reminderAppointment.start_time).slice(0, 5)}</dd></div>
+                        </dl>
+                        <button type="button" onClick={() => window.history.back()}>Voltar para meus agendamentos</button>
+                    </section>
+                    <style>{`.client-reminder-page{min-height:100vh;display:grid;place-items:center;background:#17191d;padding:24px;box-sizing:border-box}.client-reminder-card{width:min(520px,100%);background:#23272b;color:#f7f3f1;border:1px solid #c98e7b;border-radius:24px;padding:34px;box-shadow:0 18px 45px #0008}.client-reminder-card h1{margin:8px 0 22px;font-size:2rem}.client-reminder-card p{font-size:1.1rem;line-height:1.5}.client-reminder-card dl{margin:28px 0}.client-reminder-card dl div{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #ffffff20;padding:12px 0}.client-reminder-card dt{color:#d8b5a8}.client-reminder-card dd{margin:0;font-weight:700;text-align:right}.client-reminder-card button{border:0;border-radius:12px;background:#d49a86;color:#241b1a;padding:13px 18px;font:inherit;font-weight:700;cursor:pointer}`}</style>
+                </div>
+            )}
+            {mockReminder && clientUserId && clientProfile && (
+                <div className="client-reminder-page"><section className="client-reminder-card"><span className="client-modal__eyebrow">Mirian Silva Nail Design</span><h1>Lembrete de horário</h1><p>Olá, MOISÉS! ✨</p><p>Passando para te lembrar do <strong>agendamento</strong> comigo daqui a pouco.</p><dl><div><dt>Serviço</dt><dd>Esmaltação em Gel com Blindagem</dd></div><div><dt>Data</dt><dd>25/12/2026</dd></div><div><dt>Horário</dt><dd>12:00</dd></div></dl><p>Te aguardo!</p><button type="button" onClick={() => window.history.back()}>Voltar para meus agendamentos</button></section></div>
+            )}
             <style>{clientAccountStyles}</style>
             <style>{`\n.client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }\n.client-month-calendar, .admin-manual-month-calendar { display: block !important; }\n.client-week-picker__calendar-button, .admin-manual-week-picker__month button { display: none !important; }\n.client-week-picker__top > .client-week-picker__navs, .admin-manual-week-picker__top > .admin-manual-week-picker__navs { display: none !important; }\n`}</style>
             <style>{`
@@ -3298,6 +3344,17 @@ function PublicSite() {
                 .client-logged-header__actions {
                     gap: 9px;
                 }
+                .client-push-bell {
+                    flex: 0 0 auto !important;
+                    width: 48px !important;
+                    padding: 10px !important;
+                    border: 1px solid #ead9df !important;
+                    background: #fff8fa !important;
+                    color: #6d3445;
+                    font-size: 1.3rem !important;
+                }
+                .client-push-bell.is-enabled { background: #6d3445 !important; color: #fff; }
+                .client-push-hint { margin: 6px 0 0; color: #8a7078; font-size: .75rem; text-align: right; }
                 .client-logged-page .services {
                     padding-top: 4px;
                 }
@@ -3339,6 +3396,15 @@ function PublicSite() {
 
                         <div className="client-logged-header__actions">
                             <button
+                                className={`client-push-bell${clientPushState === "enabled" ? " is-enabled" : ""}`}
+                                type="button"
+                                onClick={() => void activateClientPush()}
+                                aria-label={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
+                                title={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
+                            >
+                                {clientPushState === "enabled" ? "🔔" : "🔕"}
+                            </button>
+                            <button
                                 className="client-logged-header__appointments"
                                 type="button"
                                 onClick={openClientAppointments}
@@ -3346,6 +3412,7 @@ function PublicSite() {
                                 Meus agendamentos
                             </button>
                         </div>
+                        {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
                     </header>
 
 
