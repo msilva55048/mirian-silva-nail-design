@@ -25,6 +25,15 @@ async function send(action: "subscribe" | "unsubscribe", subscription: PushSubsc
     if (error) throw error;
 }
 
+export async function isClientPushRegistered() {
+    if (!supported()) return false;
+    const subscription = await (await registration()).pushManager.getSubscription();
+    if (!subscription) return false;
+    const {data, error} = await supabase.functions.invoke("client-web-push", {body: {action: "status", subscription: subscription.toJSON()}});
+    if (error) throw error;
+    return data?.registered === true;
+}
+
 export async function getClientPushState(): Promise<ClientPushState> {
     if (!supported() || !vapidPublicKey) return "unsupported";
     if (Notification.permission === "denied") return "blocked";

@@ -31,6 +31,10 @@ async function manage(req: Request, body: Record<string, unknown>, h: Record<str
     const clientId = await clientForUser(user.id); if (!clientId) return json({error: "Perfil de cliente não encontrado."}, 403, h);
     const sub = (body.subscription || {}) as Subscription; const endpoint = sub.endpoint?.trim();
     if (!endpoint) return json({error: "Subscription inválida."}, 400, h);
+    if (body.action === "status") {
+        const {data} = await admin.from("client_push_subscriptions").select("id").eq("endpoint", endpoint).eq("client_id", clientId).maybeSingle();
+        return json({registered: Boolean(data)}, 200, h);
+    }
     if (body.action === "unsubscribe") {
         const {error} = await admin.from("client_push_subscriptions").delete().eq("endpoint", endpoint).eq("client_id", clientId);
         return error ? json({error: error.message}, 500, h) : json({ok: true}, 200, h);

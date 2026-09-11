@@ -17,7 +17,7 @@ import {
     getAdminPushState,
     type AdminPushState,
 } from "./lib/adminPush";
-import {enableClientPush, getClientPushState, type ClientPushState} from "./lib/clientPush";
+import {disableClientPush, enableClientPush, getClientPushState, isClientPushRegistered, type ClientPushState} from "./lib/clientPush";
 import "./App.css";
 
 declare global {
@@ -1614,14 +1614,14 @@ function PublicSite() {
 
     useEffect(() => {
         if (!clientProfile) { setClientPushState("unsupported"); return; }
-        void getClientPushState().then(setClientPushState).catch(() => setClientPushState("disabled"));
+        void (async () => { try { const state = await getClientPushState(); setClientPushState(state === "enabled" && await isClientPushRegistered() ? "enabled" : state === "blocked" ? "blocked" : "disabled"); } catch { setClientPushState("disabled"); } })();
     }, [clientProfile]);
 
-    async function activateClientPush() {
+    async function toggleClientPush() {
         setClientPushError("");
         try {
-            await enableClientPush();
-            setClientPushState("enabled");
+            if (clientPushState === "enabled") { await disableClientPush(); setClientPushState("disabled"); }
+            else { await enableClientPush(); setClientPushState(await isClientPushRegistered() ? "enabled" : "disabled"); }
         } catch (error) {
             setClientPushError(error instanceof Error ? error.message : "Não foi possível ativar os lembretes.");
         }
@@ -3292,8 +3292,8 @@ function PublicSite() {
                     width: min(1160px, calc(100% - 32px));
                     margin: 0 auto 22px;
                     display: flex;
-                    justify-content: space-between;
-                    align-items: center;
+                    flex-direction: column;
+                    align-items: stretch;
                     gap: 16px;
                     padding: 14px 16px;
                     border: 1px solid rgba(125, 78, 91, .12);
@@ -3327,9 +3327,10 @@ function PublicSite() {
                     color: #8a7078;
                     font-size: .76rem;
                 }
+                .client-logged-header__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
                 .client-logged-header__brand > div { min-width: 0; }
                 .client-logged-header__brand strong,
-                .client-logged-header__brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .client-logged-header__brand span { overflow: visible; white-space: normal; }
                 .client-logged-header__actions {
                     display: flex;
                     width: auto;
@@ -3338,8 +3339,6 @@ function PublicSite() {
                     align-items: center;
                 }
                 .client-logged-header__actions button {
-                    flex: 1 1 0;
-                    width: 100%;
                     border: 0;
                     border-radius: 14px;
                     padding: 16px 18px;
@@ -3351,6 +3350,8 @@ function PublicSite() {
                 .client-logged-header__appointments {
                     background: #6d3445;
                     color: #fff;
+                    width: min(440px, 100%);
+                    margin-top: 14px;
                 }
                 .client-logged-header__actions {
                     gap: 9px;
@@ -3384,8 +3385,7 @@ function PublicSite() {
                 }
                 @media (max-width: 700px) {
                     .client-logged-header {
-                        align-items: center;
-                        flex-direction: row;
+                        align-items: stretch;
                     }
                     .client-logged-header__actions {
                         width: auto;
@@ -3394,32 +3394,34 @@ function PublicSite() {
             `}</style>
 
                     <header className="client-logged-header">
-                        <div className="client-logged-header__brand">
+                        <div className="client-logged-header__top">
+                          <div className="client-logged-header__brand">
                             <img src="/logo-mirian.png" alt="Mirian Silva Nail Design" />
                             <div>
                                 <strong>Mirian Silva Nail Design</strong>
                                 <span>Olá, {clientProfile?.full_name.split(/\s+/)[0]}</span>
                             </div>
-                        </div>
+                          </div>
 
-                        <div className="client-logged-header__actions">
+                          <div className="client-logged-header__actions">
                             <button
                                 className={`client-push-bell${clientPushState === "enabled" ? " is-enabled" : ""}`}
                                 type="button"
-                                onClick={() => void activateClientPush()}
+                                onClick={() => void toggleClientPush()}
                                 aria-label={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
                                 title={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
                             >
                                 {clientPushState === "enabled" ? "🔔" : "🔕"}
                             </button>
-                            <button
-                                className="client-logged-header__appointments"
-                                type="button"
-                                onClick={openClientAppointments}
-                            >
-                                Meus agendamentos
-                            </button>
+                          </div>
                         </div>
+                        <button
+                            className="client-logged-header__appointments"
+                            type="button"
+                            onClick={openClientAppointments}
+                        >
+                            Meus agendamentos
+                        </button>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
                     </header>
 
