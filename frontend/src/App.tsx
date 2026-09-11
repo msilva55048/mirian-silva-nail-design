@@ -3323,8 +3323,10 @@ function PublicSite() {
                 }
                 .client-logged-header__actions {
                     display: flex;
-                    width: min(440px, 100%);
-                    flex: 1;
+                    width: auto;
+                    flex: 0 0 auto;
+                    margin-left: auto;
+                    align-items: center;
                 }
                 .client-logged-header__actions button {
                     flex: 1 1 0;
@@ -3349,11 +3351,11 @@ function PublicSite() {
                     width: 48px !important;
                     padding: 10px !important;
                     border: 1px solid #ead9df !important;
-                    background: #fff8fa !important;
+                    background: #fff !important;
                     color: #6d3445;
                     font-size: 1.3rem !important;
                 }
-                .client-push-bell.is-enabled { background: #6d3445 !important; color: #fff; }
+                .client-push-bell.is-enabled { background: #f0faf2 !important; border-color: #9bcaa3 !important; color: #397348; }
                 .client-push-hint { margin: 6px 0 0; color: #8a7078; font-size: .75rem; text-align: right; }
                 .client-logged-page .services {
                     padding-top: 4px;
@@ -3403,6 +3405,13 @@ function PublicSite() {
                                 title={clientPushState === "enabled" ? "Lembretes ativados" : "Ativar lembretes de horário"}
                             >
                                 {clientPushState === "enabled" ? "🔔" : "🔕"}
+                            </button>
+                            <button
+                                type="button"
+                                className="client-logged-header__appointments"
+                                onClick={() => void logoutClient()}
+                            >
+                                Sair
                             </button>
                             <button
                                 className="client-logged-header__appointments"
@@ -4589,6 +4598,7 @@ type AdminClient = {
 
 type ClientAnamnesisForm = {
     profession: string;
+    workSchedule: string;
     birthDate: string;
     referral: string;
     pregnant: string;
@@ -4605,6 +4615,7 @@ type ClientAnamnesisForm = {
 
 const emptyClientAnamnesis: ClientAnamnesisForm = {
     profession: "",
+    workSchedule: "",
     birthDate: "",
     referral: "",
     pregnant: "",
@@ -11534,7 +11545,7 @@ function AdminPanel() {
         const {data, error} = await supabase
             .from("client_anamnesis")
             .select(
-                "profession, birth_date, referral, pregnant, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, mycosis, continuous_medication, cleaning_products",
+                "profession, work_schedule, birth_date, referral, pregnant, diabetes, bariatric, chemotherapy, thyroid, nail_biting, allergies, mycosis, continuous_medication, cleaning_products",
             )
             .eq("client_id", profileId)
             .maybeSingle();
@@ -11548,6 +11559,7 @@ function AdminPanel() {
 
         setClientAnamnesis({
             profession: data?.profession ?? "",
+            workSchedule: data?.work_schedule ?? "",
             birthDate: formatBirthDateForDisplay(data?.birth_date),
             referral: data?.referral ?? "",
             pregnant: data?.pregnant ?? "",
@@ -11656,6 +11668,7 @@ function AdminPanel() {
                         {
                             client_id: existingProfile.id,
                             profession: clientAnamnesis.profession.trim() || null,
+                            work_schedule: clientAnamnesis.workSchedule.trim() || null,
                             birth_date: formatBirthDateForDatabase(
                                 clientAnamnesis.birthDate,
                             ),
@@ -15949,7 +15962,17 @@ function AdminPanel() {
                                         </label>
 
                                         <label>
-                                            <span>2. Data de nascimento</span>
+                                            <span>2. Horário de trabalho</span>
+                                            <input
+                                                value={clientAnamnesis.workSchedule}
+                                                onChange={(event) => updateClientAnamnesisField("workSchedule", event.target.value)}
+                                                placeholder="Ex.: 08:00 às 18:00"
+                                                maxLength={120}
+                                            />
+                                        </label>
+
+                                        <label>
+                                            <span>3. Data de nascimento</span>
                                             <input
                                                 type="text"
                                                 inputMode="numeric"
