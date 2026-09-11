@@ -64,7 +64,7 @@ async function mock(body: Record<string, unknown>, h: Record<string, string>) {
     if (!clientId) return json({error: "Cliente ausente."}, 400, h);
     const {data: subs} = await admin.from("client_push_subscriptions").select("id,endpoint,p256dh,auth_key").eq("client_id", clientId).order("updated_at", {ascending: false}).limit(1);
     if (!subs?.length) return json({error: "Nenhuma subscription ativa para esta cliente."}, 404, h);
-    const payload = JSON.stringify({title: "Lembrete de horario do seu agendamento com a Mirian", body: "Seu agendamento está confirmado para 25/12/2026 às 12:00.", url: "/client/reminder?mock=1"});
+    const payload = JSON.stringify({title: "Lembrete de horario do seu agendamento com a Mirian", body: "Toque para ver os detalhes do seu agendamento.", url: "/client/reminder?mock=1"});
     try { await webpush.sendNotification({endpoint: subs[0].endpoint, keys: {p256dh: subs[0].p256dh, auth: subs[0].auth_key}}, payload, {TTL: 3600, urgency: "high"}); return json({ok: true, sent: 1}, 200, h); }
     catch (e) { return json({error: e instanceof Error ? e.message : String(e)}, 502, h); }
 }
