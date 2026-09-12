@@ -36,6 +36,10 @@ test('cards do Admin seguem o layout legível da lista da cliente', () => {
   assert.match(admin, /Na lista de espera/);
   assert.match(admin, /shared-waitlist-request-card__actions/);
   assert.doesNotMatch(admin, /<strong>\{profile\?\.full_name[^<]*<span>\{profile\?\.phone/);
+  assert.match(admin, /background:linear-gradient\(135deg,#7c4356,#a95470\)/);
+  assert.match(admin, /min-height:44px/);
+  assert.match(admin, /align-items:center;justify-content:center/);
+  assert.match(admin, /border-radius:10px/);
 });
 
 test('lista antiga permanece somente como legado e nenhum push/claim é criado', () => {
