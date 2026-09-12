@@ -4457,7 +4457,7 @@ function PublicSite() {
                         <button className="client-modal__close" type="button" onClick={() => setShowClientAccount(false)}>×</button>
                         <span className="client-modal__eyebrow">Minha conta</span>
                         <h2>{clientProfile ? `Olá, ${clientProfile.full_name.split(/\s+/)[0]}!` : "Sua conta"}</h2>
-                        <p>Consulte seus dados e os agendamentos vinculados ao seu perfil.</p>
+
 
                         {isLoadingClientAccount ? (
                             <div className="client-account__empty">Carregando sua conta...</div>
@@ -4481,7 +4481,7 @@ function PublicSite() {
                                                     : ""
                                         }`}
                                     >
-                                        <strong>Indique uma amiga e ganhe 30% de desconto</strong>
+                                        <strong>Indique uma amiga e ganhe 30% de desconto na sua próxima manutenção.</strong>
                                         {referralSummary.reward_status === "available" ? (
                                             <p>
                                                 Seu desconto de 30% está disponível e será aplicado automaticamente na sua próxima manutenção. Depois de usar, você poderá conquistar outro indicando uma nova amiga.
