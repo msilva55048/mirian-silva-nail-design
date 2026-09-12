@@ -14975,18 +14975,13 @@ function AdminPanel() {
                                         <span className="admin-manual-booking__step">2</span>
                                         <div className="admin-manual-booking__content">
                                             <h3>Serviço</h3>
-                                            <select
-                                                className="admin-manual-booking__service"
-                                                value={manualServiceName}
-                                                onChange={(event) => {
-                                                    const nextServiceName =
-                                                        event.target.value;
-                                                    const nextService =
-                                                        adminServices.find(
-                                                            (service) =>
-                                                                service.name ===
-                                                                nextServiceName,
-                                                        );
+                                            <ServicePicker
+                                                label="Serviço"
+                                                services={adminServices.map((service) => ({id: Number(service.id), name: service.name}))}
+                                                value={String(adminServices.find((service) => service.name === manualServiceName)?.id ?? "")}
+                                                onChange={(serviceId) => {
+                                                    const nextService = adminServices.find((service) => String(service.id) === serviceId);
+                                                    const nextServiceName = nextService?.name ?? "";
 
                                                     setManualServiceName(
                                                         nextServiceName,
@@ -15008,13 +15003,7 @@ function AdminPanel() {
                                                         );
                                                     }
                                                 }}
-                                            >
-                                                {adminServices.map((service) => (
-                                                    <option key={service.id} value={service.name}>
-                                                        {service.name} — {service.duration_minutes} min — {formatCurrency(service.price_cents)}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            />
                                         </div>
                                     </section>
 

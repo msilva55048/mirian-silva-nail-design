@@ -14,6 +14,8 @@ test('cliente usa RPCs compartilhadas e calendário útil', () => {
   assert.match(app, /clientWaitlistServices/);
   assert.match(app, /client-month-calendar/);
   assert.match(app, /service-card__button/);
+  assert.match(app, /admin-manual-booking__content[\s\S]*<ServicePicker/);
+  assert.doesNotMatch(app, /className="admin-manual-booking__service"/);
 });
 
 test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
