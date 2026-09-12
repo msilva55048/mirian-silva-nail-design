@@ -178,7 +178,7 @@ a {
   color: #fffafa;
   font-size: 14px;
   font-weight: 700;
-  background: linear-gradient(135deg, #d99ba6, #bd7484);
+  background: var(--color-primary-action);
   box-shadow: 0 12px 28px rgba(183, 108, 124, 0.25);
 }
 
@@ -259,7 +259,7 @@ a {
 
 .button--primary {
   color: #fffafa;
-  background: linear-gradient(135deg, #d99ba6, #bd7484);
+  background: var(--color-primary-action);
   box-shadow: 0 14px 30px rgba(187, 111, 128, 0.26);
 }
 
@@ -527,11 +527,11 @@ a {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  color: #a56472;
+  color: #fff;
   font-size: 13px;
   font-weight: 800;
   border: 1px solid rgba(190, 113, 130, 0.21);
-  background: #fff7f8;
+  background: var(--color-primary-action);
 }
 
 /* =========================
@@ -1346,3 +1346,4 @@ a {
     }
 
 }
+

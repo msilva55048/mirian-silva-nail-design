@@ -1,5 +1,10 @@
 @import "./styles/theme.css";
 
+:root {
+  --color-primary-action: #6d3445;
+  --color-primary-action-hover: #592838;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -50,3 +55,4 @@ button {
     border: 0;
     cursor: pointer;
 }
+

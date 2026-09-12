@@ -3654,7 +3654,7 @@ function PublicSite() {
                             {services.map((service, index) => (
                                 <article className="service-card" key={service.name}>
                                     <span className="service-card__number">{String(index + 1).padStart(2, "0")}</span>
-                                    <div className="service-card__content"><h3>{service.name}</h3><p>{service.description}</p>
+                                    <div className="service-card__content"><h3>{service.name}</h3>
                                     </div>
                                     <div className="service-card__footer">
                                         <div><span>Duração</span><strong>{service.duration}</strong></div>
@@ -16063,3 +16063,4 @@ function App() {
 }
 
 export default App;
+
