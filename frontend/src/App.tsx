@@ -569,6 +569,15 @@ type SharedWaitlistRequest = {
     created_at: string;
 };
 
+type ClientWaitlistOpportunity = {
+    id: string;
+    service_name: string;
+    appointment_date: string;
+    start_time: string;
+    duration_minutes: number;
+    available: boolean;
+};
+
 const clientAccountStyles = `
 .client-navbar-actions {
     display: flex;
@@ -1613,6 +1622,8 @@ function PublicSite() {
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
     const [clientPushState, setClientPushState] = useState<ClientPushState>("loading");
     const [clientPushError, setClientPushError] = useState("");
+    const [clientOpportunity, setClientOpportunity] = useState<ClientWaitlistOpportunity | null>(null);
+    const [clientOpportunityLoading, setClientOpportunityLoading] = useState(false);
 
     const [showPasswordRecoveryRequest, setShowPasswordRecoveryRequest] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -1641,6 +1652,24 @@ function PublicSite() {
         if (!clientProfile) { setClientPushState("inactive"); return; }
         setClientPushState("loading");
         void (async () => { try { const state = await getClientPushState(); setClientPushState(state === "active" && await isClientPushRegistered() ? "active" : "inactive"); } catch { setClientPushState("inactive"); } })();
+    }, [clientProfile]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+        const opportunityId = params.get("opportunity");
+        if (!opportunityId || !clientProfile) return;
+        setClientAccountSection("appointments");
+        setShowClientAccount(true);
+        setClientOpportunityLoading(true);
+        void (async () => {
+            const {data, error} = await supabase.rpc("get_my_waitlist_opportunity", {p_opportunity_id: opportunityId});
+            const opportunity = normalizeRpcRow<ClientWaitlistOpportunity>(data as ClientWaitlistOpportunity[] | ClientWaitlistOpportunity | null);
+            if (!error && opportunity) {
+                setClientOpportunity(opportunity);
+                if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
+            } else setClientOpportunity(null);
+            setClientOpportunityLoading(false);
+        })();
     }, [clientProfile]);
 
     async function toggleClientPush() {
@@ -4465,6 +4494,11 @@ function PublicSite() {
 
                                 {clientAccountSection === "appointments" && <section className="client-account__section" id="client-account-appointments">
                                     <h3 className="client-account__section-title">Agendamentos</h3>
+                                    {clientOpportunityLoading && <p className="client-auth-message">Carregando vaga disponível...</p>}
+                                    {!clientOpportunityLoading && clientOpportunity && <article className={`client-waitlist-opportunity ${clientOpportunity.available ? "is-available" : "is-unavailable"}`}>
+                                        <strong>{clientOpportunity.available ? "Vaga disponível" : "Esta vaga não está mais disponível."}</strong>
+                                        {clientOpportunity.available && <><span>{clientOpportunity.service_name}</span><span>{new Date(`${clientOpportunity.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")} às {String(clientOpportunity.start_time).slice(0, 5)}</span><small>Confira os detalhes no sistema para solicitar este horário.</small></>}
+                                    </article>}
                                     {clientAppointments.length > 0 ? (
                                         <div className="client-account__appointments">
                                             {clientAppointments.map((appointment) => (
