@@ -31,6 +31,9 @@ test('lista antiga permanece somente como legado e nenhum push/claim é criado',
   assert.match(admin, /Registros antigos/);
   assert.doesNotMatch(app + admin, /claim_waitlist_opportunity|client-web-push|notificationclick/);
   assert.match(admin, /selectedClient/);
+  assert.match(admin, /CLIENTE SELECIONADA/);
+  assert.match(admin, /clearSelectedClient/);
+  assert.match(admin, /!selectedClient \?/);
   assert.match(admin, /p_client_id: selectedClient\.id/);
   assert.match(admin, /onPointerDown/);
   assert.match(admin, /shared-waitlist-submit/);
