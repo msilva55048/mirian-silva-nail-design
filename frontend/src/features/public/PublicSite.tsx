@@ -1661,9 +1661,6 @@ export default function PublicSite() {
                             <h3>
                                 {editingClientAppointment ? "Escolha o novo dia e horário" : "Quando fica melhor para você?"}
                             </h3>
-                            <p>
-                                Toque em qualquer dia da semana para ver os horários disponíveis sem precisar voltar.
-                            </p>
 
                             {editingClientAppointment && (
                                 <div className="client-edit-current">
