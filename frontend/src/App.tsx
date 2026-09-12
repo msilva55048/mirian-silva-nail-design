@@ -8,7 +8,6 @@ import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
 import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
 import {useWaitingList, type WaitingListEntry} from "./features/admin/useWaitingList";
-import {WaitingList} from "./features/admin/WaitingList";
 import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {ServicePicker} from "./features/shared/ServicePicker";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
@@ -2597,7 +2596,12 @@ function PublicSite() {
             setClientWaitlistMessage("Você entrou na lista de espera.");
             await loadClientWaitlistRequests();
         } catch (error) {
-            setClientWaitlistError(error instanceof Error && error.message.startsWith("Você") ? error.message : "Não foi possível entrar na lista de espera.");
+            const details = error as {code?: string; message?: string};
+            console.error("Erro ao criar solicitação de lista de espera:", details.code ?? "unknown", details.message ?? error);
+            if (details.code === "23505" || (details.message ?? "").includes("solicitação ativa") || (details.message ?? "").startsWith("Você já está")) setClientWaitlistError("Você já está na lista de espera para este serviço nesta semana.");
+            else if (details.code === "42501") setClientWaitlistError("Sua sessão expirou. Entre novamente para entrar na lista de espera.");
+            else if (details.code === "22023") setClientWaitlistError(details.message ?? "Escolha um serviço e uma data válidos.");
+            else setClientWaitlistError("Não foi possível entrar na lista de espera.");
         } finally {
             setClientWaitlistSaving(false);
         }
@@ -14888,7 +14892,7 @@ function AdminPanel() {
                             </div>
 
                             {adminView === "waiting" && <>
-                                <SharedWaitlist profiles={adminClientProfiles} services={adminServices} onBook={(profile, serviceName, date) => {
+                                <SharedWaitlist legacyEntries={waitingList.entries} profiles={adminClientProfiles} services={adminServices} onBook={(profile, serviceName, date) => {
                                     setSelectedManualClient({key: `profile:${profile.id}`, profileId: profile.id, name: profile.full_name, phone: profile.phone, email: profile.email ?? "", userId: profile.user_id});
                                     setManualClientSearch(profile.full_name);
                                     setManualServiceName(serviceName);
@@ -14900,29 +14904,10 @@ function AdminPanel() {
                                     setManualError("");
                                     window.setTimeout(() => document.getElementById("admin-shared-booking")?.scrollIntoView({behavior: "smooth", block: "start"}), 40);
                                 }}/>
-                                <h3 className="admin-waiting-list__legacy-title">Lista antiga (legado)</h3>
-                                <WaitingList getInterestTimes={(date) => getConfiguredAdminStartMinutes(date, adminTimeOverrides).map(minutesToTime)} profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
-                                    pendingWaitingPreference.current = entry;
-                                    setWaitingBooking(entry);
-                                    const single = getSingleWaitingPreference(entry);
-                                    setManualDate(single?.date ?? "");
-                                    const referenceDate = single?.date ?? formatDateForInput(new Date());
-                                    setManualWeekReferenceDate(referenceDate);
-                                    const date = new Date(referenceDate + "T12:00:00");
-                                    setManualCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-                                    setSelectedManualClient(client);
-                                    setManualClientSearch(client.name);
-                                    setManualTime("");
-                                    setManualError("");
-                                    setManualSuccess("");
-                                    setWaitingMessage("");
-                                    setShowManualForm(true);
-                                    window.setTimeout(() => document.getElementById("admin-shared-booking")?.scrollIntoView({behavior: "smooth", block: "start"}), 40);
-                                }}/>
                                 {waitingMessage && <p role="status" className="admin-manual-form__success">{waitingMessage}</p>}
                             </>}
 
-                            {showManualForm && (adminView === "new" || waitingBooking) && (
+                            {showManualForm && (adminView === "new" || waitingBooking || (adminView === "waiting" && selectedManualClient)) && (
                                 <form id="admin-shared-booking" className={`admin-manual-booking${waitingBooking ? " admin-waiting-booking" : ""}`} onSubmit={createManualAppointment}>
                                     {waitingBooking && <section aria-label="Preferências da cliente" className="admin-waiting-booking-preferences">
                                         <strong>Preferências da cliente</strong>

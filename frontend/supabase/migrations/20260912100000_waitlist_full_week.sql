@@ -4,6 +4,8 @@ begin;
 
 alter table public.waiting_list_requests
     drop constraint if exists waiting_list_requests_week_end_check;
+alter table public.waiting_list_requests
+    drop constraint if exists waiting_list_requests_check;
 
 update public.waiting_list_requests
 set week_start = selected_date - extract(dow from selected_date)::integer,

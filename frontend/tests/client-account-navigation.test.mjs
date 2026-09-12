@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 const source = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+const sharedWaitlist = fs.readFileSync(new URL('../src/features/admin/SharedWaitlist.tsx', import.meta.url), 'utf8');
 
 test('área autenticada oferece os quatro destinos da cliente', () => {
   for (const label of ['Perfil', 'Agendamentos', 'Indicação', 'Lista de espera']) assert.match(source, new RegExp(label));
@@ -28,5 +29,5 @@ test('lista de espera compartilhada usa RPCs autenticadas e preserva o legado', 
   assert.match(source, /create_my_waitlist_request/);
   assert.match(source, /get_my_waitlist_requests/);
   assert.match(source, /waiting_list_requests/);
-  assert.match(source, /Lista antiga \(legado\)/);
+  assert.match(sharedWaitlist, /Registros antigos/);
 });

@@ -26,6 +26,6 @@ test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
 });
 
 test('lista antiga permanece somente como legado e nenhum push/claim é criado', () => {
-  assert.match(app, /Lista antiga \(legado\)/);
+  assert.match(admin, /Registros antigos/);
   assert.doesNotMatch(app + admin, /claim_waitlist_opportunity|client-web-push|notificationclick/);
 });
