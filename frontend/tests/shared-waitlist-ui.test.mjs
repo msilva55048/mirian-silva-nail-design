@@ -11,6 +11,8 @@ test('cliente usa RPCs compartilhadas e calendário útil', () => {
   assert.match(app, /cancel_my_waitlist_request/);
   assert.match(app, /day === 0 \|\| day === 6/);
   assert.match(app, /clientWaitlistServices/);
+  assert.match(app, /client-month-calendar/);
+  assert.match(app, /service-card__button/);
 });
 
 test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
@@ -18,6 +20,8 @@ test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
   assert.match(admin, /admin_create_waitlist_request/);
   assert.match(admin, /admin_cancel_waitlist_request/);
   assert.match(admin, /waiting_list_requests/);
+  assert.match(admin, /admin-manual-form/);
+  assert.match(admin, /admin-manual-month-calendar/);
 });
 
 test('lista antiga permanece somente como legado e nenhum push/claim é criado', () => {
