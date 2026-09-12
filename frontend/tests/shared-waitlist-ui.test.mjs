@@ -27,6 +27,17 @@ test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
   assert.match(admin, /admin-manual-month-calendar/);
 });
 
+test('cards do Admin seguem o layout legível da lista da cliente', () => {
+  assert.match(admin, /shared-waitlist-request-card/);
+  assert.match(admin, /shared-waitlist-request-card__client/);
+  assert.match(admin, /Serviço: \{request\.service_name_snapshot\}/);
+  assert.match(admin, /Data: \{new Date\(\`\$\{request\.selected_date\}T12:00:00\`\)/);
+  assert.match(admin, /Semana:/);
+  assert.match(admin, /Na lista de espera/);
+  assert.match(admin, /shared-waitlist-request-card__actions/);
+  assert.doesNotMatch(admin, /<strong>\{profile\?\.full_name[^<]*<span>\{profile\?\.phone/);
+});
+
 test('lista antiga permanece somente como legado e nenhum push/claim é criado', () => {
   assert.match(admin, /Registros antigos/);
   assert.doesNotMatch(app + admin, /claim_waitlist_opportunity|client-web-push|notificationclick/);
