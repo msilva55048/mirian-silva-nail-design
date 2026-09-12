@@ -1280,6 +1280,10 @@ const clientAccountStyles = `
     font-size: .82rem;
 }
 .client-account__status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
     border-radius: 999px;
     padding: 7px 10px;
     background: #f3e7ea;
@@ -1699,8 +1703,9 @@ function PublicSite() {
         if (!data) return null;
         return Array.isArray(data) ? (data[0] ?? null) : data;
     }
-    async function loadClientAppointments(profileId: string) {
-        const {data, error} = await supabase.rpc("get_my_client_appointments");
+    async function loadClientAppointments(profileId: string, isCurrent = () => true) {
+        const {data, error} = await supabase.rpc("get_my_client_appointments_v2");
+        if (!isCurrent()) return;
 
         if (error) {
             console.error("Erro ao carregar agendamentos da cliente:", error);
@@ -1718,6 +1723,27 @@ function PublicSite() {
 
         setClientAppointments(loaded);
     }
+
+    useEffect(() => {
+        if (!clientProfile || clientAccountSection !== "appointments") return;
+        let active = true;
+        let revision = 0;
+        const refresh = () => {
+            if (document.visibilityState !== "visible") return;
+            const current = ++revision;
+            void loadClientAppointments(clientProfile.id, () => active && current === revision);
+        };
+        refresh();
+        const timer = window.setInterval(refresh, 15000);
+        window.addEventListener("focus", refresh);
+        document.addEventListener("visibilitychange", refresh);
+        return () => {
+            active = false;
+            window.clearInterval(timer);
+            window.removeEventListener("focus", refresh);
+            document.removeEventListener("visibilitychange", refresh);
+        };
+    }, [clientProfile?.id, clientAccountSection]);
 
     async function loadReferralSummary(userId = clientUserId) {
         if (!userId) return null;
@@ -4781,6 +4807,7 @@ type AdminAppointment = {
     is_referred_first_appointment?: boolean | null;
     is_paid?: boolean | null;
     client_hidden: boolean;
+    confirmation_sent_at?: string | null;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
 };
@@ -6867,13 +6894,6 @@ function getAppointmentEndDateTime(appointment: AdminAppointment) {
 
 type WhatsAppNotificationType = "attendance-confirmation" | "two-hour-reminder";
 
-type AppointmentMessageDispatch = {
-    id: string;
-    appointment_id: string;
-    message_type: WhatsAppNotificationType;
-    sent_at: string;
-    sent_by: string;
-};
 
 function getWhatsAppNotificationLabel(type: WhatsAppNotificationType) {
     if (type === "attendance-confirmation") return "Solicitar confirmação";
@@ -8586,8 +8606,6 @@ const adminEnhancementStyles = `
 
 const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
 const MIRIAN_LAST_MODE_KEY = "mirian-last-access-mode";
-const LEGACY_WHATSAPP_NOTIFICATIONS_KEY = "mirian-whatsapp-notifications-opened";
-const LEGACY_WHATSAPP_MIGRATION_KEY = "mirian-whatsapp-notifications-migrated-v1";
 type MirianAccessMode = "admin" | "client";
 
 function getMirianLastAccessMode(): MirianAccessMode | null {
@@ -9818,7 +9836,6 @@ function AdminPanel() {
     const [isLoading, setIsLoading] = useState(false);
     const [panelError, setPanelError] = useState("");
     const [notificationClock, setNotificationClock] = useState(() => Date.now());
-    const [appointmentMessageDispatches, setAppointmentMessageDispatches] = useState<AppointmentMessageDispatch[]>([]);
 
     const [adminView, setAdminView] = useState<
         "agenda" | "week" | "month" | "new" | "waiting" | "clients" | "finance" | "schedule" | "settings" | "blocks"
@@ -9971,54 +9988,7 @@ function AdminPanel() {
         return () => window.clearInterval(clock);
     }, []);
 
-    useEffect(() => {
-        if (!isAuthenticated || !appointments.length) return;
 
-        const completedIds = appointments
-            .filter(
-                (appointment) =>
-                    (appointment.status === "confirmed" ||
-                        appointment.status === "pending") &&
-                    getAppointmentEndDateTime(appointment).getTime() <=
-                    adminNow.getTime(),
-            )
-            .map((appointment) => appointment.id);
-
-        if (!completedIds.length) return;
-
-        let cancelled = false;
-
-        async function markFinishedAppointmentsAsCompleted() {
-            const {error} = await supabase
-                .from("appointments")
-                .update({status: "completed"})
-                .in("id", completedIds);
-
-            if (error) {
-                console.error(
-                    "Erro ao concluir atendimentos automaticamente:",
-                    error,
-                );
-                return;
-            }
-
-            if (cancelled) return;
-
-            setAppointments((current) =>
-                current.map((appointment) =>
-                    completedIds.includes(appointment.id)
-                        ? {...appointment, status: "completed"}
-                        : appointment,
-                ),
-            );
-        }
-
-        void markFinishedAppointmentsAsCompleted();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [isAuthenticated, appointments, adminNow]);
 
 
     useEffect(() => {
@@ -10074,113 +10044,10 @@ function AdminPanel() {
         if (!isAuthenticated) {
             setAppointments([]);
             setAdminClientProfiles([]);
-            setAppointmentMessageDispatches([]);
             return;
         }
 
         void getAdminPushState().then(setAdminPushState).catch(() => setAdminPushState("disabled"));
-
-        async function migrateLegacyWhatsAppDispatches() {
-            let migrationStatus: string | null;
-            let legacyValue: string | null;
-            try {
-                migrationStatus = window.localStorage.getItem(LEGACY_WHATSAPP_MIGRATION_KEY);
-                legacyValue = window.localStorage.getItem(LEGACY_WHATSAPP_NOTIFICATIONS_KEY);
-            } catch (error) {
-                console.error("Não foi possível acessar o histórico local de mensagens:", error);
-                return;
-            }
-
-            if (migrationStatus === "completed") {
-                return;
-            }
-
-            function markMigrationAsCompleted() {
-                try {
-                    window.localStorage.setItem(LEGACY_WHATSAPP_MIGRATION_KEY, "completed");
-                } catch (error) {
-                    console.error("Não foi possível marcar a migração de mensagens como concluída:", error);
-                }
-            }
-
-            if (!legacyValue) {
-                markMigrationAsCompleted();
-                return;
-            }
-
-            let legacyNotifications: Record<string, unknown>;
-            try {
-                const parsedValue = JSON.parse(legacyValue) as unknown;
-                legacyNotifications = typeof parsedValue === "object" &&
-                parsedValue !== null &&
-                !Array.isArray(parsedValue)
-                    ? parsedValue as Record<string, unknown>
-                    : {};
-            } catch (error) {
-                console.error("Não foi possível ler o histórico local de mensagens:", error);
-                markMigrationAsCompleted();
-                return;
-            }
-
-            const validTypes = new Set<WhatsAppNotificationType>([
-                "attendance-confirmation",
-                "two-hour-reminder",
-            ]);
-            const legacyDispatches = Object.entries(legacyNotifications).flatMap(([key, wasOpened]) => {
-                if (wasOpened !== true) return [];
-
-                const separatorIndex = key.lastIndexOf(":");
-                if (separatorIndex <= 0) return [];
-
-                const appointmentId = key.slice(0, separatorIndex);
-                const messageType = key.slice(separatorIndex + 1) as WhatsAppNotificationType;
-                if (!appointmentId || !validTypes.has(messageType)) return [];
-
-                return [{
-                    appointment_id: appointmentId,
-                    message_type: messageType,
-                    sent_at: new Date().toISOString(),
-                    sent_by: `${MIRIAN_ADMIN_EMAIL}:legacy-local-storage`,
-                }];
-            });
-
-            if (!legacyDispatches.length) {
-                markMigrationAsCompleted();
-                return;
-            }
-
-            const {data: existingAppointments, error: appointmentLookupError} = await supabase
-                .from("appointments")
-                .select("id");
-
-            if (appointmentLookupError) {
-                console.error("Erro ao validar o histórico local de mensagens:", appointmentLookupError);
-                return;
-            }
-
-            const existingAppointmentIds = new Set(
-                (existingAppointments ?? []).map((appointment) => String(appointment.id)),
-            );
-            const validLegacyDispatches = legacyDispatches.filter((dispatch) =>
-                existingAppointmentIds.has(dispatch.appointment_id),
-            );
-
-            if (validLegacyDispatches.length) {
-                const {error: migrationError} = await supabase
-                    .from("appointment_message_dispatches")
-                    .upsert(validLegacyDispatches, {
-                        onConflict: "appointment_id,message_type",
-                        ignoreDuplicates: true,
-                    });
-
-                if (migrationError) {
-                    console.error("Erro ao migrar o histórico local de mensagens:", migrationError);
-                    return;
-                }
-            }
-
-            markMigrationAsCompleted();
-        }
 
         async function loadAdminData() {
             setIsLoading(true);
@@ -10191,10 +10058,9 @@ function AdminPanel() {
                 {data: serviceData, error: serviceLoadError},
                 {data: clientProfileData, error: clientProfileLoadError},
                 {data: timeOverrideData, error: timeOverrideLoadError},
-                {data: messageDispatchData, error: messageDispatchLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
-                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, is_referred_first_appointment, is_paid, client_hidden, status, created_at")
+                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, original_price_cents, referral_discount_percent, referral_reward_id, is_referred_first_appointment, is_paid, client_hidden, status, confirmation_sent_at, created_at")
                     .order("appointment_date", {ascending: true})
                     .order("start_time", {ascending: true}),
                 supabase.from("schedule_blocks")
@@ -10212,16 +10078,14 @@ function AdminPanel() {
                     .select("id, override_date, start_time, is_available, created_at, updated_at")
                     .order("override_date", {ascending: true})
                     .order("start_time", {ascending: true}),
-                supabase.from("appointment_message_dispatches")
-                    .select("id, appointment_id, message_type, sent_at, sent_by"),
             ]);
 
             if (timeOverrideLoadError) {
                 console.warn("Exceções de horário ainda não disponíveis no ADM:", timeOverrideLoadError);
             }
 
-            if (appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError || messageDispatchLoadError) {
-                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError || messageDispatchLoadError);
+            if (appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError) {
+                console.error("Erro ao carregar painel:", appointmentError || blockLoadError || serviceLoadError || clientProfileLoadError);
                 setPanelError("Não foi possível carregar os dados do painel. Atualize a página.");
                 setIsLoading(false);
                 return;
@@ -10231,7 +10095,6 @@ function AdminPanel() {
             setAdminBlocks((blockData ?? []) as AdminScheduleBlock[]);
             setAdminServices((serviceData ?? []) as AdminServiceSetting[]);
             setAdminClientProfiles((clientProfileData ?? []) as ClientProfile[]);
-            setAppointmentMessageDispatches((messageDispatchData ?? []) as AppointmentMessageDispatch[]);
             setAdminTimeOverrides(
                 ((timeOverrideData ?? []) as ScheduleTimeOverride[]).map((item) => ({
                     ...item,
@@ -10243,7 +10106,6 @@ function AdminPanel() {
         }
 
         async function initializeAdminData() {
-            await migrateLegacyWhatsAppDispatches();
             await loadAdminData();
         }
 
@@ -10270,20 +10132,17 @@ function AdminPanel() {
                 () => void loadAdminData(),
             )
             .subscribe();
-        const messageDispatchesChannel = supabase.channel("admin-message-dispatches-updates")
-            .on(
-                "postgres_changes",
-                {event: "*", schema: "public", table: "appointment_message_dispatches"},
-                () => void loadAdminData(),
-            )
-            .subscribe();
+        const refresh = () => { if (document.visibilityState === "visible") void loadAdminData(); };
+        const refreshTimer = window.setInterval(refresh, 30000);
+        window.addEventListener("focus", refresh);
 
         return () => {
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
             void supabase.removeChannel(clientProfilesChannel);
             void supabase.removeChannel(timeOverridesChannel);
-            void supabase.removeChannel(messageDispatchesChannel);
+            window.clearInterval(refreshTimer);
+            window.removeEventListener("focus", refresh);
         };
     }, [isAuthenticated]);
 
@@ -12344,46 +12203,11 @@ function AdminPanel() {
         return `${appointmentId}:${type}`;
     }
 
-    const dispatchedWhatsAppNotificationKeys = useMemo(
-        () => new Set(
-            appointmentMessageDispatches.map((dispatch) =>
-                getNotificationKey(dispatch.appointment_id, dispatch.message_type),
-            ),
-        ),
-        [appointmentMessageDispatches],
-    );
-
-    function getAdminAppointmentDisplayStatusLabel(
-        appointment: AdminAppointment,
-    ) {
-        const today = formatDateForInput(new Date());
-
-        // Na agenda, datas anteriores a hoje funcionam como histórico.
-        // Um atendimento passado que não foi cancelado/não compareceu
-        // é exibido como realizado, mesmo se o status persistido ainda
-        // estiver como pending/confirmed.
-        if (appointment.appointment_date < today) {
-            if (appointment.status === "cancelled") return "Cancelado";
-            if (appointment.status === "no-show") return "Não compareceu";
-            return "Realizado";
-        }
-
-        if (appointment.status === "completed") {
-            return "Realizado";
-        }
-
-        if (appointment.status !== "confirmed") {
-            return getAppointmentStatusLabel(appointment.status);
-        }
-
-        const confirmationKey = getNotificationKey(
-            appointment.id,
-            "attendance-confirmation",
-        );
-
-        return dispatchedWhatsAppNotificationKeys.has(confirmationKey)
-            ? "Confirmado"
-            : "Agendado";
+    function getAdminAppointmentDisplayStatusLabel(appointment: AdminAppointment) {
+        if (appointment.status === "cancelled") return "Cancelado";
+        if (appointment.status === "completed") return "Realizado";
+        if (appointment.status === "no-show") return "Não compareceu";
+        return appointment.confirmation_sent_at ? "Confirmado" : "Agendado";
     }
 
     function isActiveReferralAppointment(appointment: AdminAppointment) {
@@ -12421,92 +12245,22 @@ function AdminPanel() {
         return `admin-status admin-status--${appointment.status}`;
     }
 
-    async function openWhatsAppNotification(
-        event: MouseEvent<HTMLAnchorElement>,
-        appointment: AdminAppointment,
-        type: WhatsAppNotificationType,
+    function openWhatsAppNotification(
+        event: MouseEvent<HTMLAnchorElement>, appointment: AdminAppointment, type: WhatsAppNotificationType,
     ) {
         event.preventDefault();
-        const key = getNotificationKey(appointment.id, type);
-        const whatsappUrl = getWhatsAppUrl(appointment, type);
-        const whatsappWindow = window.open("about:blank", "_blank");
+        window.open(getWhatsAppUrl(appointment, type), "_blank", "noopener,noreferrer");
+    }
 
-        if (whatsappWindow) {
-            whatsappWindow.opener = null;
+    async function markConfirmationSent(appointment: AdminAppointment) {
+        setPanelError("");
+        const {data, error} = await supabase.rpc("mark_appointment_confirmation_sent", {p_appointment_id: appointment.id});
+        if (error || typeof data !== "string") {
+            setPanelError("Não foi possível registrar a confirmação. A mensagem continua pendente.");
+            return;
         }
-
-        try {
-            const {data: existingDispatch, error: checkError} = await supabase
-                .from("appointment_message_dispatches")
-                .select("id, appointment_id, message_type, sent_at, sent_by")
-                .eq("appointment_id", appointment.id)
-                .eq("message_type", type)
-                .maybeSingle();
-
-            if (checkError) throw checkError;
-
-            if (existingDispatch) {
-                setAppointmentMessageDispatches((current) =>
-                    current.some((dispatch) => getNotificationKey(dispatch.appointment_id, dispatch.message_type) === key)
-                        ? current
-                        : [...current, existingDispatch as AppointmentMessageDispatch],
-                );
-                whatsappWindow?.close();
-                return;
-            }
-
-            const {data: insertedDispatch, error: insertError} = await supabase
-                .from("appointment_message_dispatches")
-                .insert({
-                    appointment_id: appointment.id,
-                    message_type: type,
-                    sent_at: new Date().toISOString(),
-                    sent_by: MIRIAN_ADMIN_EMAIL,
-                })
-                .select("id, appointment_id, message_type, sent_at, sent_by")
-                .single();
-
-            if (insertError) {
-                if (insertError.code === "23505") {
-                    const {data: concurrentDispatch} = await supabase
-                        .from("appointment_message_dispatches")
-                        .select("id, appointment_id, message_type, sent_at, sent_by")
-                        .eq("appointment_id", appointment.id)
-                        .eq("message_type", type)
-                        .maybeSingle();
-
-                    if (concurrentDispatch) {
-                        setAppointmentMessageDispatches((current) =>
-                            current.some((dispatch) => getNotificationKey(dispatch.appointment_id, dispatch.message_type) === key)
-                                ? current
-                                : [...current, concurrentDispatch as AppointmentMessageDispatch],
-                        );
-                    }
-
-                    whatsappWindow?.close();
-                    return;
-                }
-
-                throw insertError;
-            }
-
-            setAppointmentMessageDispatches((current) => [
-                ...current.filter((dispatch) =>
-                    getNotificationKey(dispatch.appointment_id, dispatch.message_type) !== key,
-                ),
-                insertedDispatch as AppointmentMessageDispatch,
-            ]);
-
-            if (whatsappWindow) {
-                whatsappWindow.location.replace(whatsappUrl);
-            } else {
-                window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-            }
-        } catch (error) {
-            console.error("Erro ao registrar envio da mensagem:", error);
-            whatsappWindow?.close();
-            setPanelError("Não foi possível abrir a mensagem. Tente novamente.");
-        }
+        setAppointments((current) => current.map((item) => item.id === appointment.id
+            ? {...item, confirmation_sent_at: data} : item));
     }
 
     function getWhatsAppUrl(
@@ -12519,7 +12273,7 @@ function AdminPanel() {
     }
 
     function getDueNotificationTypes(appointment: AdminAppointment) {
-        if (appointment.status === "cancelled") return [] as WhatsAppNotificationType[];
+        if (!["pending", "confirmed"].includes(appointment.status)) return [] as WhatsAppNotificationType[];
 
         const appointmentTime = getAppointmentDateTime(appointment).getTime();
         const difference = appointmentTime - notificationClock;
@@ -12544,13 +12298,13 @@ function AdminPanel() {
                     key: getNotificationKey(appointment.id, type),
                 })),
             )
-            .filter((notification) => !dispatchedWhatsAppNotificationKeys.has(notification.key))
+            .filter((notification) => !notification.appointment.confirmation_sent_at)
             .sort(
                 (first, second) =>
                     getAppointmentDateTime(first.appointment).getTime() -
                     getAppointmentDateTime(second.appointment).getTime(),
             );
-    }, [appointments, notificationClock, dispatchedWhatsAppNotificationKeys]);
+    }, [appointments, notificationClock]);
 
 
     const scheduleConfigVisibleWeekDates = useMemo(
@@ -13354,8 +13108,8 @@ function AdminPanel() {
     }
 
     const renderAppointmentCard = (appointment: AdminAppointment) => {
-        const dueTypes = getDueNotificationTypes(appointment).filter((type) =>
-            !dispatchedWhatsAppNotificationKeys.has(getNotificationKey(appointment.id, type)),
+        const dueTypes = getDueNotificationTypes(appointment).filter(() =>
+            !appointment.confirmation_sent_at,
         );
         const isExpanded = expandedAppointmentCardId === appointment.id;
 
@@ -13454,8 +13208,7 @@ function AdminPanel() {
 
                             {dueTypes.map((type) => {
                                 return (
-                                    <a
-                                        key={type}
+                                    <div key={type}><a
                                         className="is-due"
                                         href={getWhatsAppUrl(appointment, type)}
                                         target="_blank"
@@ -13465,7 +13218,7 @@ function AdminPanel() {
                                         }
                                     >
                                         {getWhatsAppNotificationLabel(type)}
-                                    </a>
+                                    </a><button type="button" onClick={() => void markConfirmationSent(appointment)}>Marcar como enviada</button></div>
                                 );
                             })}
                         </div>
@@ -13564,7 +13317,7 @@ function AdminPanel() {
                                         onClick={(event) => void openWhatsAppNotification(event, appointment, type)}
                                     >
                                         Abrir WhatsApp
-                                    </a>
+                                    </a><button type="button" onClick={() => void markConfirmationSent(appointment)}>Marcar como enviada</button>
                                 </article>
                             ))}
                         </div>
