@@ -1,13 +1,10 @@
 import {getClientBookingStartContext, canServiceUseClientStart, getAgendaDurationMinutes} from "./shared/dynamicSchedule";
 import {getPublicBaseStartMinutes} from "./shared/publicSchedule";
 import {isClientBookingDateBlocked} from "./features/public/bookingDateRules";
-import {getSingleWaitingPreference} from "./features/admin/waitingPreferences";
-import {WaitingPreferencesSummary} from "./features/admin/WaitingPreferencesSummary";
 import {SelectedClientCard} from "./features/admin/SelectedClientCard";
 import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
 import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
-import {useWaitingList, type WaitingListEntry} from "./features/admin/useWaitingList";
 import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {ServicePicker} from "./features/shared/ServicePicker";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
@@ -9884,10 +9881,6 @@ function AdminPanel() {
 
     const [clientSearch, setClientSearch] = useState("");
     const [clientAppointmentFilter, setClientAppointmentFilter] = useState<ClientAppointmentFilter>("all");
-    const waitingList = useWaitingList(isAuthenticated);
-    const [waitingBooking, setWaitingBooking] = useState<WaitingListEntry | null>(null);
-    const [waitingMessage, setWaitingMessage] = useState("");
-    const pendingWaitingPreference = useRef<WaitingListEntry | null>(null);
     const [selectedClient, setSelectedClient] = useState<AdminClient | null>(null);
     const [editingClient, setEditingClient] = useState<AdminClient | null>(null);
     const [editClientName, setEditClientName] = useState("");
@@ -10436,7 +10429,6 @@ function AdminPanel() {
     async function createManualAppointment(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (isSavingManualAppointment) return;
-        const bookedWaitingEntry = waitingBooking;
         setManualError("");
         setManualSuccess("");
 
@@ -10465,7 +10457,7 @@ function AdminPanel() {
             return;
         }
 
-        if ((bookedWaitingEntry && (manualDate < formatDateForInput(new Date()) || !manualAvailableTimes.includes(manualTime))) || manualAppointmentConflicts(manualDate, manualTime, service.duration_minutes)) {
+        if (manualAppointmentConflicts(manualDate, manualTime, service.duration_minutes)) {
             setManualError("Este período entra em conflito com outro agendamento ou bloqueio de horário.");
             return;
         }
@@ -10540,17 +10532,7 @@ function AdminPanel() {
             );
             setAgendaDate(manualDate);
             setManualTime("");
-            if (bookedWaitingEntry) {
-                // A RPC confirmou a criação e retornou o id. Nunca remover antes disso.
-                const removed = await waitingList.remove(bookedWaitingEntry.id);
-                setWaitingMessage(removed
-                    ? `Agendamento de ${createdRow.client_name} criado com sucesso. Cliente removida da lista de espera.`
-                    : `Agendamento de ${createdRow.client_name} criado com sucesso, mas a remoção da lista falhou. Use “Remover da lista”; não agende novamente.`);
-                setWaitingBooking(null);
-                setSelectedManualClient(null);
-                setManualClientSearch("");
-                setShowManualForm(false);
-            }
+
         } catch (error) {
             console.error("Erro ao criar agendamento:", error);
 
@@ -11697,17 +11679,8 @@ function AdminPanel() {
         adminBlocks,
     ]);
 
-    useEffect(() => {
-        const entry = pendingWaitingPreference.current;
-        if (!entry || !waitingBooking || !manualSelectedService) return;
-        pendingWaitingPreference.current = null;
-        const single = getSingleWaitingPreference(entry);
-        const time = single?.time ?? "";
-        setManualTime(single?.date === manualDate && manualDate >= formatDateForInput(new Date()) && manualAvailableTimes.includes(time) ? time : "");
-    }, [waitingBooking, manualDate, manualSelectedService, manualAvailableTimes]);
 
     const manualDisplayedTimes = useMemo(() => {
-        if (waitingBooking) return manualDate < formatDateForInput(new Date()) ? [] : manualAvailableTimes;
         // Preserva a seleção especial do Admin, mas nunca recoloca um horário bloqueado.
         if (manualTime && manualSelectedService && hasScheduleBlockConflict(
             adminBlocks, manualDate, manualTime, manualSelectedService.duration_minutes,
@@ -11720,7 +11693,7 @@ function AdminPanel() {
             (first, second) =>
                 getMinutesFromTime(first) - getMinutesFromTime(second),
         );
-    }, [manualAvailableTimes, manualTime, adminBlocks, manualDate, manualSelectedService, waitingBooking]);
+    }, [manualAvailableTimes, manualTime, adminBlocks, manualDate, manualSelectedService]);
 
     function formatBirthDateForDisplay(value: string | null | undefined) {
         if (!value) return "";
@@ -13166,8 +13139,7 @@ function AdminPanel() {
 
     function openAdminDashboardView(view: AdminDashboardView) {
         if (isSavingManualAppointment) return;
-        if (waitingBooking || view === "waiting") {
-            setWaitingBooking(null);
+        if (view === "waiting") {
             setShowManualForm(false);
             setSelectedManualClient(null);
             setManualClientSearch("");
@@ -14923,35 +14895,28 @@ function AdminPanel() {
                             </div>
 
                             {adminView === "waiting" && <>
-                                <SharedWaitlist legacyEntries={waitingList.entries} profiles={adminClientProfiles} services={adminServices} onBook={(profile, serviceName, date) => {
+                                <SharedWaitlist profiles={adminClientProfiles} services={adminServices} onBook={(profile, serviceName, date) => {
                                     setSelectedManualClient({key: `profile:${profile.id}`, profileId: profile.id, name: profile.full_name, phone: profile.phone, email: profile.email ?? "", userId: profile.user_id});
                                     setManualClientSearch(profile.full_name);
                                     setManualServiceName(serviceName);
                                     setManualDate(date);
                                     setManualWeekReferenceDate(date);
                                     setManualTime("");
-                                    setWaitingBooking(null);
                                     setShowManualForm(true);
                                     setManualError("");
                                     window.setTimeout(() => document.getElementById("admin-shared-booking")?.scrollIntoView({behavior: "smooth", block: "start"}), 40);
                                 }}/>
-                                {waitingMessage && <p role="status" className="admin-manual-form__success">{waitingMessage}</p>}
                             </>}
 
-                            {showManualForm && (adminView === "new" || waitingBooking || (adminView === "waiting" && selectedManualClient)) && (
-                                <form id="admin-shared-booking" className={`admin-manual-booking${waitingBooking ? " admin-waiting-booking" : ""}`} onSubmit={createManualAppointment}>
-                                    {waitingBooking && <section aria-label="Preferências da cliente" className="admin-waiting-booking-preferences">
-                                        <strong>Preferências da cliente</strong>
-                                        <WaitingPreferencesSummary entry={waitingBooking}/>
-                                        {!getSingleWaitingPreference(waitingBooking) && <p>Escolha uma data no calendário e um horário disponível para agendar.</p>}
-                                    </section>}
+                            {showManualForm && (adminView === "new" || (adminView === "waiting" && selectedManualClient)) && (
+                                <form id="admin-shared-booking" className="admin-manual-booking" onSubmit={createManualAppointment}>
                                     <section className="admin-manual-booking__section">
                                         <span className="admin-manual-booking__step">1</span>
                                         <div className="admin-manual-booking__content">
-                                            <h3>{waitingBooking ? "Agendar cliente da lista de espera" : "Buscar cliente"}</h3>
-                                            {!waitingBooking && <p>Digite o nome ou telefone e selecione uma cliente cadastrada.</p>}
+                                            <h3>Buscar cliente</h3>
+                                            <p>Digite o nome ou telefone e selecione uma cliente cadastrada.</p>
 
-                                            <div className="admin-client-picker" hidden={Boolean(waitingBooking)}>
+                                            <div className="admin-client-picker">
                                                 <input
                                                     value={manualClientSearch}
                                                     onChange={(event) => {
@@ -14994,7 +14959,7 @@ function AdminPanel() {
 
                                             {selectedManualClient && (
                                                 <SelectedClientCard name={selectedManualClient.name} phone={selectedManualClient.phone} email={selectedManualClient.email}
-                                                                    hideChange={Boolean(waitingBooking)} onChange={() => {
+                                                                    onChange={() => {
                                                     setSelectedManualClient(null);
                                                     setManualClientSearch("");
                                                 }}/>
@@ -15152,7 +15117,7 @@ function AdminPanel() {
                                         <button
                                             className="admin-manual-form__save"
                                             type="submit"
-                                            disabled={isSavingManualAppointment || !selectedManualClient || !manualTime || (Boolean(waitingBooking) && !manualDisplayedTimes.includes(manualTime))}
+                                            disabled={isSavingManualAppointment || !selectedManualClient || !manualTime}
                                         >
                                             {isSavingManualAppointment ? "Criando..." : "Salvar agendamento"}
                                         </button>
@@ -15162,13 +15127,6 @@ function AdminPanel() {
                                             disabled={isSavingManualAppointment}
                                             onClick={() => {
                                                 setShowManualForm(false);
-                                                if (waitingBooking) {
-                                                    setWaitingBooking(null);
-                                                    setSelectedManualClient(null);
-                                                    setManualClientSearch("");
-                                                    setManualTime("");
-                                                    setManualError("");
-                                                }
                                             }}
                                         >
                                             Cancelar

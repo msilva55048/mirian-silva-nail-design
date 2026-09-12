@@ -42,8 +42,8 @@ test('cards do Admin seguem o layout legível da lista da cliente', () => {
   assert.match(admin, /border-radius:10px/);
 });
 
-test('lista antiga permanece somente como legado e nenhum push/claim é criado', () => {
-  assert.match(admin, /Registros antigos/);
+test('seção antiga foi removida e nenhum push/claim é criado', () => {
+  assert.doesNotMatch(admin, /Registros antigos|legacyEntries|shared-waitlist-legacy/);
   assert.doesNotMatch(app + admin, /claim_waitlist_opportunity|client-web-push|notificationclick/);
   assert.match(admin, /selectedClient/);
   assert.match(admin, /CLIENTE SELECIONADA/);

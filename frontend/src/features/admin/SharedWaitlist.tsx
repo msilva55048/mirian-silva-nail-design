@@ -8,9 +8,9 @@ import {isClientBookingDateBlocked} from "../public/bookingDateRules";
 type Service = {id: number; name: string; duration_minutes: number; price_cents: number};
 type Request = {id: string; client_id: string; service_name_snapshot: string; selected_date: string; week_start?: string; week_end?: string; source: string; status: string};
 type SelectedClient = {id: string; name: string; phone: string; email?: string | null};
-type Props = {profiles: ClientProfile[]; services: Service[]; legacyEntries?: Array<{id: string; client_id: string; preferred_dates?: string[] | null; preferred_times?: string[] | null}>; onBook: (client: ClientProfile, service: string, date: string) => void};
+type Props = {profiles: ClientProfile[]; services: Service[]; onBook: (client: ClientProfile, service: string, date: string) => void};
 
-export function SharedWaitlist({profiles, services, legacyEntries = [], onBook}: Props) {
+export function SharedWaitlist({profiles, services, onBook}: Props) {
   const [requests, setRequests] = useState<Request[]>([]);
   const [selectedClient, setSelectedClient] = useState<SelectedClient | null>(null);
   const [clientQuery, setClientQuery] = useState(""); const [serviceId, setServiceId] = useState(""); const [selectedDate, setSelectedDate] = useState("");
@@ -34,6 +34,5 @@ export function SharedWaitlist({profiles, services, legacyEntries = [], onBook}:
     <button type="button" className="admin-dashboard-card shared-waitlist-submit" disabled={saving || !selectedClient?.id || !serviceId || !selectedDate} onClick={() => void create()}>{saving ? "Salvando..." : "Adicionar à lista compartilhada"}</button>{error && <p className="admin-manual-form__error">{error}</p>}
     <h3>Solicitações compartilhadas</h3>
     {requests.map((request) => { const profile = byId.get(request.client_id); return <article className="shared-waitlist-request-card" key={request.id}><div className="shared-waitlist-request-card__client"><strong>{profile?.full_name ?? "Cliente"}</strong><span>{profile?.phone ?? ""}</span></div><span className="shared-waitlist-request-card__service">Serviço: {request.service_name_snapshot}</span><span className="shared-waitlist-request-card__date">Data: {new Date(`${request.selected_date}T12:00:00`).toLocaleDateString("pt-BR")}</span><span className="shared-waitlist-request-card__week">Semana: {request.week_start ? new Date(`${request.week_start}T12:00:00`).toLocaleDateString("pt-BR") : "—"} a {request.week_end ? new Date(`${request.week_end}T12:00:00`).toLocaleDateString("pt-BR") : "—"}</span><span className="shared-waitlist-request-card__status">{request.status === "active" ? "Na lista de espera" : request.status === "cancelled" ? "Cancelada" : request.status}</span>{request.status === "active" && <div className="shared-waitlist-request-card__actions"><button type="button" onClick={() => profile && onBook(profile, request.service_name_snapshot, request.selected_date)}>Agendar</button><button type="button" className="is-danger" onClick={() => void cancel(request.id)}>Encerrar</button></div>}</article>; })}
-    {legacyEntries.length > 0 && <section className="shared-waitlist-legacy"><h3>Registros antigos</h3>{legacyEntries.map((entry) => { const profile = byId.get(entry.client_id); return <article key={entry.id}><strong>{profile?.full_name ?? "Cliente"}</strong><span>{profile?.phone ?? ""}</span><small>Registro anterior à nova lista · {[...(entry.preferred_dates ?? [])].join(", ") || "Preferências antigas"}</small></article>; })}</section>}
   </div>);
 }

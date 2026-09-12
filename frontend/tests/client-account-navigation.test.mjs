@@ -24,9 +24,10 @@ test('perfil, logout e indicação reutilizam os fluxos existentes', () => {
   assert.match(source, /register_my_referral/);
 });
 
-test('lista de espera compartilhada usa RPCs autenticadas e preserva o legado', () => {
+test('lista de espera compartilhada usa RPCs autenticadas e não carrega registros legados', () => {
   assert.match(source, /create_my_waitlist_request/);
   assert.match(source, /get_my_waitlist_requests/);
   assert.match(source, /waiting_list_requests/);
-  assert.match(sharedWaitlist, /Registros antigos/);
+  assert.doesNotMatch(sharedWaitlist, /Registros antigos|legacyEntries/);
+  assert.doesNotMatch(source, /useWaitingList|waitingList\.entries/);
 });
