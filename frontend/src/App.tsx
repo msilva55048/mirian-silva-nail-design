@@ -1036,8 +1036,8 @@ const clientAccountStyles = `
     margin-bottom: 24px;
 }
 .client-account__logout {
-    background: #efe4e7;
-    color: #6d3445;
+    background: var(--color-primary-action);
+    color: #fff;
 }
 .client-account__referral-button {
     flex: 1 1 100%;
@@ -1046,7 +1046,7 @@ const clientAccountStyles = `
     justify-content: center;
     gap: 9px;
     width: 100%;
-    border: 1px solid #d7afbc;
+    border: 1px solid var(--color-primary-action);
     border-radius: 13px;
     padding: 13px 15px;
     background: var(--color-primary-action);
@@ -1132,8 +1132,8 @@ const clientAccountStyles = `
     border: 1px solid #ead9de;
     border-radius: 16px;
     padding: 12px 14px;
-    background: linear-gradient(135deg, #fffafb, #f6e8ed);
-    color: #563941;
+    background: var(--color-primary-action);
+    color: #fff;
     text-align: left;
     font: inherit;
     cursor: pointer;
@@ -1145,8 +1145,8 @@ const clientAccountStyles = `
     width: 42px;
     height: 42px;
     border-radius: 13px;
-    background: #ead4db;
-    color: #7d3d53;
+    background: rgba(255,255,255,.18);
+    color: #fff;
     font-size: 1.1rem;
     font-weight: 900;
 }
@@ -1156,15 +1156,15 @@ const clientAccountStyles = `
     gap: 2px;
 }
 .client-account__edit-profile strong {
-    color: #55383f;
+    color: #fff;
     font-size: .91rem;
 }
 .client-account__edit-profile small {
-    color: #927780;
+    color: rgba(255,255,255,.82);
     font-size: .71rem;
 }
 .client-account__edit-profile-arrow {
-    color: #8b5365;
+    color: #fff;
     font-size: 1.35rem;
     font-weight: 900;
 }
@@ -9009,7 +9009,7 @@ const adminServiceManagerStyles = `
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    color: #563941;
+    color: #fff;
     text-transform: capitalize;
 }
 .admin-schedule-config-week__top > div {
@@ -16063,5 +16063,4 @@ function App() {
 }
 
 export default App;
-
 
