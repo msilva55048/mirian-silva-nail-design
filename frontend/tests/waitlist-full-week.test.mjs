@@ -14,8 +14,8 @@ test("semana compartilhada usa domingo a sábado e recalcula registros existente
 });
 
 test("cliente e Admin aceitam todos os dias futuros da semana", () => {
-  assert.match(client, /const isBlocked = false/);
-  assert.match(admin, /const disabled = date < today/);
+  assert.match(client, /isBlocked = isClientBookingDateBlocked\(date\)/);
+  assert.match(admin, /isClosed = isClientBookingDateBlocked\(date\)/);
   assert.match(client, /getWaitlistWeek/);
   assert.match(admin, /Semana:/);
 });

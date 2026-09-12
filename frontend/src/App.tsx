@@ -4527,7 +4527,7 @@ function PublicSite() {
                                                 {Array.from({length: new Date(clientWaitlistMonth.getFullYear(), clientWaitlistMonth.getMonth() + 1, 0).getDate()}, (_, index) => {
                                                     const date = formatDateForInput(new Date(clientWaitlistMonth.getFullYear(), clientWaitlistMonth.getMonth(), index + 1));
                                                     const isPast = date < formatDateForInput(new Date());
-                                                    const isBlocked = false;
+                                                    const isBlocked = isClientBookingDateBlocked(date);
                                                     return <button key={date} type="button" disabled={isPast || isBlocked} className={["client-month-calendar__day", clientWaitlistDate === date ? "is-selected" : "", isPast ? "is-past" : "", isBlocked ? "is-blocked" : ""].filter(Boolean).join(" ")} onClick={() => { setClientWaitlistDate(date); setClientWaitlistError(""); }}>{index + 1}</button>;
                                                 })}
                                             </div>
