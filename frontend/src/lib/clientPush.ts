@@ -4,6 +4,14 @@ export type ClientPushState = "loading" | "active" | "inactive";
 
 const vapidPublicKey = import.meta.env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
 
+export function isIOSDevice() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+export function isStandaloneDisplay() {
+    return window.matchMedia?.("(display-mode: standalone)").matches === true || (navigator as Navigator & {standalone?: boolean}).standalone === true;
+}
+
 function supported() {
     return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }

@@ -15,7 +15,7 @@ import {
     getAdminPushState,
     type AdminPushState,
 } from "./lib/adminPush";
-import {disableClientPush, enableClientPush, getClientPushState, isClientPushRegistered, type ClientPushState} from "./lib/clientPush";
+import {disableClientPush, enableClientPush, getClientPushState, isClientPushRegistered, isIOSDevice, isStandaloneDisplay, type ClientPushState} from "./lib/clientPush";
 import "./App.css";
 
 declare global {
@@ -1624,6 +1624,7 @@ function PublicSite() {
     const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
     const [clientPushState, setClientPushState] = useState<ClientPushState>("loading");
     const [clientPushError, setClientPushError] = useState("");
+    const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [clientOpportunity, setClientOpportunity] = useState<ClientWaitlistOpportunity | null>(null);
     const [clientOpportunityLoading, setClientOpportunityLoading] = useState(false);
 
@@ -1676,6 +1677,7 @@ function PublicSite() {
 
     async function toggleClientPush() {
         setClientPushError("");
+        if (clientPushState !== "active" && isIOSDevice() && !isStandaloneDisplay()) { setShowIosPushGuide(true); return; }
         try {
             if (clientPushState === "active") { await disableClientPush(); setClientPushState("inactive"); }
             else { await enableClientPush(); setClientPushState(await isClientPushRegistered() ? "active" : "inactive"); }
@@ -3629,6 +3631,7 @@ function PublicSite() {
                             ))}
                         </nav>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
+                        {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
                     </header>
 
 
