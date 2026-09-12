@@ -24,7 +24,9 @@ test('perfil, logout e indicação reutilizam os fluxos existentes', () => {
   assert.match(source, /register_my_referral/);
 });
 
-test('lista de espera permanece apenas informativa nesta fase', () => {
-  assert.match(source, /Esta área está sendo atualizada\./);
-  assert.doesNotMatch(source, /create_my_waitlist_request/);
+test('lista de espera compartilhada usa RPCs autenticadas e preserva o legado', () => {
+  assert.match(source, /create_my_waitlist_request/);
+  assert.match(source, /get_my_waitlist_requests/);
+  assert.match(source, /waiting_list_requests/);
+  assert.match(source, /Lista antiga \(legado\)/);
 });

@@ -9,6 +9,7 @@ import {supabase} from "./lib/supabase";
 import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
 import {useWaitingList, type WaitingListEntry} from "./features/admin/useWaitingList";
 import {WaitingList} from "./features/admin/WaitingList";
+import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {
@@ -553,6 +554,19 @@ type ReferralSummary = {
     discounted_appointment_id: string | null;
     original_price_cents: number | null;
     discounted_price_cents: number | null;
+};
+
+type SharedWaitlistRequest = {
+    id: string;
+    client_id: string;
+    service_id: number;
+    service_name_snapshot: string;
+    selected_date: string;
+    week_start: string;
+    week_end: string;
+    source: "client" | "admin";
+    status: "active" | "fulfilled" | "cancelled" | "expired";
+    created_at: string;
 };
 
 const clientAccountStyles = `
@@ -1561,6 +1575,15 @@ function PublicSite() {
     const [clientUserEmail, setClientUserEmail] = useState("");
     const [clientProfile, setClientProfile] = useState<PublicClientProfile | null>(null);
     const [clientAppointments, setClientAppointments] = useState<PublicClientAppointment[]>([]);
+    const [clientWaitlistRequests, setClientWaitlistRequests] = useState<SharedWaitlistRequest[]>([]);
+    const [clientWaitlistServiceId, setClientWaitlistServiceId] = useState("");
+    const [clientWaitlistDate, setClientWaitlistDate] = useState("");
+    const [clientWaitlistMonth, setClientWaitlistMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const [clientWaitlistLoading, setClientWaitlistLoading] = useState(false);
+    const [clientWaitlistSaving, setClientWaitlistSaving] = useState(false);
+    const [clientWaitlistMessage, setClientWaitlistMessage] = useState("");
+    const [clientWaitlistError, setClientWaitlistError] = useState("");
+    const [clientWaitlistServices, setClientWaitlistServices] = useState<{id: number; name: string}[]>([]);
     const [referralSummary, setReferralSummary] = useState<ReferralSummary | null>(null);
     const [isLoadingReferralSummary, setIsLoadingReferralSummary] = useState(false);
     const [, setIsCheckingClientSession] = useState(true);
@@ -2530,6 +2553,75 @@ function PublicSite() {
         return "Pendente";
     }
 
+        async function loadClientWaitlistRequests() {
+        setClientWaitlistLoading(true);
+        try {
+            const {data, error} = await supabase.rpc("get_my_waitlist_requests");
+            if (error) throw error;
+            setClientWaitlistRequests((data ?? []) as SharedWaitlistRequest[]);
+            setClientWaitlistError("");
+        } catch {
+            setClientWaitlistError("Não foi possível carregar suas solicitações.");
+        } finally {
+            setClientWaitlistLoading(false);
+        }
+    }
+
+    function getWaitlistWeek(date: string) {
+        const value = new Date(`${date}T12:00:00`);
+        const day = value.getDay() || 7;
+        const monday = new Date(value);
+        monday.setDate(value.getDate() - day + 1);
+        const friday = new Date(monday);
+        friday.setDate(monday.getDate() + 4);
+        return {start: monday.toLocaleDateString("pt-BR"), end: friday.toLocaleDateString("pt-BR")};
+    }
+
+    async function createClientWaitlistRequest() {
+        if (!clientWaitlistServiceId || !clientWaitlistDate) {
+            setClientWaitlistError("Escolha um serviço e uma data útil.");
+            return;
+        }
+        setClientWaitlistSaving(true);
+        setClientWaitlistError("");
+        setClientWaitlistMessage("");
+        try {
+            const {error} = await supabase.rpc("create_my_waitlist_request", {
+                p_service_id: Number(clientWaitlistServiceId),
+                p_selected_date: clientWaitlistDate,
+            });
+            if (error) {
+                if (error.code === "23505") throw new Error("Você já está na lista de espera para esse serviço nesta semana.");
+                throw error;
+            }
+            setClientWaitlistMessage("Você entrou na lista de espera.");
+            await loadClientWaitlistRequests();
+        } catch (error) {
+            setClientWaitlistError(error instanceof Error && error.message.startsWith("Você") ? error.message : "Não foi possível entrar na lista de espera.");
+        } finally {
+            setClientWaitlistSaving(false);
+        }
+    }
+
+    async function cancelClientWaitlistRequest(request: SharedWaitlistRequest) {
+        if (!window.confirm("Deseja sair desta lista de espera?")) return;
+        const {error} = await supabase.rpc("cancel_my_waitlist_request", {p_request_id: request.id});
+        if (error) { setClientWaitlistError("Não foi possível cancelar a solicitação."); return; }
+        await loadClientWaitlistRequests();
+    }
+
+    useEffect(() => {
+        if (!clientProfile || clientAccountSection !== "waitlist") return;
+        void loadClientWaitlistRequests();
+        const channel = supabase.channel(`client-waitlist-${clientProfile.id}`)
+            .on("postgres_changes", {event: "*", schema: "public", table: "waiting_list_requests", filter: `client_id=eq.${clientProfile.id}`}, () => void loadClientWaitlistRequests())
+            .subscribe();
+        const refresh = () => { if (document.visibilityState === "visible") void loadClientWaitlistRequests(); };
+        window.addEventListener("focus", refresh);
+        document.addEventListener("visibilitychange", refresh);
+        return () => { void supabase.removeChannel(channel); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+    }, [clientProfile, clientAccountSection]);
+
     useEffect(() => {
         async function loadPublicSettings() {
             const {data: serviceData, error: serviceError} = await supabase
@@ -2540,6 +2632,7 @@ function PublicSite() {
                 .order("name", {ascending: true});
 
             if (!serviceError && serviceData?.length) {
+                setClientWaitlistServices(serviceData.map((service) => ({id: Number(service.id), name: service.name})));
                 setServices(
                     serviceData.map((service) => ({
                         name: service.name,
@@ -2684,7 +2777,7 @@ function PublicSite() {
             )
             .subscribe();
 
-        return () => {
+    return () => {
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
             void supabase.removeChannel(scheduleOverridesChannel);
@@ -3388,6 +3481,18 @@ function PublicSite() {
                 .client-account__status.status-completed { background: #e8f0ff; color: #315c9b; }
                 .client-account__status.status-cancelled { background: #fff0f0; color: #a85454; }
                 .client-account__status.status-no-show { background: #f2edf4; color: #725d78; }
+                .client-waitlist-field { display: grid; gap: 6px; margin: 12px 0; color: #6d3445; font-weight: 700; }
+                .client-waitlist-field select { border: 1px solid #ead9df; border-radius: 10px; padding: 10px; font: inherit; }
+                .client-waitlist-calendar { border: 1px solid #ead9df; border-radius: 14px; padding: 10px; margin: 12px 0; }
+                .client-waitlist-calendar__header { display: flex; justify-content: space-between; align-items: center; color: #6d3445; }
+                .client-waitlist-calendar__header button, .client-waitlist-calendar__grid button { border: 0; border-radius: 8px; background: transparent; color: #6d3445; padding: 7px; font: inherit; cursor: pointer; }
+                .client-waitlist-calendar__weekdays, .client-waitlist-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; margin-top: 8px; }
+                .client-waitlist-calendar__weekdays { color: #987a85; font-size: .75rem; }
+                .client-waitlist-calendar__grid button:disabled { opacity: .3; cursor: not-allowed; }
+                .client-waitlist-calendar__grid button.is-selected { background: #6d3445; color: #fff; }
+                .client-waitlist-request { display: grid; gap: 4px; border: 1px solid #ead9df; border-radius: 12px; padding: 12px; margin-top: 8px; color: #6d5961; }
+                .client-waitlist-request strong { color: #5f3c47; }
+                .client-waitlist-request button { justify-self: start; border: 0; background: transparent; color: #a85454; font-weight: 700; cursor: pointer; padding: 4px 0; }
                 .client-logged-header__actions {
                     gap: 9px;
                 }
@@ -4406,7 +4511,36 @@ function PublicSite() {
                                 {clientAccountSection === "waitlist" && (
                                     <section className="client-account__section">
                                         <h3 className="client-account__section-title">Lista de espera</h3>
-                                        <div className="client-account__empty">Esta área está sendo atualizada.</div>
+                                        <p>Cliente: <strong>{clientProfile.full_name}</strong></p>
+                                        <label className="client-waitlist-field">Serviço
+                                            <select value={clientWaitlistServiceId} onChange={(event) => setClientWaitlistServiceId(event.target.value)}>
+                                                <option value="">Escolha um serviço</option>
+                                                {clientWaitlistServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+                                            </select>
+                                        </label>
+                                        <div className="client-waitlist-calendar">
+                                            <div className="client-waitlist-calendar__header">
+                                                <button type="button" onClick={() => setClientWaitlistMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}>‹</button>
+                                                <strong>{clientWaitlistMonth.toLocaleDateString("pt-BR", {month: "long", year: "numeric"})}</strong>
+                                                <button type="button" onClick={() => setClientWaitlistMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}>›</button>
+                                            </div>
+                                            <div className="client-waitlist-calendar__weekdays">{["D","S","T","Q","Q","S","S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
+                                            <div className="client-waitlist-calendar__grid">
+                                                {Array.from({length: clientWaitlistMonth.getDay()}, (_, index) => <span key={`empty-${index}`} />)}
+                                                {Array.from({length: new Date(clientWaitlistMonth.getFullYear(), clientWaitlistMonth.getMonth() + 1, 0).getDate()}, (_, index) => {
+                                                    const date = formatDateForInput(new Date(clientWaitlistMonth.getFullYear(), clientWaitlistMonth.getMonth(), index + 1));
+                                                    const day = new Date(`${date}T12:00:00`).getDay();
+                                                    const disabled = date < formatDateForInput(new Date()) || day === 0 || day === 6;
+                                                    return <button key={date} type="button" disabled={disabled} className={clientWaitlistDate === date ? "is-selected" : ""} onClick={() => { setClientWaitlistDate(date); setClientWaitlistError(""); }}>{index + 1}</button>;
+                                                })}
+                                            </div>
+                                        </div>
+                                        {clientWaitlistDate && <p>Seu interesse será considerado de {getWaitlistWeek(clientWaitlistDate).start} até {getWaitlistWeek(clientWaitlistDate).end}.</p>}
+                                        {clientWaitlistError && <p className="client-auth-message is-error">{clientWaitlistError}</p>}
+                                        {clientWaitlistMessage && <p className="client-auth-message is-success">{clientWaitlistMessage}</p>}
+                                        <button type="button" className="client-account__referral-button" disabled={clientWaitlistSaving || !clientWaitlistServiceId || !clientWaitlistDate} onClick={() => void createClientWaitlistRequest()}>{clientWaitlistSaving ? "Entrando..." : "Entrar na lista de espera"}</button>
+                                        <h4>Minhas solicitações</h4>
+                                        {clientWaitlistLoading ? <p>Carregando...</p> : clientWaitlistRequests.length === 0 ? <div className="client-account__empty">Nenhuma solicitação encontrada.</div> : clientWaitlistRequests.map((request) => <article className="client-waitlist-request" key={request.id}><strong>{request.service_name_snapshot}</strong><span>Data: {new Date(`${request.selected_date}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>Semana: {new Date(`${request.week_start}T12:00:00`).toLocaleDateString("pt-BR")} a {new Date(`${request.week_end}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>{request.status === "active" ? "Na lista de espera" : request.status === "fulfilled" ? "Vaga conseguida" : request.status === "cancelled" ? "Cancelada" : "Encerrada"}</span>{request.status === "active" && <button type="button" onClick={() => void cancelClientWaitlistRequest(request)}>Sair da lista</button>}</article>)}
                                     </section>
                                 )}
 
@@ -14761,6 +14895,19 @@ function AdminPanel() {
                             </div>
 
                             {adminView === "waiting" && <>
+                                <SharedWaitlist profiles={adminClientProfiles} services={adminServices} onBook={(profile, serviceName, date) => {
+                                    setSelectedManualClient({key: `profile:${profile.id}`, profileId: profile.id, name: profile.full_name, phone: profile.phone, email: profile.email ?? "", userId: profile.user_id});
+                                    setManualClientSearch(profile.full_name);
+                                    setManualServiceName(serviceName);
+                                    setManualDate(date);
+                                    setManualWeekReferenceDate(date);
+                                    setManualTime("");
+                                    setWaitingBooking(null);
+                                    setShowManualForm(true);
+                                    setManualError("");
+                                    window.setTimeout(() => document.getElementById("admin-shared-booking")?.scrollIntoView({behavior: "smooth", block: "start"}), 40);
+                                }}/>
+                                <h3 className="admin-waiting-list__legacy-title">Lista antiga (legado)</h3>
                                 <WaitingList getInterestTimes={(date) => getConfiguredAdminStartMinutes(date, adminTimeOverrides).map(minutesToTime)} profiles={adminClientProfiles} list={waitingList} bookingOpen={Boolean(waitingBooking)} onBook={(entry, client) => {
                                     pendingWaitingPreference.current = entry;
                                     setWaitingBooking(entry);
