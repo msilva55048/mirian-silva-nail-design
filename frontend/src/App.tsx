@@ -939,7 +939,7 @@ const clientAccountStyles = `
 }
 .client-auth-submit,
 .client-account__primary {
-    background: linear-gradient(135deg, #a86175, #6d3445);
+    background: var(--color-primary-action);
     color: #fff;
 }
 .client-auth-submit:disabled {
@@ -1049,8 +1049,8 @@ const clientAccountStyles = `
     border: 1px solid #d7afbc;
     border-radius: 13px;
     padding: 13px 15px;
-    background: linear-gradient(135deg, #fff8fa, #f7e4ea);
-    color: #7a3e53;
+    background: var(--color-primary-action);
+    color: #fff;
     font: inherit;
     font-weight: 900;
     cursor: pointer;
@@ -1095,7 +1095,7 @@ const clientAccountStyles = `
     border-radius: 12px;
     padding: 11px 12px;
     background: #f8e7ec;
-    color: #7a3e53;
+    color: #fff;
     font-size: .84rem;
     line-height: 1.45;
 }
@@ -1392,7 +1392,7 @@ const clientAccountStyles = `
 }
 .client-booking-gate__primary {
     border: 0;
-    background: linear-gradient(135deg, #a86175, #6d3445);
+    background: var(--color-primary-action);
     color: #fff;
     box-shadow: 0 10px 24px rgba(109, 52, 69, .2);
 }
@@ -1513,7 +1513,7 @@ const clientAccountStyles = `
     border: 0;
     border-radius: 13px;
     padding: 14px 18px;
-    background: linear-gradient(135deg, #a86175, #6d3445);
+    background: var(--color-primary-action);
     color: #fff;
     font: inherit;
     font-weight: 900;
@@ -3555,7 +3555,7 @@ function PublicSite() {
                 .client-waitlist-services { margin: 14px 0 18px; }
                 .client-waitlist-services .service-card { padding: 22px 20px; }
                 .client-waitlist-services .service-card.is-selected { border-color: #9a5368; box-shadow: 0 0 0 2px rgba(154,83,104,.12); }
-                .client-waitlist-services .service-card__button[aria-pressed="true"] { background: #8f3f58; color: #fff; }
+                .client-waitlist-services .service-card__button[aria-pressed="true"] { background: var(--color-primary-action); color: #fff; }
                 .client-waitlist-calendar { margin: 12px 0; }
                 .client-waitlist-request { display: grid; gap: 4px; border: 1px solid #ead9df; border-radius: 12px; padding: 12px; margin-top: 8px; color: #6d5961; }
                 .client-waitlist-request strong { color: #5f3c47; }
@@ -5261,7 +5261,7 @@ const adminStyles = `
 .admin-primary-button {
     width: 100%;
     padding: 14px 18px;
-    background: linear-gradient(135deg, #a86175, #6d3445);
+    background: var(--color-primary-action);
     color: white;
 }
 
@@ -8220,7 +8220,7 @@ const adminEnhancementStyles = `
 }
 
 .admin-nail-form__file-button.is-camera {
-    background: linear-gradient(135deg, #a86175, #6d3445);
+    background: var(--color-primary-action);
     border-color: transparent;
     color: #fff;
 }
@@ -8490,7 +8490,7 @@ const adminEnhancementStyles = `
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: linear-gradient(135deg, #a86175, #6d3445);
+    background: var(--color-primary-action);
     color: #fff;
     font-size: .78rem;
     font-weight: 900;
@@ -8579,7 +8579,7 @@ const adminEnhancementStyles = `
 .admin-manual-month-calendar__weekdays, .admin-manual-month-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .admin-manual-month-calendar__weekdays span { padding: 4px 0; color: #9a7a84; font-size: .65rem; font-weight: 900; text-align: center; }
 .admin-manual-month-calendar__grid button { aspect-ratio: 1; border: 0; border-radius: 9px; background: #faf5f7; color: #5d464d; cursor: pointer; }
-.admin-manual-month-calendar__grid button.is-selected { background: #8f3f58; color: #fff; font-weight: 900; }
+.admin-manual-month-calendar__grid button.is-selected { background: var(--color-primary-action); color: #fff; font-weight: 900; }
 .admin-manual-month-calendar__grid button.is-past { opacity: .3; cursor: not-allowed; }
 .admin-manual-month-calendar__grid .is-empty { visibility: hidden; }
 
@@ -8588,7 +8588,7 @@ const adminEnhancementStyles = `
     min-height: 38px; border: 1px solid #e0d0d5; border-radius: 10px; background: #fff; color: #5d464d;
     font: inherit; font-size: .82rem; font-weight: 850; cursor: pointer;
 }
-.admin-manual-times button.is-selected { border-color: #9a5368; background: #8f3f58; color: #fff; }
+.admin-manual-times button.is-selected { border-color: #9a5368; background: var(--color-primary-action); color: #fff; }
 .admin-manual-times__empty { padding: 14px; border-radius: 12px; background: #faf5f7; color: #80666e; text-align: center; }
 
 .admin-manual-booking__summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
@@ -16063,4 +16063,5 @@ function App() {
 }
 
 export default App;
+
 
