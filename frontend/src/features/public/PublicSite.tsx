@@ -2523,10 +2523,6 @@ export default function PublicSite() {
 
                         <span className="client-modal__eyebrow">Meu perfil</span>
                         <h2>Editar perfil</h2>
-                        <p>
-                            Atualize seus dados. As alterações são feitas no mesmo
-                            cadastro já vinculado à sua conta.
-                        </p>
 
                         <form
                             className="client-profile-editor__form"
