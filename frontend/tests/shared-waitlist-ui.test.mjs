@@ -9,7 +9,8 @@ test('cliente usa RPCs compartilhadas e calendário útil', () => {
   assert.match(app, /create_my_waitlist_request/);
   assert.match(app, /get_my_waitlist_requests/);
   assert.match(app, /cancel_my_waitlist_request/);
-  assert.match(app, /day === 0 \|\| day === 6/);
+  assert.match(app, /ServicePicker/);
+  assert.doesNotMatch(app, /clientWaitlistServices\.map\(\(waitlistService, index\)/);
   assert.match(app, /clientWaitlistServices/);
   assert.match(app, /client-month-calendar/);
   assert.match(app, /service-card__button/);

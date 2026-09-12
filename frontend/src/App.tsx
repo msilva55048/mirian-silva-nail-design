@@ -10,6 +10,7 @@ import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin
 import {useWaitingList, type WaitingListEntry} from "./features/admin/useWaitingList";
 import {WaitingList} from "./features/admin/WaitingList";
 import {SharedWaitlist} from "./features/admin/SharedWaitlist";
+import {ServicePicker} from "./features/shared/ServicePicker";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {
@@ -2569,12 +2570,11 @@ function PublicSite() {
 
     function getWaitlistWeek(date: string) {
         const value = new Date(`${date}T12:00:00`);
-        const day = value.getDay() || 7;
         const monday = new Date(value);
-        monday.setDate(value.getDate() - day + 1);
-        const friday = new Date(monday);
-        friday.setDate(monday.getDate() + 4);
-        return {start: monday.toLocaleDateString("pt-BR"), end: friday.toLocaleDateString("pt-BR")};
+        monday.setDate(value.getDate() - value.getDay());
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 6);
+        return {start: monday.toLocaleDateString("pt-BR"), end: saturday.toLocaleDateString("pt-BR")};
     }
 
     async function createClientWaitlistRequest() {
@@ -4510,18 +4510,7 @@ function PublicSite() {
                                     <section className="client-account__section">
                                         <h3 className="client-account__section-title">Lista de espera</h3>
                                         <p>Cliente: <strong>{clientProfile.full_name}</strong></p>
-                                        <div className="services__grid client-waitlist-services">
-                                            {clientWaitlistServices.map((waitlistService, index) => {
-                                                const service = services.find((item) => item.name === waitlistService.name);
-                                                const selected = clientWaitlistServiceId === String(waitlistService.id);
-                                                return <article className={["service-card", selected ? "is-selected" : ""].filter(Boolean).join(" ")} key={waitlistService.id}>
-                                                    <span className="service-card__number">{String(index + 1).padStart(2, "0")}</span>
-                                                    <div className="service-card__content"><h3>{waitlistService.name}</h3>{service?.description && <p>{service.description}</p>}</div>
-                                                    {service && <div className="service-card__footer"><div><span>Duração</span><strong>{service.duration}</strong></div><div><span>Valor</span><strong>{service.price}</strong></div></div>}
-                                                    <button type="button" className="service-card__button" aria-pressed={selected} onClick={() => { setClientWaitlistServiceId(String(waitlistService.id)); setClientWaitlistError(""); }}>{selected ? "Serviço selecionado" : "Escolher este serviço"}</button>
-                                                </article>;
-                                            })}
-                                        </div>
+                                        <ServicePicker label="Serviço" services={clientWaitlistServices} value={clientWaitlistServiceId} onChange={(value) => { setClientWaitlistServiceId(value); setClientWaitlistError(""); }} />
                                         <div className="client-month-calendar client-waitlist-calendar">
                                             <div className="client-month-calendar__header">
                                                 <button className="client-week-picker__nav" type="button" onClick={() => setClientWaitlistMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Mês anterior">‹</button>
@@ -4533,9 +4522,8 @@ function PublicSite() {
                                                 {Array.from({length: clientWaitlistMonth.getDay()}, (_, index) => <span key={`empty-${index}`} />)}
                                                 {Array.from({length: new Date(clientWaitlistMonth.getFullYear(), clientWaitlistMonth.getMonth() + 1, 0).getDate()}, (_, index) => {
                                                     const date = formatDateForInput(new Date(clientWaitlistMonth.getFullYear(), clientWaitlistMonth.getMonth(), index + 1));
-                                                    const day = new Date(`${date}T12:00:00`).getDay();
                                                     const isPast = date < formatDateForInput(new Date());
-                                                    const isBlocked = day === 0 || day === 6;
+                                                    const isBlocked = false;
                                                     return <button key={date} type="button" disabled={isPast || isBlocked} className={["client-month-calendar__day", clientWaitlistDate === date ? "is-selected" : "", isPast ? "is-past" : "", isBlocked ? "is-blocked" : ""].filter(Boolean).join(" ")} onClick={() => { setClientWaitlistDate(date); setClientWaitlistError(""); }}>{index + 1}</button>;
                                                 })}
                                             </div>
