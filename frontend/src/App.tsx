@@ -4581,8 +4581,7 @@ function PublicSite() {
                                 {clientAccountSection === "waitlist" && (
                                     <section className="client-account__section">
                                         <h3 className="client-account__section-title">Lista de espera</h3>
-                                        <p>Cliente: <strong>{clientProfile.full_name}</strong></p>
-                                        <ServicePicker label="Serviço" services={clientWaitlistServices} value={clientWaitlistServiceId} onChange={(value) => { setClientWaitlistServiceId(value); setClientWaitlistError(""); }} />
+                                        <ServicePicker services={clientWaitlistServices} value={clientWaitlistServiceId} onChange={(value) => { setClientWaitlistServiceId(value); setClientWaitlistError(""); }} />
                                         <div className="client-month-calendar client-waitlist-calendar">
                                             <div className="client-month-calendar__header">
                                                 <button className="client-week-picker__nav" type="button" onClick={() => setClientWaitlistMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Mês anterior">‹</button>
