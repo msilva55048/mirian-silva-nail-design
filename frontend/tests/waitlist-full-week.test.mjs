@@ -23,5 +23,5 @@ test("cliente e Admin aceitam todos os dias futuros da semana", () => {
 test("busca Admin não abre lista completa e limita sugestões", () => {
   assert.match(admin, /Digite nome ou sobrenome/);
   assert.match(admin, /slice\(0, 8\)/);
-  assert.match(admin, /setClientId\(""\)/);
+  assert.match(admin, /setSelectedClient\(null\)/);
 });
