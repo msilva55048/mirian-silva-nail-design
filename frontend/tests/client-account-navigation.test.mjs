@@ -10,11 +10,10 @@ test('área autenticada oferece os quatro destinos da cliente', () => {
   assert.match(source, /clientAccountSection/);
 });
 
-test('histórico carrega todos os status e prioriza compromisso futuro ativo', () => {
+test('histórico carrega todos os status e ordena pela data do compromisso', () => {
   assert.doesNotMatch(source, /appointment\.status === "pending" \|\| appointment\.status === "confirmed"\)\n\s*\)\n\s*\.sort/);
-  assert.match(source, /aActive = \(a\.status === "pending" \|\| a\.status === "confirmed"\)/);
-  assert.match(source, /status === "completed"\) return "Realizado"/);
-  assert.match(source, /status === "no-show"\) return "Não compareceu"/);
+  assert.match(source, /return second - first/);
+  assert.match(source, /appointment\.status === "completed".*Realizado/s);
 });
 
 test('perfil, logout e indicação reutilizam os fluxos existentes', () => {

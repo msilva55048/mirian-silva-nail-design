@@ -543,6 +543,7 @@ type PublicClientAppointment = {
     price_cents: number | null;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     created_at: string;
+    confirmation_sent_at?: string | null;
 };
 
 type ReferralSummary = {
@@ -1715,9 +1716,6 @@ function PublicSite() {
             .sort((a, b) => {
                 const first = new Date(`${a.appointment_date}T${String(a.start_time).slice(0, 5)}:00`).getTime();
                 const second = new Date(`${b.appointment_date}T${String(b.start_time).slice(0, 5)}:00`).getTime();
-                const aActive = (a.status === "pending" || a.status === "confirmed") && first > Date.now();
-                const bActive = (b.status === "pending" || b.status === "confirmed") && second > Date.now();
-                if (aActive !== bActive) return aActive ? -1 : 1;
                 return second - first;
             });
 
@@ -2574,12 +2572,11 @@ function PublicSite() {
     }
 
 
-    function getClientAppointmentStatusLabel(status: PublicClientAppointment["status"]) {
-        if (status === "confirmed") return "Confirmado";
-        if (status === "completed") return "Realizado";
-        if (status === "cancelled") return "Cancelado";
-        if (status === "no-show") return "Não compareceu";
-        return "Pendente";
+    function getClientAppointmentDisplayStatus(appointment: PublicClientAppointment) {
+        if (appointment.status === "cancelled") return {label: "Cancelado", className: "cancelled"};
+        if (appointment.status === "completed") return {label: "Realizado", className: "completed"};
+        if (appointment.confirmation_sent_at) return {label: "Confirmado", className: "confirmed"};
+        return {label: "Agendado", className: "pending"};
     }
 
         async function loadClientWaitlistRequests() {
@@ -4531,8 +4528,8 @@ function PublicSite() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span className={`client-account__status status-${appointment.status.replace("_", "-")}`}>
-                                                        {getClientAppointmentStatusLabel(appointment.status)}
+                                                    <span className={`client-account__status status-${getClientAppointmentDisplayStatus(appointment).className}`}>
+                                                        {getClientAppointmentDisplayStatus(appointment).label}
                                                     </span>
                                                 </button>
                                             ))}

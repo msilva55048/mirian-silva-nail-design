@@ -2225,6 +2225,18 @@ export default function AdminPanel() {
         setOpenedWhatsAppNotifications((current) => ({...current, [key]: true}));
     }
 
+    async function markConfirmationSent(appointment: AdminAppointment) {
+        setPanelError("");
+        const {error} = await supabase.rpc("mark_appointment_confirmation_sent", {p_appointment_id: appointment.id});
+        if (error) {
+            setPanelError("Não foi possível registrar a confirmação. A mensagem continua pendente.");
+            return;
+        }
+        setAppointments((current) => current.map((item) => item.id === appointment.id
+            ? {...item, confirmation_sent_at: new Date().toISOString()}
+            : item));
+    }
+
     function getWhatsAppUrl(
         appointment: AdminAppointment,
         type: WhatsAppNotificationType,
@@ -2260,7 +2272,7 @@ export default function AdminPanel() {
                     key: getNotificationKey(appointment.id, type),
                 })),
             )
-            .filter((notification) => !openedWhatsAppNotifications[notification.key])
+            .filter((notification) => !notification.appointment.confirmation_sent_at)
             .sort(
                 (first, second) =>
                     getAppointmentDateTime(first.appointment).getTime() -
@@ -2887,16 +2899,18 @@ export default function AdminPanel() {
                         const wasOpened = Boolean(openedWhatsAppNotifications[key]);
 
                         return (
-                            <a
-                                key={type}
-                                className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
-                                href={getWhatsAppUrl(appointment, type)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => markWhatsAppNotificationOpened(appointment, type)}
-                            >
-                                {wasOpened ? "Abrir novamente" : getWhatsAppNotificationLabel(type)}
-                            </a>
+                            <span key={type} className="admin-confirmation-actions">
+                                <a
+                                    className={`is-due${wasOpened ? " is-opened" : ""}`.trim()}
+                                    href={getWhatsAppUrl(appointment, type)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => markWhatsAppNotificationOpened(appointment, type)}
+                                >
+                                    {wasOpened ? "Abrir novamente" : getWhatsAppNotificationLabel(type)}
+                                </a>
+                                {type === "attendance-confirmation" && <button type="button" onClick={() => void markConfirmationSent(appointment)}>Marcar como enviada</button>}
+                            </span>
                         );
                     })}
                 </div>

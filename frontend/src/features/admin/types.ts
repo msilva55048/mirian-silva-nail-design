@@ -12,6 +12,7 @@ export type AdminAppointment = {
     price_cents: number | null;
     client_hidden: boolean;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
+    confirmation_sent_at?: string | null;
     created_at: string;
 };
 
