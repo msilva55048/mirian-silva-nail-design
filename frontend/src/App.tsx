@@ -1627,6 +1627,8 @@ function PublicSite() {
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [clientOpportunity, setClientOpportunity] = useState<ClientWaitlistOpportunity | null>(null);
     const [clientOpportunityLoading, setClientOpportunityLoading] = useState(false);
+    const [clientOpportunityClaiming, setClientOpportunityClaiming] = useState(false);
+    const [clientOpportunityError, setClientOpportunityError] = useState("");
 
     const [showPasswordRecoveryRequest, setShowPasswordRecoveryRequest] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -1686,6 +1688,18 @@ function PublicSite() {
         }
     }
 
+    async function claimClientOpportunity() {
+        if (!clientOpportunity || clientOpportunityClaiming) return;
+        setClientOpportunityClaiming(true); setClientOpportunityError("");
+        const {data, error} = await supabase.rpc("claim_waitlist_opportunity", {p_opportunity_id: clientOpportunity.id});
+        const result = data?.result;
+        if (error || !result) setClientOpportunityError(error?.message || "Não foi possível confirmar esta vaga.");
+        else if (result === "claimed") { setClientOpportunity(null); await loadClientAppointments(clientProfile?.id ?? ""); }
+        else if (result === "already_claimed_by_you") setClientOpportunityError("Você já agendou esta vaga.");
+        else if (result === "already_claimed") setClientOpportunityError("Esta vaga já foi preenchida.");
+        else setClientOpportunityError("Esta vaga não está mais disponível.");
+        setClientOpportunityClaiming(false);
+    }
     const reminderAppointmentId = typeof window !== "undefined" && window.location.pathname === "/client/reminder"
         ? new URLSearchParams(window.location.search).get("appointment_id")
         : null;
@@ -4520,7 +4534,7 @@ function PublicSite() {
                                     {clientOpportunityLoading && <p className="client-auth-message">Carregando vaga disponível...</p>}
                                     {!clientOpportunityLoading && clientOpportunity && <article className={`client-waitlist-opportunity ${clientOpportunity.available ? "is-available" : "is-unavailable"}`}>
                                         <strong>{clientOpportunity.available ? "Vaga disponível" : "Esta vaga não está mais disponível."}</strong>
-                                        {clientOpportunity.available && <><span>{clientOpportunity.service_name}</span><span>{new Date(`${clientOpportunity.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")} às {String(clientOpportunity.start_time).slice(0, 5)}</span><small>Confira os detalhes no sistema para solicitar este horário.</small></>}
+                                        {clientOpportunity.available && <><span>{clientOpportunity.service_name}</span><span>{new Date(`${clientOpportunity.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")} às {String(clientOpportunity.start_time).slice(0, 5)}</span><small>Confira os detalhes no sistema para solicitar este horário.</small><button type="button" disabled={clientOpportunityClaiming} onClick={() => void claimClientOpportunity()}>{clientOpportunityClaiming ? "Confirmando..." : "Confirmar agendamento"}</button></>}{clientOpportunityError && <small>{clientOpportunityError}</small>}
                                     </article>}
                                     {clientAppointments.length > 0 ? (
                                         <div className="client-account__appointments">
