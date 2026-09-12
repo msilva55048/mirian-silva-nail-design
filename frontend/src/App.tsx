@@ -12245,22 +12245,24 @@ function AdminPanel() {
         return `admin-status admin-status--${appointment.status}`;
     }
 
-    function openWhatsAppNotification(
-        event: MouseEvent<HTMLAnchorElement>, appointment: AdminAppointment, type: WhatsAppNotificationType,
-    ) {
-        event.preventDefault();
-        window.open(getWhatsAppUrl(appointment, type), "_blank", "noopener,noreferrer");
-    }
-
     async function markConfirmationSent(appointment: AdminAppointment) {
         setPanelError("");
         const {data, error} = await supabase.rpc("mark_appointment_confirmation_sent", {p_appointment_id: appointment.id});
         if (error || typeof data !== "string") {
             setPanelError("Não foi possível registrar a confirmação. A mensagem continua pendente.");
-            return;
+            return false;
         }
         setAppointments((current) => current.map((item) => item.id === appointment.id
             ? {...item, confirmation_sent_at: data} : item));
+        return true;
+    }
+
+    async function openWhatsAppNotification(
+        event: MouseEvent<HTMLAnchorElement>, appointment: AdminAppointment, type: WhatsAppNotificationType,
+    ) {
+        event.preventDefault();
+        if (!await markConfirmationSent(appointment)) return;
+        window.open(getWhatsAppUrl(appointment, type), "_blank", "noopener,noreferrer");
     }
 
     function getWhatsAppUrl(
@@ -13218,7 +13220,7 @@ function AdminPanel() {
                                         }
                                     >
                                         {getWhatsAppNotificationLabel(type)}
-                                    </a><button type="button" onClick={() => void markConfirmationSent(appointment)}>Marcar como enviada</button></div>
+                                    </a></div>
                                 );
                             })}
                         </div>
@@ -13317,7 +13319,7 @@ function AdminPanel() {
                                         onClick={(event) => void openWhatsAppNotification(event, appointment, type)}
                                     >
                                         Abrir WhatsApp
-                                    </a><button type="button" onClick={() => void markConfirmationSent(appointment)}>Marcar como enviada</button>
+                                    </a>
                                 </article>
                             ))}
                         </div>
