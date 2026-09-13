@@ -3645,7 +3645,7 @@ function PublicSite() {
                             ))}
                         </nav>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
-                        {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
+                        {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button primary-action" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
                     </header>
 
 
@@ -3900,7 +3900,7 @@ function PublicSite() {
 
                                 <div className="client-edit-actions">
                                     <button
-                                        className="booking-modal__button"
+                                        className="booking-modal__button primary-action"
                                         type="button"
                                         disabled={!selectedDate || !selectedTime}
                                         onClick={async () => {
@@ -3968,7 +3968,7 @@ function PublicSite() {
                                 )}
                             </div>
                             {bookingError && <p className="booking-modal__error">{bookingError}</p>}
-                            <button className="booking-modal__button" type="button" disabled={isConfirmingBooking}
+                            <button className="booking-modal__button primary-action" type="button" disabled={isConfirmingBooking}
                                     onClick={confirmBooking}>
                                 {isConfirmingBooking
                                     ? "Salvando..."
@@ -16063,5 +16063,7 @@ function App() {
 }
 
 export default App;
+
+
 
 

@@ -876,6 +876,9 @@ a {
   cursor: pointer;
 }
 
+.primary-action { background: var(--color-primary-action); color: #fff; border-color: var(--color-primary-action); opacity: 1; filter: none; }
+.booking-modal__button.primary-action:disabled { opacity: 1; filter: none; background: var(--color-primary-action); }
+
 .booking-modal__button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1346,4 +1349,6 @@ a {
     }
 
 }
+
+
 
