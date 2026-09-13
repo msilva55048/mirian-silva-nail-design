@@ -1064,6 +1064,19 @@ const clientAccountStyles = `
     opacity: .6;
     cursor: wait;
 }
+.client-waitlist-submit-button,
+.client-waitlist-submit-button:hover,
+.client-waitlist-submit-button:focus-visible,
+.client-waitlist-submit-button:disabled {
+    background: var(--color-primary-action);
+    background-color: var(--color-primary-action);
+    color: #fff;
+    opacity: 1;
+    filter: none;
+}
+.client-waitlist-submit-button:disabled {
+    cursor: not-allowed;
+}
 .client-account__referral-summary {
     display: grid;
     gap: 9px;
@@ -4602,7 +4615,7 @@ function PublicSite() {
                                         {clientWaitlistDate && <p>Seu interesse será considerado de {getWaitlistWeek(clientWaitlistDate).start} até {getWaitlistWeek(clientWaitlistDate).end}.</p>}
                                         {clientWaitlistError && <p className="client-auth-message is-error">{clientWaitlistError}</p>}
                                         {clientWaitlistMessage && <p className="client-auth-message is-success">{clientWaitlistMessage}</p>}
-                                        <button type="button" className="client-account__referral-button" disabled={clientWaitlistSaving || !clientWaitlistServiceId || !clientWaitlistDate} onClick={() => void createClientWaitlistRequest()}>{clientWaitlistSaving ? "Entrando..." : "Entrar na lista de espera"}</button>
+                                        <button type="button" className="client-account__referral-button client-waitlist-submit-button" disabled={clientWaitlistSaving || !clientWaitlistServiceId || !clientWaitlistDate} onClick={() => void createClientWaitlistRequest()}>{clientWaitlistSaving ? "Entrando..." : "Entrar na lista de espera"}</button>
                                         <h4>Minhas solicitações</h4>
                                         {clientWaitlistLoading ? <p>Carregando...</p> : clientWaitlistRequests.length === 0 ? <div className="client-account__empty">Nenhuma solicitação encontrada.</div> : clientWaitlistRequests.map((request) => <article className="client-waitlist-request" key={request.id}><strong>{request.service_name_snapshot}</strong><span>Data: {new Date(`${request.selected_date}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>Semana: {new Date(`${request.week_start}T12:00:00`).toLocaleDateString("pt-BR")} a {new Date(`${request.week_end}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>{request.status === "active" ? "Na lista de espera" : request.status === "fulfilled" ? "Vaga conseguida" : request.status === "cancelled" ? "Cancelada" : "Encerrada"}</span>{request.status === "active" && <button type="button" onClick={() => void cancelClientWaitlistRequest(request)}>Sair da lista</button>}</article>)}
                                     </section>
