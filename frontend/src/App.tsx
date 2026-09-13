@@ -10073,6 +10073,7 @@ function AdminPanel() {
     const [editAppointmentService, setEditAppointmentService] = useState("");
     const [editAppointmentDate, setEditAppointmentDate] = useState("");
     const [editAppointmentTime, setEditAppointmentTime] = useState("");
+    const [showEditServicePicker, setShowEditServicePicker] = useState(false);
     const [showEditDateTimePicker, setShowEditDateTimePicker] = useState(false);
     const [editWeekReferenceDate, setEditWeekReferenceDate] = useState(formatDateForInput(new Date()));
     const [showEditMonthCalendar, setShowEditMonthCalendar] = useState(true);
@@ -10610,6 +10611,7 @@ function AdminPanel() {
         );
 
         setShowEditDateTimePicker(false);
+        setShowEditServicePicker(false);
         setShowEditMonthCalendar(true);
         setAppointmentEditError("");
     }
@@ -15283,23 +15285,40 @@ function AdminPanel() {
 
                                     <label className="admin-edit-form__full">E-mail<input type="email" value={editAppointmentEmail} onChange={(event) => setEditAppointmentEmail(event.target.value)}/></label>
 
-                                    <label className="admin-edit-form__full">
-                                        Serviço
-                                        <select
-                                            value={editAppointmentService}
-                                            onChange={(event) => {
-                                                setEditAppointmentService(event.target.value);
-                                                setEditAppointmentTime("");
-                                                setAppointmentEditError("");
-                                            }}
+                                    <div className="admin-edit-form__full admin-edit-service-picker">
+                                        <span className="admin-edit-service-picker__label">Serviço</span>
+                                        <button
+                                            type="button"
+                                            className={`admin-edit-service-picker__trigger${showEditServicePicker ? " is-open" : ""}`}
+                                            aria-haspopup="listbox"
+                                            aria-expanded={showEditServicePicker}
+                                            onClick={() => setShowEditServicePicker((current) => !current)}
                                         >
-                                            {adminServices.map((service) => (
-                                                <option key={service.id} value={service.name}>
-                                                    {service.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
+                                            <span>{editAppointmentService}</span>
+                                            <span aria-hidden="true">{showEditServicePicker ? "⌃" : "⌄"}</span>
+                                        </button>
+                                        {showEditServicePicker && (
+                                            <div className="admin-edit-service-picker__options" role="listbox">
+                                                {adminServices.map((service) => (
+                                                    <button
+                                                        key={service.id}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={editAppointmentService === service.name}
+                                                        className={editAppointmentService === service.name ? "is-selected" : ""}
+                                                        onClick={() => {
+                                                            setEditAppointmentService(service.name);
+                                                            setEditAppointmentTime("");
+                                                            setAppointmentEditError("");
+                                                            setShowEditServicePicker(false);
+                                                        }}
+                                                    >
+                                                        {service.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <div className="admin-edit-date-time admin-edit-form__full">
                                         <span className="admin-edit-date-time__label">Data e hora</span>

@@ -1673,6 +1673,72 @@ a {
   color: #fff !important;
 }
 
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker {
+  position: relative;
+  display: grid;
+  gap: 7px;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker__label {
+  font-size: .84rem;
+  font-weight: 800;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: #fff !important;
+  color: #35272c;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker__trigger.is-open {
+  background: #fff8fa !important;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker__options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 5px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 7px;
+  border: 1px solid var(--color-gold-border);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(83, 48, 58, .16);
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker__options button {
+  border: 1px solid var(--color-gold-border);
+  border-radius: 9px;
+  padding: 10px 11px;
+  background: #fff;
+  color: #513a42;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-service-picker__options button.is-selected {
+  background: var(--gradient-primary-action);
+  background-image: var(--gradient-primary-action);
+  color: #fff;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
