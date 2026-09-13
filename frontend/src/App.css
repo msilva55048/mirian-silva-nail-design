@@ -2146,5 +2146,17 @@ a {
   border-color: var(--color-gold-border) !important;
 }
 
+/* Elementos pontuais do formulário: fundo neutro e borda dourada no próprio controle. */
+.admin-page .admin-client-history .admin-nail-form__actions .cancel {
+  background: #eadde1 !important;
+  background-image: none !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #6d3445 !important;
+}
+
+.admin-page .admin-client-history .admin-nail-records__empty {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
 
 
