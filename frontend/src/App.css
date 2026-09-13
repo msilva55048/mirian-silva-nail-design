@@ -1675,5 +1675,17 @@ a {
   background: #fff !important;
 }
 
+.client-logged-page .booking-modal__content {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-logged-page .booking-modal__summary {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-logged-page .booking-modal__summary div {
+  border-bottom-color: var(--color-gold-border) !important;
+}
+
 
 
