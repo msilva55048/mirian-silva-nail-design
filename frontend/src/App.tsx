@@ -15263,7 +15263,7 @@ function AdminPanel() {
 
                 {selectedAdminAppointment && (
                     <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedAdminAppointment(null);}}>
-                        <section className="admin-modal">
+                        <section className="admin-modal admin-appointment-edit-modal">
                             <div className="admin-modal__header"><div><h2>Editar agendamento</h2><p>Altere os dados ou cancele o agendamento.</p></div><button className="admin-modal__close" type="button" onClick={() => setSelectedAdminAppointment(null)}>×</button></div>
                             <div className="admin-modal__body">
                                 <div className="admin-edit-form">

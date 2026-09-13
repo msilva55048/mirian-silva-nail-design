@@ -1649,6 +1649,29 @@ a {
   border: 1px solid var(--color-gold-border) !important;
 }
 
+/* Modal Editar agendamento: identidade visual isolada do painel ADM. */
+.admin-page .admin-appointment-edit-modal {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-modal__header {
+  border-bottom-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-form input,
+.admin-page .admin-appointment-edit-modal .admin-edit-form textarea,
+.admin-page .admin-appointment-edit-modal .admin-edit-form select,
+.admin-page .admin-appointment-edit-modal .admin-edit-date-time__toggle {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-appointment-edit-modal .admin-edit-actions button {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
