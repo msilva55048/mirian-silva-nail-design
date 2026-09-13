@@ -1872,6 +1872,17 @@ a {
   border-color: var(--color-gold-border) !important;
 }
 
+.admin-page .admin-waiting-list .admin-waitlist-client-selection {
+  padding: 14px;
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 14px;
+  background: #fff !important;
+}
+
+.admin-page .admin-waiting-list .admin-waitlist-client-selection .admin-selected-client {
+  margin-top: 0;
+}
+
 .admin-page .admin-waiting-list .shared-waitlist-client-suggestions button {
   background: #fff !important;
   background-image: none !important;
