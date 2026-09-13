@@ -1633,6 +1633,16 @@ a {
   border-bottom-color: var(--color-gold-border) !important;
 }
 
+.admin-page .admin-top-agenda__header,
+.admin-page .admin-top-agenda .admin-empty--top {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-top-agenda .admin-empty--top {
+  background: #fff !important;
+  background-image: none !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
