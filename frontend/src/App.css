@@ -1433,6 +1433,14 @@ a {
   border-radius: 14px !important;
 }
 
+.client-modal.client-modal--account .client-account__appointment {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-modal.client-modal--account .client-account__status {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
 /* Editor de perfil: repetir o padrão claro/dourado e o degradê de ação aprovado. */
 .client-modal.client-profile-editor {
   border: 1px solid var(--color-gold-border) !important;
