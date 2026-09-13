@@ -1433,6 +1433,51 @@ a {
   border-radius: 14px !important;
 }
 
+/* Editor de perfil: repetir o padrão claro/dourado e o degradê de ação aprovado. */
+.client-modal.client-profile-editor {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.client-modal.client-profile-editor .client-profile-editor__form input,
+.client-modal.client-profile-editor .client-password-field {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-modal.client-profile-editor .client-profile-editor__form input:focus {
+  border-color: var(--color-gold-border) !important;
+  box-shadow: 0 0 0 3px rgba(198, 161, 91, .12) !important;
+}
+
+.client-modal.client-profile-editor .client-password-field {
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+}
+
+.client-modal.client-profile-editor .client-password-field input {
+  border-color: transparent !important;
+}
+
+.client-modal.client-profile-editor .client-password-toggle {
+  border: 1px solid var(--color-gold-border) !important;
+  background: #fff8fa !important;
+  color: var(--color-primary-action) !important;
+}
+
+.client-modal.client-profile-editor .client-profile-editor__save {
+  border: 1px solid var(--color-gold-border) !important;
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  color: var(--color-primary-text-on-gradient) !important;
+}
+
+.client-modal.client-profile-editor .client-profile-editor__cancel {
+  border: 1px solid var(--color-gold-border) !important;
+  background: #fff8fa !important;
+  background-image: none !important;
+  color: var(--color-primary-action) !important;
+}
+
 :where(.home, .client-logged-page, .admin-page) .service-picker__trigger,
 :where(.home, .client-logged-page, .admin-page) .client-week-picker__nav,
 :where(.home, .client-logged-page, .admin-page) .client-week-picker__calendar-button,
