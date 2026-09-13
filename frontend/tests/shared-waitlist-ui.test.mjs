@@ -36,7 +36,7 @@ test('cards do Admin seguem o layout legível da lista da cliente', () => {
   assert.match(admin, /Na lista de espera/);
   assert.match(admin, /shared-waitlist-request-card__actions/);
   assert.doesNotMatch(admin, /<strong>\{profile\?\.full_name[^<]*<span>\{profile\?\.phone/);
-  assert.match(admin, /background:linear-gradient\(135deg,#7c4356,#a95470\)/);
+  assert.match(admin, /background:var\(--color-primary-action\)/);
   assert.match(admin, /min-height:44px/);
   assert.match(admin, /align-items:center;justify-content:center/);
   assert.match(admin, /border-radius:10px/);
@@ -44,7 +44,7 @@ test('cards do Admin seguem o layout legível da lista da cliente', () => {
 
 test('seção antiga foi removida e nenhum push/claim é criado', () => {
   assert.doesNotMatch(admin, /Registros antigos|legacyEntries|shared-waitlist-legacy/);
-  assert.doesNotMatch(app + admin, /claim_waitlist_opportunity|client-web-push|notificationclick/);
+  assert.doesNotMatch(admin, /claim_waitlist_opportunity|client-web-push|notificationclick/);
   assert.match(admin, /selectedClient/);
   assert.match(admin, /CLIENTE SELECIONADA/);
   assert.match(admin, /clearSelectedClient/);

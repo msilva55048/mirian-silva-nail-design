@@ -7910,6 +7910,170 @@ const adminEnhancementStyles = `
     min-height: 42px;
 }
 
+/* Identidade única para controles acionáveis do Admin. Estados semânticos
+   (status, indisponível, bloqueado, passado e pagamento) permanecem intactos. */
+.admin-page .admin-primary-button,
+.admin-page .admin-secondary-button,
+.admin-page .admin-action,
+.admin-page .admin-dashboard-card,
+.admin-page .admin-section-date-controls button,
+.admin-page .admin-agenda-date-picker__month button,
+.admin-page .admin-agenda-date-picker__panel-navs button,
+.admin-page .admin-manual-month-calendar__header button,
+.admin-page .admin-manual-month-calendar__grid button:not(.is-past):not(.is-blocked),
+.admin-page .admin-manual-week-day:not(.is-past):not(.is-blocked),
+.admin-page .admin-manual-times-grid button:not(.is-past):not(.is-blocked),
+.admin-page .admin-block-time,
+.admin-page .admin-block-submit-row button,
+.admin-page .admin-schedule-config-add-inline button,
+.admin-page .admin-schedule-config-editor__actions button,
+.admin-page .admin-edit-actions button,
+.admin-page .admin-nail-form__actions .save,
+.admin-page .admin-nail-record__new-button,
+.admin-page .admin-nail-form__file-button,
+.admin-page .admin-service-summary-card__actions button,
+.admin-page .admin-finance-month-panel__grid button,
+.admin-page .admin-booking-card__footer button,
+.admin-page .admin-booking-card__footer a:not(.is-due):not(.is-opened),
+.admin-page .admin-modal__actions button {
+    background: var(--color-primary-action);
+    background-image: none;
+    border-color: var(--color-primary-action);
+    color: #fff;
+}
+
+.admin-page .admin-dashboard-card.is-active,
+.admin-page .admin-finance-month-panel__grid button.is-selected,
+.admin-page .admin-block-time.is-selected {
+    background: var(--color-primary-action);
+    border-color: var(--color-primary-action);
+    color: #fff;
+}
+
+.admin-page .admin-primary-button:hover,
+.admin-page .admin-secondary-button:hover,
+.admin-page .admin-action:hover,
+.admin-page .admin-dashboard-card:hover,
+.admin-page .admin-section-date-controls button:hover,
+.admin-page .admin-agenda-date-picker__month button:hover,
+.admin-page .admin-agenda-date-picker__panel-navs button:hover,
+.admin-page .admin-manual-month-calendar__header button:hover,
+.admin-page .admin-manual-month-calendar__grid button:not(:disabled):hover,
+.admin-page .admin-manual-week-day:not(:disabled):hover,
+.admin-page .admin-manual-times-grid button:not(:disabled):hover,
+.admin-page .admin-block-time:hover,
+.admin-page .admin-block-submit-row button:hover,
+.admin-page .admin-schedule-config-add-inline button:hover,
+.admin-page .admin-schedule-config-editor__actions button:hover,
+.admin-page .admin-edit-actions button:hover,
+.admin-page .admin-nail-form__actions button:hover,
+.admin-page .admin-nail-record__new-button:hover,
+.admin-page .admin-nail-form__file-button:hover,
+.admin-page .admin-service-summary-card__actions button:hover,
+.admin-page .admin-finance-month-panel__grid button:not(:disabled):hover,
+.admin-page .admin-booking-card__footer button:hover,
+.admin-page .admin-booking-card__footer a:not(.is-due):not(.is-opened):hover,
+.admin-page .admin-modal__actions button:hover {
+    background: var(--color-primary-action-hover);
+    background-image: none;
+    border-color: var(--color-primary-action-hover);
+    color: #fff;
+}
+
+.admin-page .admin-primary-button:disabled,
+.admin-page .admin-secondary-button:disabled,
+.admin-page .admin-action:disabled,
+.admin-page .admin-block-submit-row button:disabled,
+.admin-page .admin-schedule-config-add-inline button:disabled,
+.admin-page .admin-schedule-config-editor__actions button:disabled,
+.admin-page .admin-edit-actions button:disabled,
+.admin-page .admin-nail-form__actions button:disabled,
+.admin-page .admin-service-summary-card__actions button:disabled {
+    background: var(--color-primary-action);
+    background-image: none;
+    border-color: var(--color-primary-action);
+    color: #fff;
+    opacity: .72;
+    cursor: not-allowed;
+}
+
+.admin-page .admin-nail-form__file-button input,
+.admin-page .admin-nail-form__preview button {
+    background: var(--color-primary-action);
+    border-color: var(--color-primary-action);
+}
+
+.admin-page .admin-month-agenda__nav button,
+.admin-page .admin-message-item a,
+.admin-page .admin-view-switch button,
+.admin-page .admin-date-navigation button,
+.admin-page .admin-agenda__appointment-actions button,
+.admin-page .admin-details-button,
+.admin-page .admin-block-form button,
+.admin-page .admin-block-item button,
+.admin-page .admin-week__actions button,
+.admin-page .admin-finance-month-picker__quick > button,
+.admin-page .admin-finance-month-panel__header button,
+.admin-page .admin-schedule-config-add button,
+.admin-page .admin-schedule-config-time button,
+.admin-page .admin-client-picker__results button,
+.admin-page .admin-selected-client button {
+    background: var(--color-primary-action);
+    background-image: none;
+    border-color: var(--color-primary-action);
+    color: #fff;
+}
+
+.admin-page .admin-message-item a:hover,
+.admin-page .admin-view-switch button:hover,
+.admin-page .admin-date-navigation button:hover,
+.admin-page .admin-agenda__appointment-actions button:hover,
+.admin-page .admin-details-button:hover,
+.admin-page .admin-block-form button:hover,
+.admin-page .admin-block-item button:hover,
+.admin-page .admin-week__actions button:hover,
+.admin-page .admin-finance-month-picker__quick > button:hover,
+.admin-page .admin-finance-month-panel__header button:hover,
+.admin-page .admin-schedule-config-add button:hover,
+.admin-page .admin-schedule-config-time button:hover,
+.admin-page .admin-client-picker__results button:hover,
+.admin-page .admin-selected-client button:hover {
+    background: var(--color-primary-action-hover);
+    background-image: none;
+    border-color: var(--color-primary-action-hover);
+    color: #fff;
+}
+
+.admin-page .admin-schedule-config-time button.is-secondary,
+.admin-page .admin-schedule-config-time button.is-danger,
+.admin-page .admin-client-card__actions button.is-secondary,
+.admin-page .admin-client-card__actions button.is-nail-record,
+.admin-page .admin-client-card__actions button.is-danger,
+.admin-page .admin-edit-actions .cancel,
+.admin-page .admin-edit-actions .delete,
+.admin-page .admin-edit-actions .close {
+    background: var(--color-primary-action);
+    background-image: none;
+    border-color: var(--color-primary-action);
+    color: #fff;
+}
+
+.admin-page .admin-view-switch button.is-active,
+.admin-page .admin-finance-month-panel__grid button.is-selected,
+.admin-page .admin-schedule-config-times-grid button.is-selected,
+.admin-page .admin-manual-times button.is-selected {
+    background: var(--color-primary-action) !important;
+    border-color: var(--color-primary-action) !important;
+    color: #fff !important;
+}
+
+.admin-page .admin-schedule-config-card .admin-manual-week-day.is-selected {
+    background: var(--color-primary-action) !important;
+    border-color: var(--color-primary-action) !important;
+    color: #fff !important;
+    box-shadow: 0 7px 18px rgba(109, 52, 69, .16) !important;
+}
+
 .admin-finance__period {
     display: flex;
     gap: 7px;
