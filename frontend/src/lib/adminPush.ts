@@ -19,12 +19,13 @@ async function getRegistration() {
     return navigator.serviceWorker.register("/push-sw.js", {scope: "/"});
 }
 
-async function sendSubscription(action: "subscribe" | "unsubscribe", subscription: PushSubscription) {
-    const {error} = await supabase.functions.invoke("admin-web-push", {
+async function sendSubscription(action: "subscribe" | "unsubscribe" | "status", subscription: PushSubscription) {
+    const {data, error} = await supabase.functions.invoke("admin-web-push", {
         body: {action, subscription: subscription.toJSON()},
     });
 
     if (error) throw error;
+    return data;
 }
 
 export async function getAdminPushState(): Promise<AdminPushState> {
@@ -34,7 +35,9 @@ export async function getAdminPushState(): Promise<AdminPushState> {
 
     const registration = await getRegistration();
     const subscription = await registration.pushManager.getSubscription();
-    return subscription ? "enabled" : "disabled";
+    if (!subscription) return "disabled";
+    const data = await sendSubscription("status", subscription);
+    return data?.registered === true ? "enabled" : "disabled";
 }
 
 export async function enableAdminPush() {
@@ -68,5 +71,4 @@ export async function disableAdminPush() {
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) return;
     await sendSubscription("unsubscribe", subscription);
-    await subscription.unsubscribe();
 }

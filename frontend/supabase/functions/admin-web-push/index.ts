@@ -111,6 +111,12 @@ async function manageSubscription(req: Request, body: Record<string, unknown>, h
     const endpoint = subscription.endpoint?.trim();
     if (!endpoint) return json({error: "Subscription inválida."}, 400, headers);
 
+    if (body.action === "status") {
+        const {data, error} = await admin.from("admin_push_subscriptions")
+            .select("id").eq("endpoint", endpoint).eq("admin_user_id", user.id).maybeSingle();
+        return error ? json({error: error.message}, 500, headers) : json({registered: Boolean(data)}, 200, headers);
+    }
+
     if (body.action === "unsubscribe") {
         const {error} = await admin.from("admin_push_subscriptions").delete().eq("endpoint", endpoint).eq("admin_user_id", user.id);
         return error ? json({error: error.message}, 500, headers) : json({ok: true}, 200, headers);

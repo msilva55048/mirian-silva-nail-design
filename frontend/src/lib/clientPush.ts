@@ -63,5 +63,4 @@ export async function disableClientPush() {
     const subscription = await (await registration()).pushManager.getSubscription();
     if (!subscription) return;
     await send("unsubscribe", subscription);
-    await subscription.unsubscribe();
 }
