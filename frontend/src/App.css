@@ -1546,7 +1546,7 @@ a {
 
 .client-logged-page .client-logged-header {
   position: sticky;
-  top: 12px;
+  top: 0;
   z-index: 50;
   border-color: var(--color-gold-border) !important;
   background: #fff !important;
@@ -1562,18 +1562,6 @@ a {
   border-color: var(--color-gold-border) !important;
   background: #fff !important;
   color: var(--color-primary-action) !important;
-}
-
-.client-logged-page .client-fixed-top-bar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 60;
-  height: 12px;
-  border-bottom: 1px solid var(--color-gold-border);
-  background: var(--gradient-primary-action);
-  background-image: var(--gradient-primary-action);
 }
 
 .client-logged-page .client-fixed-bottom-bar {
