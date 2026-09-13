@@ -1661,7 +1661,8 @@ a {
 .admin-page .admin-appointment-edit-modal .admin-edit-form input,
 .admin-page .admin-appointment-edit-modal .admin-edit-form textarea,
 .admin-page .admin-appointment-edit-modal .admin-edit-form select,
-.admin-page .admin-appointment-edit-modal .admin-edit-date-time__toggle {
+.admin-page .admin-appointment-edit-modal .admin-edit-date-time__toggle,
+.admin-page .admin-appointment-edit-modal .admin-edit-date-time__picker {
   border-color: var(--color-gold-border) !important;
 }
 
