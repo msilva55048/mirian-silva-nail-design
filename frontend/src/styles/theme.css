@@ -4,18 +4,23 @@
     --surface: #fffafa;
     --surface-strong: #ffffff;
 
-    --rose-gold: #d79aa6;
-    --rose-gold-dark: #bd7484;
-    --rose-gold-light: #efd0d6;
+    --rose-gold: #e778ae;
+    --rose-gold-dark: #c94f8d;
+    --rose-gold-light: #f3b1d0;
 
-    --gold: #c9a45f;
-    --gold-soft: #e4c98e;
+    --gold: #c6a15b;
+    --gold-soft: #e7cf9b;
+
+    --gradient-primary-action: radial-gradient(circle at center, #f3b1d0 0%, #e778ae 46%, #c94f8d 100%);
+    --gradient-primary-action-hover: radial-gradient(circle at center, #f6bfd8 0%, #ed88b8 46%, #d45d99 100%);
+    --color-gold-border: #c6a15b;
+    --color-primary-text-on-gradient: #fff;
 
     --text-primary: #4a383d;
     --text-secondary: #7c656b;
     --text-light: #fffafa;
 
-    --border: rgba(189, 116, 132, 0.2);
+    --border: rgba(198, 161, 91, 0.42);
     --shadow: 0 18px 45px rgba(126, 79, 90, 0.14);
     --shadow-soft: 0 10px 30px rgba(126, 79, 90, 0.1);
 

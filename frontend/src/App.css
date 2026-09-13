@@ -1350,5 +1350,103 @@ a {
 
 }
 
+/* Sistema visual global: rosa luminoso em degradê + ouro discreto. */
+:where(.home, .client-logged-page, .client-modal, .booking-modal, .admin-page) {
+  --color-primary-action: #e778ae;
+  --color-primary-action-hover: #c94f8d;
+  --gradient-primary-action: radial-gradient(circle at center, #f3b1d0 0%, #e778ae 46%, #c94f8d 100%);
+  --gradient-primary-action-hover: radial-gradient(circle at center, #f6bfd8 0%, #ed88b8 46%, #d45d99 100%);
+  --color-gold-border: #c6a15b;
+}
+
+:where(.home, .client-logged-page, .admin-page) input,
+:where(.home, .client-logged-page, .admin-page) select,
+:where(.home, .client-logged-page, .admin-page) textarea,
+:where(.home, .client-logged-page, .admin-page) .service-card,
+:where(.home, .client-logged-page, .admin-page) .client-modal,
+:where(.home, .client-logged-page, .admin-page) .admin-login__card,
+:where(.home, .client-logged-page, .admin-page) .admin-section-heading,
+:where(.home, .client-logged-page, .admin-page) .admin-message-center,
+:where(.home, .client-logged-page, .admin-page) .admin-booking-card,
+:where(.home, .client-logged-page, .admin-page) .admin-client-card,
+:where(.home, .client-logged-page, .admin-page) .admin-finance-service-card,
+:where(.home, .client-logged-page, .admin-page) .admin-service-form-card,
+:where(.home, .client-logged-page, .admin-page) .admin-service-list-section {
+  border-color: var(--color-gold-border);
+}
+
+:where(.home, .client-logged-page, .admin-page) .service-card__button,
+:where(.home, .client-logged-page, .admin-page) .button--primary,
+:where(.home, .client-logged-page, .admin-page) .button--instagram,
+:where(.home, .client-logged-page, .admin-page) .button--whatsapp,
+:where(.home, .client-logged-page, .admin-page) .client-account-button,
+:where(.home, .client-logged-page, .admin-page) .client-account__referral-button,
+:where(.home, .client-logged-page, .admin-page) .booking-modal__button,
+:where(.home, .client-logged-page, .admin-page) .primary-action,
+:where(.home, .client-logged-page, .admin-page) .admin-primary-button,
+:where(.home, .client-logged-page, .admin-page) .admin-secondary-button,
+:where(.home, .client-logged-page, .admin-page) .admin-action,
+:where(.home, .client-logged-page, .admin-page) .admin-dashboard-card.is-active,
+:where(.home, .client-logged-page, .admin-page) .admin-booking-card__footer a,
+:where(.home, .client-logged-page, .admin-page) .admin-booking-card__footer button {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: var(--color-primary-text-on-gradient) !important;
+}
+
+:where(.home, .client-logged-page, .admin-page) .service-picker__trigger,
+:where(.home, .client-logged-page, .admin-page) .client-week-picker__nav,
+:where(.home, .client-logged-page, .admin-page) .client-week-picker__calendar-button,
+:where(.home, .client-logged-page, .admin-page) .client-modal__close,
+:where(.home, .client-logged-page, .admin-page) .booking-modal__close {
+  background: #fff !important;
+  background-image: none !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: var(--color-primary-action) !important;
+}
+
+:where(.home, .client-logged-page, .admin-page) .service-picker__menu,
+:where(.home, .client-logged-page, .admin-page) .service-picker__menu button {
+  border-color: var(--color-gold-border) !important;
+}
+
+:where(.home, .client-logged-page, .admin-page) .service-picker__menu button:hover,
+:where(.home, .client-logged-page, .admin-page) .service-picker__menu button:focus-visible,
+:where(.home, .client-logged-page, .admin-page) .service-picker__menu button.is-selected {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
+:where(.home, .client-logged-page, .admin-page) .client-month-calendar__day:not(:disabled),
+:where(.home, .client-logged-page, .admin-page) .admin-manual-month-calendar__grid button:not(:disabled),
+:where(.home, .client-logged-page, .admin-page) .admin-manual-times button:not(:disabled),
+:where(.home, .client-logged-page, .admin-page) .admin-block-time:not(:disabled) {
+  background: #fff !important;
+  background-image: none !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: var(--text-primary) !important;
+}
+
+:where(.home, .client-logged-page, .admin-page) .client-month-calendar__day.is-selected,
+:where(.home, .client-logged-page, .admin-page) .admin-manual-month-calendar__grid button.is-selected,
+:where(.home, .client-logged-page, .admin-page) .admin-manual-times button.is-selected,
+:where(.home, .client-logged-page, .admin-page) .admin-block-time.is-selected {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
+:where(.home, .client-logged-page, .admin-page) button:focus-visible,
+:where(.home, .client-logged-page, .admin-page) input:focus,
+:where(.home, .client-logged-page, .admin-page) select:focus,
+:where(.home, .client-logged-page, .admin-page) textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-gold-border) 55%, var(--color-primary-action));
+  outline-offset: 2px;
+}
+
 
 

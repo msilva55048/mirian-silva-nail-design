@@ -1,8 +1,12 @@
 @import "./styles/theme.css";
 
 :root {
-  --color-primary-action: #6d3445;
-  --color-primary-action-hover: #592838;
+  --color-primary-action: #e778ae;
+  --color-primary-action-hover: #c94f8d;
+  --gradient-primary-action: radial-gradient(circle at center, #f3b1d0 0%, #e778ae 46%, #c94f8d 100%);
+  --gradient-primary-action-hover: radial-gradient(circle at center, #f6bfd8 0%, #ed88b8 46%, #d45d99 100%);
+  --color-gold-border: #c6a15b;
+  --color-primary-text-on-gradient: #fff;
 }
 
 * {
