@@ -2158,5 +2158,20 @@ a {
   border: 1px solid var(--color-gold-border) !important;
 }
 
+/* Editar cadastro: bordas douradas somente no modal e na ficha de anamnese. */
+.admin-page .admin-client-editor {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.admin-page .admin-client-editor > label > input,
+.admin-page .admin-client-editor > label > textarea,
+.admin-page .admin-anamnesis-card {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.admin-page .admin-anamnesis-card__questions input {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
 
 
