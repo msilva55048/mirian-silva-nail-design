@@ -1854,6 +1854,49 @@ a {
   color: #fff !important;
 }
 
+/* Identidade visual exclusiva da Lista de espera do painel ADM. */
+.admin-page .admin-new-appointment:has(.admin-waiting-list) {
+  background: #fff !important;
+  background-image: none !important;
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-waiting-list input,
+.admin-page .admin-waiting-list .service-picker__trigger,
+.admin-page .admin-waiting-list .shared-waitlist-client-suggestions,
+.admin-page .admin-waiting-list .shared-waitlist-client-suggestions button,
+.admin-page .admin-waiting-list .shared-waitlist-selected-card,
+.admin-page .admin-waiting-list .admin-manual-month-calendar,
+.admin-page .admin-waiting-list .admin-manual-month-calendar__grid button,
+.admin-page .admin-waiting-list .shared-waitlist-request-card {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-waiting-list .shared-waitlist-client-suggestions button {
+  background: #fff !important;
+  background-image: none !important;
+  color: #4d363e !important;
+}
+
+.admin-page .admin-waiting-list .shared-waitlist-client-suggestions button:hover,
+.admin-page .admin-waiting-list .shared-waitlist-client-suggestions button:focus-visible {
+  background: #fff8fa !important;
+  background-image: none !important;
+}
+
+.admin-page .admin-waiting-list .shared-waitlist-submit,
+.admin-page .admin-waiting-list .shared-waitlist-request-card__actions button {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-waiting-list .shared-waitlist-selected-card button {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
