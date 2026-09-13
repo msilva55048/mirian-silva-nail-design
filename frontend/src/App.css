@@ -1641,5 +1641,34 @@ a {
   outline-offset: 2px;
 }
 
+/* Fluxo de reagendamento da cliente: contornos dourados sem alterar a lógica ou o Admin. */
+.client-logged-page .booking-modal__content {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-logged-page .client-edit-current,
+.client-logged-page .client-month-calendar,
+.client-logged-page .booking-time,
+.client-logged-page .client-edit-cancel {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-logged-page .booking-time:not(.booking-time--selected) {
+  background: #fff !important;
+  background-image: none !important;
+}
+
+.client-logged-page .booking-time--selected,
+.client-logged-page .booking-modal__button.primary-action {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-logged-page .client-edit-cancel {
+  background: #fff !important;
+  color: #a23f4d;
+}
+
 
 
