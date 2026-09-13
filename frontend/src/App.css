@@ -1909,6 +1909,31 @@ a {
   border-color: var(--color-gold-border) !important;
 }
 
+/* Acabamento dourado exclusivo da seção Clientes do painel ADM. */
+.admin-page .admin-clients,
+.admin-page .admin-clients__count,
+.admin-page .admin-clients__search input,
+.admin-page .admin-client-card,
+.admin-page .admin-client-card__compact-date {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-client-filters {
+  display: grid;
+  gap: 0;
+  margin-bottom: 20px;
+}
+
+.admin-page .admin-client-filters .admin-dashboard-card {
+  width: 100%;
+  box-sizing: border-box;
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-clients__count {
+  box-sizing: border-box;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
