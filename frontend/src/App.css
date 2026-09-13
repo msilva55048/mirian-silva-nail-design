@@ -2173,5 +2173,12 @@ a {
   border: 1px solid var(--color-gold-border) !important;
 }
 
+/* Avatar circular da cliente no painel Admin. */
+.admin-page .admin-client-card__avatar {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  color: #fff !important;
+}
+
 
 
