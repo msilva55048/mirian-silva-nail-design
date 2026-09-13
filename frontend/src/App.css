@@ -1551,6 +1551,51 @@ a {
   color: rgba(255, 255, 255, .82) !important;
 }
 
+/* Agendamentos do Admin: cartões claros com contorno dourado e controles
+   destacados apenas quando o estado selecionado pede ação visual. */
+.admin-page .admin-message-center,
+.admin-page .admin-message-center__count,
+.admin-page .admin-top-agenda,
+.admin-page .admin-agenda-date-picker__panel,
+.admin-page .admin-manual-month-calendar {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-message-center,
+.admin-page .admin-top-agenda,
+.admin-page .admin-agenda-date-picker__panel,
+.admin-page .admin-manual-month-calendar {
+  background: #fff !important;
+  background-image: none !important;
+}
+
+.admin-page .admin-message-center__count {
+  background: #fff8fa !important;
+  background-image: none !important;
+}
+
+.admin-page .admin-agenda-date-picker__month button,
+.admin-page .admin-agenda-date-picker__panel-navs button,
+.admin-page .admin-manual-month-calendar__header button {
+  background: #fff !important;
+  background-image: none !important;
+  border-color: var(--color-gold-border) !important;
+  color: #b76f86 !important;
+}
+
+.admin-page .admin-section-date-controls--agenda > button:last-child {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
+.admin-page .admin-back-to-top {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
