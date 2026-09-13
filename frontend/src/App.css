@@ -1423,6 +1423,16 @@ a {
   color: var(--color-primary-text-on-gradient) !important;
 }
 
+/* Conta da cliente: envelope e dados com o mesmo contorno dourado discreto. */
+.client-modal.client-modal--account {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.client-modal.client-modal--account .client-account__profile > div {
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 14px !important;
+}
+
 :where(.home, .client-logged-page, .admin-page) .service-picker__trigger,
 :where(.home, .client-logged-page, .admin-page) .client-week-picker__nav,
 :where(.home, .client-logged-page, .admin-page) .client-week-picker__calendar-button,
