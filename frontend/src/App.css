@@ -1881,6 +1881,8 @@ a {
 
 .admin-page .admin-waiting-list .admin-waitlist-client-selection .admin-selected-client {
   margin-top: 0;
+  background: #fff !important;
+  background-image: none !important;
 }
 
 .admin-page .admin-waiting-list .shared-waitlist-client-suggestions button {
