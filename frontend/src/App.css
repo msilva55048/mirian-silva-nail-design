@@ -1395,6 +1395,34 @@ a {
   color: var(--color-primary-text-on-gradient) !important;
 }
 
+/* Seletores da área da cliente: apenas o item ativo recebe o degradê. */
+.client-logged-page .client-logged-header {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-logged-page .client-logged-header__brand img {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.client-logged-page .client-account-nav button,
+.client-logged-page .client-account-nav button:hover,
+.client-logged-page .client-account-nav button:focus-visible {
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 14px !important;
+  background: #fff8fa !important;
+  background-image: none !important;
+  color: var(--color-primary-action) !important;
+}
+
+.client-logged-page .client-account-nav button.is-active,
+.client-logged-page .client-account-nav button.is-active:hover,
+.client-logged-page .client-account-nav button.is-active:focus-visible {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: var(--color-primary-text-on-gradient) !important;
+}
+
 :where(.home, .client-logged-page, .admin-page) .service-picker__trigger,
 :where(.home, .client-logged-page, .admin-page) .client-week-picker__nav,
 :where(.home, .client-logged-page, .admin-page) .client-week-picker__calendar-button,
