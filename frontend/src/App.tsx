@@ -16224,7 +16224,6 @@ function AdminPanel() {
                         </section>
                     </div>
                 )}
-                <div className="admin-fixed-bottom-bar" aria-hidden="true" />
             </section>
         </main>
     );

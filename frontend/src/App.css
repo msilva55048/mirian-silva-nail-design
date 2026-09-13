@@ -1498,45 +1498,57 @@ a {
   color: var(--color-primary-action) !important;
 }
 
-/* Barras fixas do painel Admin: rosa sempre em degradê, com ouro discreto. */
+/* Painel Admin: cabeçalho claro, ação de saída em degradê e navegação semântica. */
 .admin-page .admin-panel {
-  padding-bottom: 96px;
+  padding-bottom: 0 !important;
 }
 
 .admin-page .admin-header {
   border-color: var(--color-gold-border) !important;
-  background: var(--gradient-primary-action) !important;
-  background-image: var(--gradient-primary-action) !important;
-  color: var(--color-primary-text-on-gradient) !important;
+  background: #fff !important;
+  background-image: none !important;
+  color: #35272c !important;
 }
 
 .admin-page .admin-header h1,
 .admin-page .admin-header p {
-  color: var(--color-primary-text-on-gradient) !important;
+  color: #35272c !important;
 }
 
-.admin-page .admin-fixed-bottom-bar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 49;
-  height: 48px;
-  border-top: 1px solid var(--color-gold-border);
-  background: var(--gradient-primary-action);
-  background-image: var(--gradient-primary-action);
-  box-shadow: 0 -8px 24px rgba(83, 48, 58, .12);
-  pointer-events: none;
+.admin-page .admin-header__actions .admin-push-button {
+  background: #fff !important;
+  background-image: none !important;
+  border-color: var(--color-gold-border) !important;
+  color: #6d3445 !important;
 }
 
-@media (max-width: 560px) {
-  .admin-page .admin-panel {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-  }
+.admin-page .admin-header__actions > .admin-secondary-button:not(.admin-push-button) {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
 
-  .admin-page .admin-fixed-bottom-bar {
-    height: calc(44px + env(safe-area-inset-bottom, 0px));
-  }
+.admin-page .admin-dashboard-card {
+  border: 1px solid var(--color-gold-border) !important;
+  background: #fff !important;
+  background-image: none !important;
+  color: #35272c !important;
+}
+
+.admin-page .admin-dashboard-card span {
+  color: #80666e !important;
+}
+
+.admin-page .admin-dashboard-card.is-active {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
+.admin-page .admin-dashboard-card.is-active span {
+  color: rgba(255, 255, 255, .82) !important;
 }
 
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
