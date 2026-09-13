@@ -1954,6 +1954,21 @@ a {
   border-color: var(--color-gold-border) !important;
 }
 
+.admin-page .admin-client-card.is-expanded .admin-client-card__metrics > div,
+.admin-page .admin-client-card.is-expanded .admin-client-card__next {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.admin-page .admin-client-card.is-expanded .admin-client-card__actions button,
+.admin-page .admin-client-card.is-expanded .admin-client-card__actions button.is-secondary,
+.admin-page .admin-client-card.is-expanded .admin-client-card__actions button.is-nail-record,
+.admin-page .admin-client-card.is-expanded .admin-client-card__actions button.is-danger {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
 .admin-page .admin-clients__count {
   box-sizing: border-box;
 }
