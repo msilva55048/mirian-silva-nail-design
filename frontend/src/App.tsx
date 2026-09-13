@@ -14817,7 +14817,7 @@ function AdminPanel() {
                     </section>
                 ) : adminView === "new" || adminView === "waiting" ? (
                     <section className="admin-content-section">
-                        <section className="admin-new-appointment">
+                        <section className={`admin-new-appointment${adminView === "new" ? " admin-new-appointment--new" : ""}`}>
                             <div className="admin-new-appointment__header">
                                 <div>
                                     <h2>{adminView === "waiting" ? "Lista de espera" : "Novo agendamento"}</h2>

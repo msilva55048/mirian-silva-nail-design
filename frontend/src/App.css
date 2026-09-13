@@ -1739,6 +1739,46 @@ a {
   color: #fff;
 }
 
+/* Novo agendamento: contornos e estados visuais somente desta seção. */
+.admin-page .admin-new-appointment--new {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-new-appointment__toggle {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-booking__section {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-client-picker > input,
+.admin-page .admin-new-appointment--new .service-picker__trigger {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-week-picker,
+.admin-page .admin-new-appointment--new .admin-manual-month-calendar {
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 16px;
+  padding: 13px;
+  background: #fff;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-month-calendar__grid button:not(.is-past) {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-month-calendar__grid button.is-selected {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
