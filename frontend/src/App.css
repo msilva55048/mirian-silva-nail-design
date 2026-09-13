@@ -2140,6 +2140,7 @@ a {
 }
 
 .admin-page .admin-client-history .admin-nail-record,
+.admin-page .admin-client-history .admin-nail-form,
 .admin-page .admin-client-history .admin-nail-records__empty,
 .admin-page .admin-client-history .admin-client-history__list article {
   border-color: var(--color-gold-border) !important;
