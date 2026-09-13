@@ -1538,22 +1538,34 @@ a {
 
 .client-logged-page .client-logged-header {
   position: sticky;
-  top: 0;
+  top: 12px;
   z-index: 50;
   border-color: var(--color-gold-border) !important;
-  background: var(--gradient-primary-action) !important;
-  background-image: var(--gradient-primary-action) !important;
+  background: #fff !important;
+  background-image: none !important;
 }
 
 .client-logged-page .client-logged-header__brand strong,
-.client-logged-page .client-logged-header__brand span,
-.client-logged-page .client-push-bell {
-  color: var(--color-primary-text-on-gradient) !important;
+.client-logged-page .client-logged-header__brand span {
+  color: #4d363e !important;
 }
 
 .client-logged-page .client-push-bell {
   border-color: var(--color-gold-border) !important;
-  background: rgba(255, 255, 255, .18) !important;
+  background: #fff !important;
+  color: var(--color-primary-action) !important;
+}
+
+.client-logged-page .client-fixed-top-bar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 60;
+  height: 12px;
+  border-bottom: 1px solid var(--color-gold-border);
+  background: var(--gradient-primary-action);
+  background-image: var(--gradient-primary-action);
 }
 
 .client-logged-page .client-fixed-bottom-bar {

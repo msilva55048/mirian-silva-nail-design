@@ -3614,6 +3614,7 @@ function PublicSite() {
                 }
             `}</style>
 
+                    <div className="client-fixed-top-bar" aria-hidden="true" />
                     <header className="client-logged-header">
                         <div className="client-logged-header__top">
                           <div className="client-logged-header__brand">
