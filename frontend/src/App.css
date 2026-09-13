@@ -1643,6 +1643,12 @@ a {
   background-image: none !important;
 }
 
+/* Campos internos do card expandido na seção Agendamentos. */
+.admin-page .admin-top-agenda .admin-booking-card__compact-date,
+.admin-page .admin-top-agenda .admin-booking-card__details--expanded > div {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
