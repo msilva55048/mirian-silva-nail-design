@@ -1687,5 +1687,14 @@ a {
   border-bottom-color: var(--color-gold-border) !important;
 }
 
+/* Login do Admin: contornos dourados somente no card e nos campos de acesso. */
+.admin-page .admin-login__card {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.admin-page .admin-login__card .admin-field input {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
 
 
