@@ -1779,6 +1779,45 @@ a {
   color: #fff !important;
 }
 
+.admin-page .admin-new-appointment--new .admin-manual-booking__section:nth-of-type(4),
+.admin-page .admin-new-appointment--new .admin-manual-times,
+.admin-page .admin-new-appointment--new .admin-manual-times__empty,
+.admin-page .admin-new-appointment--new .admin-manual-booking__summary > div {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-times,
+.admin-page .admin-new-appointment--new .admin-manual-times__empty,
+.admin-page .admin-new-appointment--new .admin-manual-booking__summary > div {
+  background: #fff !important;
+  background-image: none !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-times {
+  padding: 8px;
+  border-radius: 13px;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-times button {
+  border: 1px solid var(--color-gold-border) !important;
+  background: #fff !important;
+  background-image: none !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-times button.is-selected {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border-color: var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
+.admin-page .admin-new-appointment--new .admin-manual-form__save {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
 /* Barras fixas do painel da cliente; o painel Admin permanece inalterado. */
 .client-logged-page {
   padding-bottom: 96px !important;
