@@ -1818,6 +1818,13 @@ a {
   color: #fff !important;
 }
 
+.admin-page .admin-new-appointment--new .admin-manual-form__cancel {
+  background: #fff !important;
+  background-image: none !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: var(--color-primary-dark) !important;
+}
+
 .admin-page .admin-new-appointment--new .admin-client-picker__results {
   border-color: var(--color-gold-border) !important;
 }
