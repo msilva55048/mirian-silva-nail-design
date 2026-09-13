@@ -1931,11 +1931,15 @@ a {
 
 /* Acabamento dourado exclusivo da seção Clientes do painel ADM. */
 .admin-page .admin-clients,
-.admin-page .admin-clients__count,
 .admin-page .admin-clients__search input,
 .admin-page .admin-client-card,
 .admin-page .admin-client-card__compact-date {
   border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-clients__count,
+.admin-page .admin-client-card__compact-date {
+  border: 1px solid var(--color-gold-border) !important;
 }
 
 .admin-page .admin-client-filters {
