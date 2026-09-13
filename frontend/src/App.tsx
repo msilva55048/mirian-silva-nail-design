@@ -4806,6 +4806,7 @@ function PublicSite() {
                     </section>
                 </div>
             )}
+            <div className="client-fixed-bottom-bar" aria-hidden="true" />
         </main>
     );
 }
