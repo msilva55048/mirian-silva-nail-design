@@ -1885,6 +1885,24 @@ a {
   background-image: none !important;
 }
 
+.admin-page .admin-waiting-list .admin-client-picker__results {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-waiting-list .admin-client-picker__results button {
+  background: #fff !important;
+  background-image: none !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #4d363e !important;
+}
+
+.admin-page .admin-waiting-list .admin-client-picker__results button:hover,
+.admin-page .admin-waiting-list .admin-client-picker__results button:focus-visible {
+  background: #fff8fa !important;
+  background-image: none !important;
+  color: #4d363e !important;
+}
+
 .admin-page .admin-waiting-list .shared-waitlist-client-suggestions button {
   background: #fff !important;
   background-image: none !important;
