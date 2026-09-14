@@ -2357,9 +2357,12 @@ a {
 .admin-page .admin-block-date-row,
 .admin-page .admin-block-times,
 .admin-page .admin-empty,
-.admin-page .admin-block-submit-row,
-.admin-page .admin-block-item {
+.admin-page .admin-block-submit-row {
   border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-block-item {
+  border: 1px solid var(--color-gold-border) !important;
 }
 
 .admin-page .admin-block-manager .admin-manual-month-calendar__grid button:not(.is-past),
