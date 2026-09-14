@@ -9,6 +9,7 @@ import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {ServicePicker} from "./features/shared/ServicePicker";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
+import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -12351,40 +12352,14 @@ function AdminPanel() {
     );
 
     const financeServiceSummary = useMemo(() => {
-        const summary = new Map<string, {
-            serviceName: string;
-            completedCount: number;
-            completedCents: number;
-            scheduledCount: number;
-            scheduledCents: number;
-        }>();
-
-        [...completedFinanceAppointments, ...scheduledFinanceAppointments].forEach((appointment) => {
-            const current = summary.get(appointment.service_name) ?? {
+        return summarizeFinanceServices(
+            [...completedFinanceAppointments, ...scheduledFinanceAppointments].map((appointment) => ({
                 serviceName: appointment.service_name,
-                completedCount: 0,
-                completedCents: 0,
-                scheduledCount: 0,
-                scheduledCents: 0,
-            };
-
-            const isAutomaticallyCompleted =
-                appointment.status === "completed" ||
-                getAppointmentDateTime(appointment).getTime() <= adminNow.getTime();
-
-            if (isAutomaticallyCompleted) {
-                current.completedCount += 1;
-                current.completedCents += appointment.price_cents ?? 0;
-            } else {
-                current.scheduledCount += 1;
-                current.scheduledCents += appointment.price_cents ?? 0;
-            }
-
-            summary.set(appointment.service_name, current);
-        });
-
-        return Array.from(summary.values()).sort(
-            (a, b) => (b.completedCents + b.scheduledCents) - (a.completedCents + a.scheduledCents),
+                priceCents: appointment.price_cents,
+                isCompleted:
+                    appointment.status === "completed" ||
+                    getAppointmentDateTime(appointment).getTime() <= adminNow.getTime(),
+            })),
         );
     }, [completedFinanceAppointments, scheduledFinanceAppointments, adminNow]);
 

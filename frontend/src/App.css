@@ -1607,6 +1607,20 @@ a {
   border: 1px solid var(--color-gold-border) !important;
 }
 
+/* Financeiro: contornos dourados nos painéis, seletor e detalhamento por serviço. */
+.admin-page .admin-finance__header,
+.admin-page .admin-finance__services,
+.admin-page .admin-finance-service-card,
+.admin-page .admin-finance-month-picker__quick > button,
+.admin-page .admin-finance-month-picker__selected,
+.admin-page .admin-finance-service-card__row {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-finance-month-picker__quick > button {
+  color: #fff !important;
+}
+
 .admin-page .admin-agenda-date-picker__month button,
 .admin-page .admin-agenda-date-picker__panel-navs button,
 .admin-page .admin-manual-month-calendar__header button {
