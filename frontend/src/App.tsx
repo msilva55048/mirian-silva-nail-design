@@ -5,6 +5,7 @@ import {SelectedClientCard} from "./features/admin/SelectedClientCard";
 import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
 import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
+import {isClientInactive} from "./features/admin/clientWithoutAppointment";
 import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {ServicePicker} from "./features/shared/ServicePicker";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
@@ -14623,8 +14624,14 @@ function AdminPanel() {
 
                                 const isExpandedClient =
                                     expandedClientCardKey === client.key;
+                                const isWithoutAppointmentFilter =
+                                    clientAppointmentFilter === "without";
+                                const isInactiveClient =
+                                    isWithoutAppointmentFilter && isClientInactive(client, adminNow);
                                 const compactAppointment =
-                                    client.nextAppointment ?? client.lastAppointment;
+                                    isWithoutAppointmentFilter
+                                        ? null
+                                        : client.nextAppointment ?? client.lastAppointment;
 
                                 return (
                                     <article
@@ -14680,10 +14687,17 @@ function AdminPanel() {
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <div className="admin-client-card__compact-date">
-                                                        <span>Agenda</span>
-                                                        <strong>Sem agendamento registrado</strong>
-                                                    </div>
+                                                    <>
+                                                        <div className="admin-client-card__compact-date">
+                                                            <span>Agenda</span>
+                                                            <strong>Sem agendamento registrado</strong>
+                                                        </div>
+                                                        {isInactiveClient && (
+                                                            <span className="admin-client-card__inactive-status">
+                                                                Cliente inativa
+                                                            </span>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         ) : (

@@ -129,6 +129,16 @@ try {
     assert.match(await count(), /5\s*clientes sem agendamento/);
     await page.getByLabel("Buscar cliente", {exact: true}).fill("");
     assert.deepEqual(await names(), ["Beatriz", "Carla Antiga", "Dora Ausente", "Maria Cancelada", "Maria Concluída"]);
+    const carlaWithoutAppointment = page.locator(".admin-client-card").filter({hasText: "Carla Antiga"});
+    assert.match(await carlaWithoutAppointment.innerText(), /Agenda\s*Sem agendamento registrado/i);
+    assert.match(await carlaWithoutAppointment.innerText(), /Cliente inativa/);
+    assert.doesNotMatch(await carlaWithoutAppointment.innerText(), /Realizado|12:00/);
+    const beatrizWithoutAppointment = page.locator(".admin-client-card").filter({hasText: "Beatriz"});
+    assert.match(await beatrizWithoutAppointment.innerText(), /Agenda\s*Sem agendamento registrado/i);
+    assert.doesNotMatch(await beatrizWithoutAppointment.innerText(), /Cliente inativa/);
+    const cancelledWithoutAppointment = page.locator(".admin-client-card").filter({hasText: "Maria Cancelada"});
+    assert.match(await cancelledWithoutAppointment.innerText(), /Agenda\s*Sem agendamento registrado/i);
+    assert.doesNotMatch(await cancelledWithoutAppointment.innerText(), /Cliente inativa/);
     await page.getByLabel("Buscar cliente", {exact: true}).fill("Maria");
     assert.deepEqual(await names(), ["Maria Cancelada", "Maria Concluída"]);
     assert.match(await count(), /5\s*clientes sem agendamento/);

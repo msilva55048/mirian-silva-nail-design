@@ -1999,6 +1999,21 @@ a {
   width: 100%;
   box-sizing: border-box;
   border-color: var(--color-gold-border) !important;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.admin-page .admin-client-card__inactive-status {
+  display: block;
+  padding: 8px 12px;
+  border: 1px solid #db9b9b;
+  border-radius: 12px;
+  color: #9f4d4d;
+  background: #fffafa;
+  text-align: center;
+  font-size: .82rem;
+  font-weight: 800;
 }
 
 .admin-page .admin-client-card.is-expanded .admin-client-card__metrics > div,
