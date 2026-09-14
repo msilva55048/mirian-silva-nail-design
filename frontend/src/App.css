@@ -2227,20 +2227,33 @@ a {
   color: #fff !important;
 }
 
-/* Ações do WhatsApp e setas do mês: o estilo injetado do Admin definia
-   fundo sólido; estes controles seguem o degradê aprovado em todos os estados. */
+/* Ação do WhatsApp: mantém o degradê rosa aprovado em todos os estados. */
 .admin-page .admin-message-item a,
-.admin-page .admin-finance-month-picker__quick > button,
 .admin-page .admin-message-item a:hover,
 .admin-page .admin-message-item a:focus-visible,
-.admin-page .admin-message-item a:active,
-.admin-page .admin-finance-month-picker__quick > button:hover,
-.admin-page .admin-finance-month-picker__quick > button:focus-visible,
-.admin-page .admin-finance-month-picker__quick > button:active {
+.admin-page .admin-message-item a:active {
   background: var(--gradient-primary-action) !important;
   background-image: var(--gradient-primary-action) !important;
   border-color: var(--color-gold-border) !important;
   color: #fff !important;
+}
+
+/* Financeiro: seletor e navegação voltam ao padrão claro, com contorno dourado. */
+.admin-page .admin-finance-month-picker__selected,
+.admin-page .admin-finance-month-picker__selected.is-open {
+  background: linear-gradient(135deg, #fffafb, #f7e9ee) !important;
+  background-image: linear-gradient(135deg, #fffafb, #f7e9ee) !important;
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-finance-month-picker__quick > button,
+.admin-page .admin-finance-month-picker__quick > button:hover,
+.admin-page .admin-finance-month-picker__quick > button:focus-visible,
+.admin-page .admin-finance-month-picker__quick > button:active {
+  background: #fff !important;
+  background-image: none !important;
+  border-color: var(--color-gold-border) !important;
+  color: #513f44 !important;
 }
 
 
