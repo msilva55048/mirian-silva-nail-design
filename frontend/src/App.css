@@ -2335,5 +2335,41 @@ a {
   color: #fff !important;
 }
 
+/* Bloquear horários: todos os níveis visuais recebem a moldura dourada. */
+.admin-page .admin-block-manager,
+.admin-page .admin-block-manager .admin-manual-week-picker,
+.admin-page .admin-block-manager .admin-manual-month-calendar,
+.admin-page .admin-block-date-row,
+.admin-page .admin-block-times,
+.admin-page .admin-empty,
+.admin-page .admin-block-submit-row,
+.admin-page .admin-block-item {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-block-manager .admin-manual-month-calendar__grid button:not(.is-past),
+.admin-page .admin-block-manager .admin-manual-week-day,
+.admin-page .admin-block-time,
+.admin-page .admin-block-submit-row input,
+.admin-page .admin-block-form input,
+.admin-page .admin-block-date-row input {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-block-submit-row input:focus,
+.admin-page .admin-block-form input:focus,
+.admin-page .admin-block-date-row input:focus {
+  border-color: var(--color-gold-border) !important;
+  box-shadow: 0 0 0 3px rgba(198, 161, 91, .14) !important;
+}
+
+.admin-page .admin-block-submit-row button,
+.admin-page .admin-block-item button {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
 
 
