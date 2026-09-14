@@ -44,6 +44,7 @@ test('effective overrides change classification and the next boundary', () => {
 
 test('repair occupation and final slot exception remain unchanged', () => {
     assert.ok(context(date,[appointment('09:00',20,'Reparo de Unha (Unitário)')]).generatedStarts.includes(570));
-    assert.deepEqual(context(date,[appointment('19:00',30),appointment('19:30',30)]).generatedStarts,[1170]);
-    assert.equal(allows(1170,180,context(date,[appointment('19:00',30)])),true);
+    assert.deepEqual(context(date,[appointment('19:00',90),appointment('20:30',30)]).generatedStarts,[1230]);
+    assert.equal(allows(1230,30,context(date,[appointment('19:00',90)])),true);
+    assert.equal(allows(1230,60,context(date,[appointment('19:00',90)])),false);
 });

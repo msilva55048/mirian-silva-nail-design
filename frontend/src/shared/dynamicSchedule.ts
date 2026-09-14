@@ -1,6 +1,6 @@
 import {getConfiguredClientStartMinutes, timeToMinutes, type Appointment, type ScheduleTimeOverride} from './domain.ts';
 const REPAIR_AGENDA_SLOT_MINUTES = 30;
-const LAST_GENERATED_CLIENT_START_MINUTES = 19 * 60 + 30;
+const LAST_GENERATED_CLIENT_START_MINUTES = 20 * 60 + 30;
 export function getAgendaDurationMinutes(durationMinutes: number) {
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 0;
 
@@ -52,11 +52,14 @@ export function getClientBookingStartContext(
         for (const appointment of validAppointments) {
             const start = timeToMinutes(appointment.startTime);
             if (!reachableStarts.has(start)) continue;
+            if (start === 13 * 60) continue;
             const candidate = start + getAgendaDurationMinutes(appointment.durationMinutes);
 
             if (candidate > LAST_GENERATED_CLIENT_START_MINUTES) continue;
             if (candidate === LAST_GENERATED_CLIENT_START_MINUTES && fixedStarts.at(-1) !== 19 * 60) continue;
             if (removedStarts.has(candidate)) continue;
+            const limit = start >= 13 * 60 && start < 17 * 60 ? 15 * 60 : start >= 19 * 60 && start < 21 * 60 ? 21 * 60 : undefined;
+            if (limit !== undefined && candidate > limit) continue;
 
             const nextFixedStart = fixedStarts.find((fixedStart) => fixedStart > start);
 
@@ -65,10 +68,10 @@ export function getClientBookingStartContext(
                 if (!fixedStartSet.has(start) && candidate > nextFixedStart) continue;
             } else {
                 // Fora de um intervalo entre âncoras, a única exceção permitida
-                // é 19:00 -> 19:30. Nenhum horário após 19:30 é gerado.
+                // é a janela final iniciada em 19:00.
                 if (
-                    start !== 19 * 60 ||
-                    candidate !== LAST_GENERATED_CLIENT_START_MINUTES
+                    start < 19 * 60 ||
+                    candidate > 21 * 60
                 ) {
                     continue;
                 }
@@ -95,25 +98,27 @@ export function canServiceUseClientStart(
     start: number,
     serviceDurationMinutes: number,
     context: ClientBookingStartContext,
+    serviceName?: string,
 ) {
     if (!Number.isFinite(serviceDurationMinutes) || serviceDurationMinutes <= 0) return false;
-    if (context.fixedStarts.includes(start)) {
-        return true;
+    const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
+    const limit = start >= 19 * 60 && start < 21 * 60 ? 21 * 60 : undefined;
+    if (start === 13 * 60 && serviceName !== undefined) {
+        const normalizedName = serviceName.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (!normalizedName.startsWith('esmaltacao') && !normalizedName.startsWith('alongamento')) return false;
     }
+    if (limit !== undefined) return start + agendaDuration <= limit;
+    if (context.fixedStarts.includes(start)) return true;
 
     if (!context.generatedStarts.includes(start)) {
         return false;
     }
 
-    const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
     const nextFixedStart = context.fixedStarts.find((fixedStart) => fixedStart > start);
 
     if (nextFixedStart !== undefined) {
         return start + agendaDuration <= nextFixedStart;
     }
 
-    // 19:30 é o último horário gerado. Quando não há outra âncora fixa
-    // depois dele, qualquer duração de serviço pode começar nesse horário.
-    return start === LAST_GENERATED_CLIENT_START_MINUTES;
+    return start <= LAST_GENERATED_CLIENT_START_MINUTES && start + agendaDuration <= 21 * 60;
 }
-

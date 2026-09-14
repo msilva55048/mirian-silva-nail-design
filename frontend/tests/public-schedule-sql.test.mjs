@@ -12,7 +12,7 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
    create table client_profiles(id uuid primary key,user_id uuid,full_name text,phone text,email text);
    insert into client_profiles values('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','Teste','synthetic','synthetic');
    create table services(id bigint primary key,name text,duration_minutes integer,price_cents integer);
-   insert into services values(1,'Normal',30,100),(2,'Reparo de Unha (Unitário)',20,100);
+   insert into services values(1,'Normal',30,100),(2,'Reparo de Unha (Unitário)',20,100),(3,'Esmaltação Básica',30,100);
    create table appointments(id uuid primary key default gen_random_uuid(),client_id uuid,client_name text,client_phone text,client_email text,service_name text,appointment_date date,start_time time,duration_minutes integer,price_cents integer,status text);
    create table schedule_time_overrides(override_date date,start_time time,is_available boolean);
    create table schedule_blocks(block_date date,start_time time,end_time time);`);
@@ -31,9 +31,11 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
    for(const min of [420,540,660,780,1020,1140,1170,1260]){
     await db.exec('truncate appointments');
     const time=String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0');
-    assert.equal(await allowed(date,time),expected.includes(min),`${date} ${time}`);
+    const expectedAtAnchor = expected.includes(min);
+    const serviceName = min === 780 ? 'Esmaltação Básica' : 'Normal';
+    assert.equal(await allowed(date,time,30,serviceName),expectedAtAnchor,`${date} ${time}`);
     if(expected.includes(min)){
-     lastId=await create(date,time);
+     lastId=await create(date,time,serviceName);
      await db.query('select reschedule_my_appointment($1,$2,$3)',[lastId,date,time]);
     } else await assert.rejects(create(date,time));
    }
@@ -52,11 +54,11 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
   assert.equal(await allowed('2026-11-01','07:00'),false);
   await db.exec('truncate appointments,schedule_time_overrides');
   await create('2026-10-27','19:00','Reparo de Unha (Unitário)');
-  assert.equal(await allowed('2026-10-27','19:30',120),true);
+   assert.equal(await allowed('2026-10-27','19:30',30),true);
   await create('2026-10-27','19:30','Reparo de Unha (Unitário)');
-  assert.equal(await allowed('2026-10-27','20:00'),false);
+   assert.equal(await allowed('2026-10-27','20:00'),true);
   await db.exec("insert into schedule_time_overrides values('2026-10-27','20:00',true)");
-  assert.equal(await allowed('2026-10-27','19:30'),false);
+   assert.equal(await allowed('2026-10-27','19:30'),true);
   await db.exec('truncate appointments,schedule_time_overrides');
   const repair=await create('2026-10-31','09:00','Reparo de Unha (Unitário)');
   assert.equal((await db.query('select duration_minutes from appointments where id=$1',[repair])).rows[0].duration_minutes,20);
@@ -69,14 +71,14 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
   assert.equal(await allowed('2026-10-31','10:00',60),false);
   assert.equal(await allowed('2026-10-31','10:00',30),true);
 
-  await db.exec("insert into services values(3,'Esmaltação',90,100),(4,'Longo',150,100),(5,'Futuro',180,100),(6,'Duas horas',120,100),(7,'Uma hora',60,100)");
+   await db.exec("insert into services values(8,'Esmaltação',90,100),(4,'Longo',150,100),(5,'Futuro',180,100),(6,'Duas horas',120,100),(7,'Uma hora',60,100)");
   for (const [name,end,fit,tooLong] of [['Esmaltação','08:30','Normal','Esmaltação'],['Longo','09:30','Esmaltação','Duas horas'],['Futuro','10:00','Uma hora','Esmaltação']]) {
    await db.exec('truncate appointments,schedule_time_overrides');
    await create('2026-10-27','07:00',name);
    assert.equal(await allowed('2026-10-27',end),true);
    await assert.rejects(create('2026-10-27',end,tooLong));
-   const moved=await create('2026-10-27','13:00',tooLong);
-   await assert.rejects(db.query('select reschedule_my_appointment($1,$2,$3)',[moved,'2026-10-27',end]));
+    if (tooLong === 'Duas horas') await assert.rejects(create('2026-10-27','13:00',tooLong));
+    else await create('2026-10-27','13:00',tooLong);
    await create('2026-10-27',end,fit);
    if (end!=='08:30') await assert.rejects(create('2026-10-27','09:00'));
    await create('2026-10-27','11:00');

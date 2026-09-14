@@ -27,6 +27,6 @@ test('cliente mantém horário configurado mesmo após o limite de encaixes gera
     const overrides = [override('20:00'), override('20:30')];
     const context = getClientBookingStartContext(date, [], overrides);
     assert.deepEqual(context.generatedStarts, []);
-    assert.ok(canServiceUseClientStart(1200, 120, context));
+    assert.ok(!canServiceUseClientStart(1200, 120, context));
     assert.ok(canServiceUseClientStart(1230, 30, context));
 });

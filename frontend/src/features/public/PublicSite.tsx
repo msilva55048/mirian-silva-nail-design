@@ -1153,7 +1153,7 @@ export default function PublicSite() {
 
         return generatedTimes
             .filter((start) => {
-                if (!canServiceUseClientStart(start, serviceDurationMinutes, context)) return false;
+                if (!canServiceUseClientStart(start, serviceDurationMinutes, context, selectedServiceInformation?.name)) return false;
                 const end = start + getAgendaDurationMinutes(serviceDurationMinutes);
 
                 const hasConflict = occupiedIntervals.some((interval) =>
@@ -1301,7 +1301,7 @@ export default function PublicSite() {
 
             const context = getClientBookingStartContext(selectedDate, appointmentsForSelectedDate,
                 overrideLoadError ? scheduleTimeOverrides : latestDateOverrides, editingClientAppointment?.id);
-            if (!canServiceUseClientStart(selectedStart, selectedServiceInformation.durationMinutes, context)) {
+            if (!canServiceUseClientStart(selectedStart, selectedServiceInformation.durationMinutes, context, selectedServiceInformation.name)) {
                 setSelectedTime("");
                 setBookingStep(3);
                 setBookingError(
@@ -2673,5 +2673,3 @@ export default function PublicSite() {
         </main>
     );
 }
-
-

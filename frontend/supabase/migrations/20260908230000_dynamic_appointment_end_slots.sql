@@ -17,7 +17,8 @@ v_start_minutes integer;
     v_agenda_duration integer;
     v_is_fixed boolean := false;
     v_is_reachable boolean := false;
-    v_next_fixed_minutes integer;
+v_next_fixed_minutes integer;
+    v_protected_end integer;
 begin
     if p_date is null
        or p_start_time is null
@@ -40,10 +41,17 @@ end if;
 
     v_start_minutes := extract(hour from p_start_time)::integer * 60
                      + extract(minute from p_start_time)::integer;
+    if v_start_minutes = 780 and lower(btrim(p_service_name)) not like 'esmaltação%' and lower(btrim(p_service_name)) not like 'esmaltacao%' and lower(btrim(p_service_name)) not like 'alongamento%' then return false; end if;
 
     -- A duração exibida do Reparo continua sendo a duração real do serviço,
     -- mas para ocupação/encaixe ele consome um bloco de 30 minutos.
     v_agenda_duration := greatest(30, p_service_duration);
+    v_protected_end := case
+        when v_start_minutes >= 780 and v_start_minutes < 1020 then 900
+        when v_start_minutes >= 1140 and v_start_minutes < 1260 then 1260
+        else null
+    end;
+    if v_protected_end is not null and v_start_minutes + v_agenda_duration > v_protected_end then return false; end if;
 
 with recursive
     base_starts(start_minutes) as (
@@ -94,8 +102,8 @@ with recursive
         select rs.start_minutes + a.agenda_duration
         from reachable_starts rs
         join appointment_ends a on a.start_minutes = rs.start_minutes
-        where rs.start_minutes + a.agenda_duration <= 1170
-          and (rs.start_minutes + a.agenda_duration <> 1170
+        where rs.start_minutes <> 780 and rs.start_minutes + a.agenda_duration <= 1230
+          and (rs.start_minutes + a.agenda_duration <> 1230
                or (select max(start_minutes) from fixed_starts) = 1140)
           and not exists (select 1 from removed_starts rem where rem.start_minutes = rs.start_minutes + a.agenda_duration)
           and (
@@ -103,7 +111,7 @@ with recursive
                and (exists (select 1 from fixed_starts fs where fs.start_minutes = rs.start_minutes)
                     or rs.start_minutes + a.agenda_duration <= (select min(fs.start_minutes) from fixed_starts fs where fs.start_minutes > rs.start_minutes)))
               or (not exists (select 1 from fixed_starts fs where fs.start_minutes > rs.start_minutes)
-                  and rs.start_minutes = 1140 and rs.start_minutes + a.agenda_duration = 1170)
+                  and rs.start_minutes >= 1140 and rs.start_minutes + a.agenda_duration <= 1230)
           )
     )
 select
@@ -141,7 +149,7 @@ end if;
 
     -- Exceção final: 19:30 é o último horário gerado e, sem nova âncora depois,
     -- aceita qualquer duração. Nada gera 20:00.
-return v_start_minutes = 1170;
+return v_start_minutes + v_agenda_duration <= 1260;
 end;
 $function$;
 
