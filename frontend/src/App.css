@@ -1528,6 +1528,24 @@ a {
   color: #28603b !important;
 }
 
+/* Autenticação da cliente: card, abas e campos com o contorno dourado padrão. */
+.client-modal:not(.client-modal--account) {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.client-modal:not(.client-modal--account) .client-auth-tabs {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.client-modal:not(.client-modal--account) .client-auth-form input,
+.client-modal:not(.client-modal--account) .client-password-field {
+  border-color: var(--color-gold-border) !important;
+}
+
+.client-modal:not(.client-modal--account) .client-password-field input {
+  border-color: transparent !important;
+}
+
 .admin-page .admin-header__actions > .admin-secondary-button:not(.admin-push-button) {
   background: var(--gradient-primary-action) !important;
   background-image: var(--gradient-primary-action) !important;
