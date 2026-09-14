@@ -2297,5 +2297,43 @@ a {
   color: #fff !important;
 }
 
+/* Configuração de serviços: cartões, campos e edição usam contorno dourado. */
+.admin-page .admin-service-form-card,
+.admin-page .admin-service-list-section,
+.admin-page .admin-service-price-field,
+.admin-page .admin-service-duration-field,
+.admin-page .admin-service-list-section__heading > strong,
+.admin-page .admin-service-summary-card,
+.admin-page .admin-service-summary-card__icon,
+.admin-page .admin-service-summary-card__actions {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-service-form-fields input,
+.admin-page .admin-service-form-card input,
+.admin-page .admin-service-form-card select,
+.admin-page .admin-service-summary-card input,
+.admin-page .admin-service-summary-card select {
+  border-color: var(--color-gold-border) !important;
+}
+
+.admin-page .admin-service-form-fields input:focus,
+.admin-page .admin-service-form-card input:focus,
+.admin-page .admin-service-form-card select:focus,
+.admin-page .admin-service-summary-card input:focus,
+.admin-page .admin-service-summary-card select:focus {
+  border-color: var(--color-gold-border) !important;
+  box-shadow: 0 0 0 3px rgba(198, 161, 91, .14) !important;
+}
+
+.admin-page .admin-service-form-card__save,
+.admin-page .admin-service-summary-card__actions .edit,
+.admin-page .admin-service-summary-card__actions .delete {
+  background: var(--gradient-primary-action) !important;
+  background-image: var(--gradient-primary-action) !important;
+  border: 1px solid var(--color-gold-border) !important;
+  color: #fff !important;
+}
+
 
 
