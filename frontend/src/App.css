@@ -1603,6 +1603,10 @@ a {
   background-image: none !important;
 }
 
+.admin-page .admin-message-item {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
 .admin-page .admin-agenda-date-picker__month button,
 .admin-page .admin-agenda-date-picker__panel-navs button,
 .admin-page .admin-manual-month-calendar__header button {
