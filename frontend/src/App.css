@@ -1529,20 +1529,25 @@ a {
 }
 
 /* Autenticação da cliente: card, abas e campos com o contorno dourado padrão. */
-.client-modal:not(.client-modal--account) {
+.client-modal.client-modal--auth {
   border: 1px solid var(--color-gold-border) !important;
 }
 
-.client-modal:not(.client-modal--account) .client-auth-tabs {
+.client-modal.client-modal--auth .client-auth-tabs {
   border: 1px solid var(--color-gold-border) !important;
 }
 
-.client-modal:not(.client-modal--account) .client-auth-form input,
-.client-modal:not(.client-modal--account) .client-password-field {
+.client-modal.client-modal--auth .client-auth-form input,
+.client-modal.client-modal--auth .client-password-field {
   border-color: var(--color-gold-border) !important;
 }
 
-.client-modal:not(.client-modal--account) .client-password-field input {
+.client-modal.client-modal--auth .client-password-field {
+  border: 1px solid var(--color-gold-border) !important;
+  border-radius: 12px;
+}
+
+.client-modal.client-modal--auth .client-password-field input {
   border-color: transparent !important;
 }
 

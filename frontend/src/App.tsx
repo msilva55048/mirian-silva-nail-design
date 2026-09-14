@@ -4138,7 +4138,7 @@ function PublicSite() {
                 <div className="client-modal-backdrop" onMouseDown={(event) => {
                     if (event.target === event.currentTarget) setShowClientAuth(false);
                 }}>
-                    <section className="client-modal">
+                    <section className="client-modal client-modal--auth">
                         <button className="client-modal__close" type="button" onClick={() => setShowClientAuth(false)}>×</button>
                         <span className="client-modal__eyebrow">Área da cliente</span>
                         <h2>{clientAuthMode === "login" ? "Entrar na sua conta" : "Criar sua conta"}</h2>
