@@ -1,17 +1,14 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withSupabase } from "npm:@supabase/server";
 import webpush from "npm:web-push@3.6.7";
 
-const cors = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type"};
+const cors = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"apikey, authorization, content-type"};
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {status, headers:{...cors,"Content-Type":"application/json"}});
 
-Deno.serve(async (req) => {
+export default {
+  fetch: withSupabase({auth:"secret"}, async (req, ctx) => {
   if (req.method === "OPTIONS") return new Response("ok", {headers:cors});
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const auth = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!auth || auth !== serviceRole) return json({error:"unauthorized"}, 401);
-  const supabase = createClient(url, serviceRole, {auth:{persistSession:false}});
-  const vapid = {subject:Deno.env.get("VAPID_SUBJECT")!, publicKey:Deno.env.get("VAPID_PUBLIC_KEY")!, privateKey:Deno.env.get("VAPID_PRIVATE_KEY")!};
+  const supabase = ctx.supabaseAdmin;
+  const vapid = {subject:Deno.env.get("WEB_PUSH_VAPID_SUBJECT")!, publicKey:Deno.env.get("WEB_PUSH_VAPID_PUBLIC_KEY")!, privateKey:Deno.env.get("WEB_PUSH_VAPID_PRIVATE_KEY")!};
   webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
   let body: {action?: string} = {};
   try { body = await req.json(); } catch { /* default dispatch */ }
@@ -21,10 +18,16 @@ Deno.serve(async (req) => {
   if (error) return json({error:"target_query_failed"}, 500);
   let sent = 0, skipped = 0, failed = 0, invalid = 0;
   for (const target of (targets ?? []) as Array<Record<string, any>>) {
-    const {data: dispatch, error: upsertError} = await supabase.from("waitlist_push_dispatches").upsert({
+    const {data: inserted, error: insertError} = await supabase.from("waitlist_push_dispatches").insert({
       opportunity_id: target.opportunity_id, client_id: target.client_id, subscription_id: target.subscription_id, status:"pending"
-    }, {onConflict:"opportunity_id,client_id,subscription_id", ignoreDuplicates:false}).select("id,status").single();
-    if (upsertError || !dispatch || ["sent","opened"].includes(dispatch.status)) { skipped++; continue; }
+    }).select("id,status").maybeSingle();
+    let dispatch = inserted;
+    if (!dispatch) {
+      const {data: existing, error: existingError} = await supabase.from("waitlist_push_dispatches").select("id,status").eq("opportunity_id",target.opportunity_id).eq("client_id",target.client_id).eq("subscription_id",target.subscription_id).maybeSingle();
+      if (insertError || existingError || !existing) { skipped++; continue; }
+      skipped++;
+      continue;
+    }
     const payload = {title:"Vaga disponível com a Mirian ✨", body:`Surgiu uma vaga para ${target.service_name}. Toque para conferir.`, url:`/client?section=appointments&opportunity=${target.opportunity_id}`, opportunityId:target.opportunity_id};
     try {
       await supabase.from("waitlist_push_dispatches").update({status:"processing", updated_at:new Date().toISOString()}).eq("id",dispatch.id);
@@ -41,4 +44,5 @@ Deno.serve(async (req) => {
     }
   }
   return json({ok:true, targets:(targets ?? []).length, sent, skipped, failed, invalid});
-});
+  }),
+};

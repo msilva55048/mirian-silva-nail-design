@@ -1,3 +1,6 @@
+self.addEventListener("install", (event) => event.waitUntil(self.skipWaiting()));
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
 self.addEventListener("push", (event) => {
     let payload = {};
 
@@ -12,7 +15,7 @@ self.addEventListener("push", (event) => {
         body: payload.body || "Há uma atualização em seus agendamentos.",
         icon: "/icon-192.png",
         badge: "/favicon-32x32.png",
-        tag: payload.eventId ? `appointment-event-${payload.eventId}` : undefined,
+        tag: payload.eventId ? `appointment-event-${payload.eventId}` : payload.opportunityId ? `waitlist-opportunity-${payload.opportunityId}` : undefined,
         renotify: false,
         data: {url: payload.url || "/admin", eventId: payload.eventId || null},
     };

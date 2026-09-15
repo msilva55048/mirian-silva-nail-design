@@ -11,7 +11,9 @@ test("dispatcher de oportunidades é separado e idempotente", () => {
   assert.match(migration, /status = 'active'/);
   assert.match(migration, /o\.appointment_date between r\.week_start and r\.week_end/);
   assert.match(fn, /waitlist_push_dispatches/);
-  assert.match(fn, /\["sent","opened"\]/);
+  assert.match(fn, /insertError \|\| existingError \|\| !existing/);
+  assert.match(fn, /skipped\+\+;\s+continue;/);
+  assert.doesNotMatch(fn, /status:\"pending\",updated_at:new Date\(\)\.toISOString\(\),last_error:null/);
   assert.match(fn, /statusCode/);
   assert.match(fn, /status === 404 \|\| status === 410/);
 });
@@ -19,7 +21,7 @@ test("dispatcher de oportunidades é separado e idempotente", () => {
 test("cron da lista de espera é independente e roda a cada minuto", () => {
   assert.match(migration, /waitlist-opportunity-push/);
   assert.match(migration, /'\* \* \* \* \*'/);
-  assert.match(migration, /service_role_key/);
+  assert.match(migration, /waitlist_secret_key/);
 });
 
 test("deep-link consulta oportunidade pelo backend e registra abertura", () => {

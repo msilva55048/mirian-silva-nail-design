@@ -13,6 +13,9 @@ test("notification click navigates or opens the payload route", () => {
     assert.match(serviceWorker, /event\.notification\.data\?\.url/);
     assert.match(serviceWorker, /existing\.navigate\(targetUrl\)/);
     assert.match(serviceWorker, /self\.clients\.openWindow\(targetUrl\)/);
+    assert.match(serviceWorker, /self\.skipWaiting\(\)/);
+    assert.match(serviceWorker, /self\.clients\.claim\(\)/);
+    assert.match(serviceWorker, /payload\.opportunityId/);
 });
 
 test("mock reminder route renders the fixed test card", () => {
