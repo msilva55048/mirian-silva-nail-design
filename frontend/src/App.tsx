@@ -1695,16 +1695,19 @@ function PublicSite() {
                         opportunity.appointment_date,
                         String(opportunity.start_time).slice(0, 5),
                     );
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("opportunity");
+                    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
                 } else {
                     setClientOpportunityError("Esta vaga não está mais disponível.");
-                    setClientAccountSection("appointments");
-                    setShowClientAccount(true);
+                    setShowClientAccount(false);
+                    setBookingStep(1);
                 }
             } else {
                 setClientOpportunity(null);
                 setClientOpportunityError("Esta vaga não está mais disponível.");
-                setClientAccountSection("appointments");
-                setShowClientAccount(true);
+                setShowClientAccount(false);
+                setBookingStep(1);
             }
             setClientOpportunityLoading(false);
         })();
@@ -3140,8 +3143,7 @@ function PublicSite() {
     const opportunityDeepLinkId = typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("opportunity")
         : null;
-    const isOpportunityBookingView = Boolean(opportunityDeepLinkId) &&
-        (clientOpportunityLoading || clientOpportunity?.available === true);
+    const hasOpportunityDeepLink = Boolean(opportunityDeepLinkId);
 
     useCloseOverlayOnBrowserBack(publicOverlayKey, () => {
         if (showClientProfileEditor) {
@@ -3704,6 +3706,9 @@ function PublicSite() {
                         {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button primary-action" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
                     </header>
 
+                    {clientOpportunityError && !clientOpportunityLoading && opportunityDeepLinkId && (
+                        <p className="client-auth-message is-error">{clientOpportunityError}</p>
+                    )}
 
                     <section className="services" id="servicos">
                         <div className="services__grid">
@@ -4498,7 +4503,7 @@ function PublicSite() {
                 </div>
             )}
 
-            {showClientAccount && clientUserId && !isOpportunityBookingView && (
+            {showClientAccount && clientUserId && !hasOpportunityDeepLink && (
                 <div className="client-modal-backdrop" onMouseDown={(event) => {
                     if (event.target === event.currentTarget) setShowClientAccount(false);
                 }}>
@@ -4577,11 +4582,6 @@ function PublicSite() {
 
                                 {clientAccountSection === "appointments" && <section className="client-account__section" id="client-account-appointments">
                                     <h3 className="client-account__section-title">Agendamentos</h3>
-                                    {clientOpportunityLoading && <p className="client-auth-message">Carregando vaga disponível...</p>}
-                                    {!clientOpportunityLoading && clientOpportunity && <article className={`client-waitlist-opportunity ${clientOpportunity.available ? "is-available" : "is-unavailable"}`}>
-                                        <strong>{clientOpportunity.available ? "Vaga disponível" : "Esta vaga não está mais disponível."}</strong>
-                                        {clientOpportunity.available && <><span>{clientOpportunity.service_name}</span><span>{new Date(`${clientOpportunity.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")} às {String(clientOpportunity.start_time).slice(0, 5)}</span><small>Confira os detalhes no sistema para solicitar este horário.</small><button type="button" disabled={clientOpportunityClaiming} onClick={() => void claimClientOpportunity()}>{clientOpportunityClaiming ? "Confirmando..." : "Confirmar agendamento"}</button></>}{clientOpportunityError && <small>{clientOpportunityError}</small>}
-                                    </article>}
                                     {clientAppointments.length > 0 ? (
                                         <div className="client-account__appointments">
                                             {clientAppointments.map((appointment) => (

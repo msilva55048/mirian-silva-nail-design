@@ -29,7 +29,6 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /get_my_waitlist_opportunity/);
   assert.match(app, /mark_waitlist_opportunity_opened/);
   assert.match(app, /opportunity/);
-  assert.match(app, /Vaga disponível/);
   assert.match(app, /startNewClientBooking\(\s*opportunity\.service_name,\s*opportunity\.appointment_date,\s*String\(opportunity\.start_time\)/);
   assert.match(app, /function startNewClientBooking\([\s\S]*?setShowClientAccount\(false\);[\s\S]*?setBookingStep\(2\);/);
   assert.match(app, /startNewClientBooking\(service\.name\)/);
@@ -37,14 +36,20 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /Revisar agendamento/);
   assert.match(app, /if \(clientOpportunity\) \{\s*await claimClientOpportunity\(\)/);
   assert.doesNotMatch(app, /debugOpportunity|OpportunityDebugRootBanner|Diagnóstico Opportunity/);
-  assert.doesNotMatch(app, /if \(!opportunityId \|\| !clientProfile\) return;\s*setClientAccountSection\("appointments"\);\s*setShowClientAccount\(true\);/);
+  const opportunityEffect = app.slice(app.indexOf('const opportunityId ='), app.indexOf('async function toggleClientPush'));
+  assert.doesNotMatch(opportunityEffect, /setClientAccountSection\("appointments"\);/);
+  assert.doesNotMatch(opportunityEffect, /setShowClientAccount\(true\);/);
 });
 
 test("deep-link de opportunity tem prioridade sobre section=appointments", () => {
   assert.match(app, /setShowClientAccount\(false\);\s*setClientOpportunityLoading\(true\);/);
   assert.match(app, /setBookingStep\(2\);/);
   assert.match(app, /startNewClientBooking\(\s*opportunity\.service_name/);
-  assert.match(app, /!isOpportunityBookingView/);
+  assert.match(app, /!hasOpportunityDeepLink/);
+  assert.match(app, /const hasOpportunityDeepLink = Boolean\(opportunityDeepLinkId\)/);
+  assert.doesNotMatch(app, /client-waitlist-opportunity/);
+  assert.doesNotMatch(app, /Carregando vaga disponível/);
+  assert.doesNotMatch(app, /Confira os detalhes no sistema para solicitar este horário/);
 });
 
 test("notificationclick mantém navegação e fallback dentro de event.waitUntil", () => {
