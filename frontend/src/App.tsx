@@ -1690,14 +1690,7 @@ function PublicSite() {
                 setClientOpportunity(opportunity);
                 if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
                 if (opportunity.available) {
-                    startNewClientBooking(
-                        opportunity.service_name,
-                        opportunity.appointment_date,
-                        String(opportunity.start_time).slice(0, 5),
-                    );
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("opportunity");
-                    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+                    setClientOpportunityError("");
                 } else {
                     setClientOpportunityError("Esta vaga não está mais disponível.");
                     setShowClientAccount(false);
@@ -1730,11 +1723,25 @@ function PublicSite() {
         const {data, error} = await supabase.rpc("claim_waitlist_opportunity", {p_opportunity_id: clientOpportunity.id});
         const result = data?.result;
         if (error || !result) setClientOpportunityError(error?.message || "Não foi possível confirmar esta vaga.");
-        else if (result === "claimed") { setClientOpportunity(null); await loadClientAppointments(clientProfile?.id ?? ""); }
+        else if (result === "claimed") { setClientOpportunity(null); clearOpportunityRoute(); await loadClientAppointments(clientProfile?.id ?? ""); }
         else if (result === "already_claimed_by_you") setClientOpportunityError("Você já agendou esta vaga.");
         else if (result === "already_claimed") setClientOpportunityError("Esta vaga já foi preenchida.");
         else setClientOpportunityError("Esta vaga não está mais disponível.");
         setClientOpportunityClaiming(false);
+    }
+    function clearOpportunityRoute() {
+        if (typeof window === "undefined") return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("opportunity");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    async function dismissClientOpportunity() {
+        const opportunityId = clientOpportunity?.id ?? opportunityDeepLinkId;
+        if (opportunityId) await supabase.rpc("dismiss_waitlist_opportunity", {p_opportunity_id: opportunityId});
+        setClientOpportunity(null);
+        setClientOpportunityError("");
+        setClientOpportunityLoading(false);
+        clearOpportunityRoute();
     }
     const reminderAppointmentId = typeof window !== "undefined" && window.location.pathname === "/client/reminder"
         ? new URLSearchParams(window.location.search).get("appointment_id")
@@ -3144,6 +3151,8 @@ function PublicSite() {
         ? new URLSearchParams(window.location.search).get("opportunity")
         : null;
     const hasOpportunityDeepLink = Boolean(opportunityDeepLinkId);
+    const shouldShowOpportunityModal = hasOpportunityDeepLink && Boolean(clientProfile) &&
+        (clientOpportunityLoading || Boolean(clientOpportunity) || Boolean(clientOpportunityError));
 
     useCloseOverlayOnBrowserBack(publicOverlayKey, () => {
         if (showClientProfileEditor) {
@@ -3422,6 +3431,41 @@ function PublicSite() {
 
     return (
         <main className="home">
+            {shouldShowOpportunityModal && (
+                <div className="client-reminder-overlay" role="presentation">
+                    <section className="client-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="waitlist-opportunity-title">
+                        <header className="client-reminder-modal__header">
+                            <img src="/logo-mirian.png" alt="" />
+                            <div><strong>Mirian Silva</strong><span>Nail Design</span></div>
+                        </header>
+                        <div className="client-reminder-modal__body">
+                            <h1 id="waitlist-opportunity-title">Vaga disponível na sua semana 💅</h1>
+                            {clientOpportunityLoading ? (
+                                <p>Verificando uma vaga compatível com a sua lista de espera...</p>
+                            ) : clientOpportunity?.available ? (
+                                <>
+                                    <p>Surgiu uma vaga compatível com a sua lista de espera. Se desejar, confirme abaixo para reservar este horário.</p>
+                                    <dl>
+                                        <div><dt>Serviço</dt><dd>{clientOpportunity.service_name}</dd></div>
+                                        <div><dt>Dia</dt><dd>{new Date(`${clientOpportunity.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}</dd></div>
+                                        <div><dt>Horário</dt><dd>{String(clientOpportunity.start_time).slice(0, 5)}</dd></div>
+                                    </dl>
+                                    {clientOpportunityError && <p className="booking-modal__error">{clientOpportunityError}</p>}
+                                    <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
+                                        <button type="button" className="booking-modal__button primary-action" disabled={clientOpportunityClaiming} onClick={() => void claimClientOpportunity()}>{clientOpportunityClaiming ? "Confirmando..." : "Confirmar agendamento"}</button>
+                                        <button type="button" className="client-reminder-modal__action" disabled={clientOpportunityClaiming} onClick={() => void dismissClientOpportunity()}>Fechar</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <p>{clientOpportunityError || "Esta vaga não está mais disponível."}</p>
+                                    <button type="button" className="client-reminder-modal__action" onClick={() => void dismissClientOpportunity()}>Fechar</button>
+                                </>
+                            )}
+                        </div>
+                    </section>
+                </div>
+            )}
             {shouldShowReminderModal && (
                 <div className="client-reminder-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) closeReminderModal(); }}>
                     <section className="client-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="client-reminder-title">

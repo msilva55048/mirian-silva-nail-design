@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const migration = fs.readFileSync("supabase/migrations/20260912140000_waitlist_opportunity_push.sql", "utf8");
+const dismissMigration = fs.readFileSync("supabase/migrations/20260915120000_waitlist_opportunity_dismiss.sql", "utf8");
 const fn = fs.readFileSync("supabase/functions/waitlist-opportunity-push/index.ts", "utf8");
 const app = fs.readFileSync("src/App.tsx", "utf8");
 const serviceWorker = fs.readFileSync("public/push-sw.js", "utf8");
@@ -29,11 +30,14 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /get_my_waitlist_opportunity/);
   assert.match(app, /mark_waitlist_opportunity_opened/);
   assert.match(app, /opportunity/);
-  assert.match(app, /startNewClientBooking\(\s*opportunity\.service_name,\s*opportunity\.appointment_date,\s*String\(opportunity\.start_time\)/);
-  assert.match(app, /function startNewClientBooking\([\s\S]*?setShowClientAccount\(false\);[\s\S]*?setBookingStep\(2\);/);
-  assert.match(app, /startNewClientBooking\(service\.name\)/);
-  assert.match(app, /Escolha data e horário/);
-  assert.match(app, /Revisar agendamento/);
+  assert.match(app, /shouldShowOpportunityModal/);
+  assert.match(app, /Vaga disponível na sua semana 💅/);
+  assert.match(app, /clientOpportunity\.service_name/);
+  assert.match(app, /clientOpportunity\.appointment_date/);
+  assert.match(app, /clientOpportunity\.start_time/);
+  assert.match(app, /Confirmar agendamento/);
+  assert.match(app, /dismissClientOpportunity/);
+  assert.match(app, /dismiss_waitlist_opportunity/);
   assert.match(app, /if \(clientOpportunity\) \{\s*await claimClientOpportunity\(\)/);
   assert.doesNotMatch(app, /debugOpportunity|OpportunityDebugRootBanner|Diagnóstico Opportunity/);
   const opportunityEffect = app.slice(app.indexOf('const opportunityId ='), app.indexOf('async function toggleClientPush'));
@@ -43,13 +47,13 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
 
 test("deep-link de opportunity tem prioridade sobre section=appointments", () => {
   assert.match(app, /setShowClientAccount\(false\);\s*setClientOpportunityLoading\(true\);/);
-  assert.match(app, /setBookingStep\(2\);/);
-  assert.match(app, /startNewClientBooking\(\s*opportunity\.service_name/);
   assert.match(app, /!hasOpportunityDeepLink/);
   assert.match(app, /const hasOpportunityDeepLink = Boolean\(opportunityDeepLinkId\)/);
   assert.doesNotMatch(app, /client-waitlist-opportunity/);
-  assert.doesNotMatch(app, /Carregando vaga disponível/);
-  assert.doesNotMatch(app, /Confira os detalhes no sistema para solicitar este horário/);
+  assert.doesNotMatch(app, /startNewClientBooking\(\s*opportunity/);
+  assert.match(dismissMigration, /status='dismissed'/);
+  assert.match(dismissMigration, /dismiss_waitlist_opportunity/);
+  assert.match(dismissMigration, /d\.status='dismissed'/);
 });
 
 test("notificationclick mantém navegação e fallback dentro de event.waitUntil", () => {
