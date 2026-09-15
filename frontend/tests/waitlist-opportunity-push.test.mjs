@@ -29,4 +29,9 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /mark_waitlist_opportunity_opened/);
   assert.match(app, /opportunity/);
   assert.match(app, /Vaga disponível/);
+  assert.match(app, /setSelectedService\(opportunity\.service_name\)/);
+  assert.match(app, /setSelectedDate\(opportunity\.appointment_date\)/);
+  assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);
+  assert.match(app, /setBookingStep\(4\)/);
+  assert.match(app, /if \(clientOpportunity\) \{\s*await claimClientOpportunity\(\)/);
 });

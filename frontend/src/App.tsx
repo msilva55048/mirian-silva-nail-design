@@ -1687,6 +1687,17 @@ function PublicSite() {
             if (!error && opportunity) {
                 setClientOpportunity(opportunity);
                 if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
+                if (opportunity.available) {
+                    setSelectedService(opportunity.service_name);
+                    setSelectedDate(opportunity.appointment_date);
+                    setSelectedTime(String(opportunity.start_time).slice(0, 5));
+                    setWeekReferenceDate(opportunity.appointment_date);
+                    setBookingError("");
+                    setShowClientAccount(false);
+                    setBookingStep(4);
+                } else {
+                    setClientOpportunityError("Esta vaga não está mais disponível.");
+                }
             } else setClientOpportunity(null);
             setClientOpportunityLoading(false);
         })();
@@ -3147,6 +3158,10 @@ function PublicSite() {
     });
 
     async function confirmBooking() {
+        if (clientOpportunity) {
+            await claimClientOpportunity();
+            return;
+        }
         setBookingError("");
 
         if (!selectedServiceInformation || !selectedDate || !selectedTime || isClientBookingDateBlocked(selectedDate)) {
@@ -12356,13 +12371,18 @@ function AdminPanel() {
         return summarizeFinanceServices(
             [...completedFinanceAppointments, ...scheduledFinanceAppointments].map((appointment) => ({
                 serviceName: appointment.service_name,
+                durationMinutes: appointment.duration_minutes,
                 priceCents: appointment.price_cents,
                 isCompleted:
                     appointment.status === "completed" ||
                     getAppointmentDateTime(appointment).getTime() <= adminNow.getTime(),
             })),
+            adminServices.map((service) => ({
+                name: service.name,
+                durationMinutes: service.duration_minutes,
+            })),
         );
-    }, [completedFinanceAppointments, scheduledFinanceAppointments, adminNow]);
+    }, [completedFinanceAppointments, scheduledFinanceAppointments, adminNow, adminServices]);
 
     function getNotificationKey(appointmentId: string, type: WhatsAppNotificationType) {
         return `${appointmentId}:${type}`;
