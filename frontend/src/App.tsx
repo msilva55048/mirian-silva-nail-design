@@ -1723,7 +1723,14 @@ function PublicSite() {
         const {data, error} = await supabase.rpc("claim_waitlist_opportunity", {p_opportunity_id: clientOpportunity.id});
         const result = data?.result;
         if (error || !result) setClientOpportunityError(error?.message || "Não foi possível confirmar esta vaga.");
-        else if (result === "claimed") { setClientOpportunity(null); clearOpportunityRoute(); await loadClientAppointments(clientProfile?.id ?? ""); }
+        else if (result === "claimed") {
+            setClientOpportunity(null);
+            clearOpportunityRoute();
+            await Promise.all([
+                loadClientAppointments(clientProfile?.id ?? ""),
+                loadClientWaitlistRequests(),
+            ]);
+        }
         else if (result === "already_claimed_by_you") setClientOpportunityError("Você já agendou esta vaga.");
         else if (result === "already_claimed") setClientOpportunityError("Esta vaga já foi preenchida.");
         else setClientOpportunityError("Esta vaga não está mais disponível.");
@@ -3453,13 +3460,13 @@ function PublicSite() {
                                     {clientOpportunityError && <p className="booking-modal__error">{clientOpportunityError}</p>}
                                     <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
                                         <button type="button" className="booking-modal__button primary-action" disabled={clientOpportunityClaiming} onClick={() => void claimClientOpportunity()}>{clientOpportunityClaiming ? "Confirmando..." : "Confirmar agendamento"}</button>
-                                        <button type="button" className="client-reminder-modal__action" disabled={clientOpportunityClaiming} onClick={() => void dismissClientOpportunity()}>Fechar</button>
+                                        <button type="button" className="client-reminder-modal__action" disabled={clientOpportunityClaiming} onClick={() => void dismissClientOpportunity()}>Recusar agendamento</button>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <p>{clientOpportunityError || "Esta vaga não está mais disponível."}</p>
-                                    <button type="button" className="client-reminder-modal__action" onClick={() => void dismissClientOpportunity()}>Fechar</button>
+                                    <button type="button" className="client-reminder-modal__action" onClick={() => void dismissClientOpportunity()}>Recusar agendamento</button>
                                 </>
                             )}
                         </div>
@@ -4697,7 +4704,7 @@ function PublicSite() {
                                         {clientWaitlistMessage && <p className="client-auth-message is-success">{clientWaitlistMessage}</p>}
                                         <button type="button" className="client-account__referral-button client-waitlist-submit-button" disabled={clientWaitlistSaving || !clientWaitlistServiceId || !clientWaitlistDate} onClick={() => void createClientWaitlistRequest()}>{clientWaitlistSaving ? "Entrando..." : "Entrar na lista de espera"}</button>
                                         <h4>Minhas solicitações</h4>
-                                        {clientWaitlistLoading ? <p>Carregando...</p> : clientWaitlistRequests.length === 0 ? <div className="client-account__empty">Nenhuma solicitação encontrada.</div> : clientWaitlistRequests.map((request) => <article className="client-waitlist-request" key={request.id}><strong>{request.service_name_snapshot}</strong><span>Data: {new Date(`${request.selected_date}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>Semana: {new Date(`${request.week_start}T12:00:00`).toLocaleDateString("pt-BR")} a {new Date(`${request.week_end}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>{request.status === "active" ? "Na lista de espera" : request.status === "fulfilled" ? "Vaga conseguida" : request.status === "cancelled" ? "Cancelada" : "Encerrada"}</span>{request.status === "active" && <button type="button" onClick={() => void cancelClientWaitlistRequest(request)}>Sair da lista</button>}</article>)}
+                                        {clientWaitlistLoading ? <p>Carregando...</p> : clientWaitlistRequests.filter((request) => request.status === "active").length === 0 ? <div className="client-account__empty">Nenhuma solicitação encontrada.</div> : clientWaitlistRequests.filter((request) => request.status === "active").map((request) => <article className="client-waitlist-request" key={request.id}><strong>{request.service_name_snapshot}</strong><span>Data: {new Date(`${request.selected_date}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>Semana: {new Date(`${request.week_start}T12:00:00`).toLocaleDateString("pt-BR")} a {new Date(`${request.week_end}T12:00:00`).toLocaleDateString("pt-BR")}</span><span>Na lista de espera</span><button type="button" onClick={() => void cancelClientWaitlistRequest(request)}>Sair da lista</button></article>)}
                                     </section>
                                 )}
 
