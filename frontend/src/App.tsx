@@ -3440,7 +3440,7 @@ function PublicSite() {
         <main className="home">
             {shouldShowOpportunityModal && (
                 <div className="client-reminder-overlay" role="presentation">
-                    <section className="client-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="waitlist-opportunity-title">
+                    <section className="client-reminder-modal waitlist-opportunity-modal" role="dialog" aria-modal="true" aria-labelledby="waitlist-opportunity-title">
                         <header className="client-reminder-modal__header">
                             <img src="/logo-mirian.png" alt="" />
                             <div><strong>Mirian Silva</strong><span>Nail Design</span></div>
@@ -3458,15 +3458,15 @@ function PublicSite() {
                                         <div><dt>Horário</dt><dd>{String(clientOpportunity.start_time).slice(0, 5)}</dd></div>
                                     </dl>
                                     {clientOpportunityError && <p className="booking-modal__error">{clientOpportunityError}</p>}
-                                    <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
+                                    <div className="waitlist-opportunity-modal__actions">
                                         <button type="button" className="booking-modal__button primary-action" disabled={clientOpportunityClaiming} onClick={() => void claimClientOpportunity()}>{clientOpportunityClaiming ? "Confirmando..." : "Confirmar agendamento"}</button>
-                                        <button type="button" className="client-reminder-modal__action" disabled={clientOpportunityClaiming} onClick={() => void dismissClientOpportunity()}>Recusar agendamento</button>
+                                        <button type="button" className="client-reminder-modal__action waitlist-opportunity-modal__decline" disabled={clientOpportunityClaiming} onClick={() => void dismissClientOpportunity()}>Recusar agendamento</button>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <p>{clientOpportunityError || "Esta vaga não está mais disponível."}</p>
-                                    <button type="button" className="client-reminder-modal__action" onClick={() => void dismissClientOpportunity()}>Recusar agendamento</button>
+                                    <button type="button" className="client-reminder-modal__action waitlist-opportunity-modal__decline" onClick={() => void dismissClientOpportunity()}>Recusar agendamento</button>
                                 </>
                             )}
                         </div>

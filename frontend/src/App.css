@@ -2391,3 +2391,27 @@ a {
 
 
 
+/* Opportunity da lista de espera: card e divisórias dourados, ações alinhadas. */
+.waitlist-opportunity-modal {
+    border-color: #c7a85a;
+}
+
+.waitlist-opportunity-modal .client-reminder-modal__header {
+    border-bottom-color: #c7a85a;
+}
+
+.waitlist-opportunity-modal .client-reminder-modal__body dl div {
+    border-bottom-color: #c7a85a;
+}
+
+.waitlist-opportunity-modal__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.waitlist-opportunity-modal__actions > button,
+.waitlist-opportunity-modal__decline {
+    flex: 1 1 220px;
+    min-width: 0;
+}
