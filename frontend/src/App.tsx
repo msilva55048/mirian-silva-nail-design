@@ -1690,17 +1690,11 @@ function PublicSite() {
                 setClientOpportunity(opportunity);
                 if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
                 if (opportunity.available) {
-                    setSelectedService(opportunity.service_name);
-                    setSelectedDate(opportunity.appointment_date);
-                    setSelectedTime(String(opportunity.start_time).slice(0, 5));
-                    setWeekReferenceDate(opportunity.appointment_date);
-                    setShowMonthCalendar(true);
-                    setEditingClientAppointment(null);
-                    setClientName(clientProfile.full_name);
-                    setClientPhone(formatBrazilianPhone(clientProfile.phone));
-                    setBookingError("");
-                    setShowClientAccount(false);
-                    setBookingStep(2);
+                    startNewClientBooking(
+                        opportunity.service_name,
+                        opportunity.appointment_date,
+                        String(opportunity.start_time).slice(0, 5),
+                    );
                 } else {
                     setClientOpportunityError("Esta vaga não está mais disponível.");
                     setClientAccountSection("appointments");
@@ -3107,6 +3101,19 @@ function PublicSite() {
         setBookingError("");
     }
 
+    function startNewClientBooking(serviceName: string, date = formatDateForInput(new Date()), time = "") {
+        setShowClientAccount(false);
+        setEditingClientAppointment(null);
+        selectService(serviceName);
+        setSelectedDate(date);
+        setSelectedTime(time);
+        setWeekReferenceDate(date);
+        setShowMonthCalendar(true);
+        setClientName(clientProfile?.full_name ?? "");
+        setClientPhone(clientProfile ? formatBrazilianPhone(clientProfile.phone) : "");
+        setBookingStep(2);
+    }
+
     function closeBooking() {
         setBookingStep(1);
         setClientName(clientProfile?.full_name ?? "");
@@ -3129,6 +3136,12 @@ function PublicSite() {
         showClientProfileEditor
             ? "public-overlay"
             : null;
+
+    const opportunityDeepLinkId = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("opportunity")
+        : null;
+    const isOpportunityBookingView = Boolean(opportunityDeepLinkId) &&
+        (clientOpportunityLoading || clientOpportunity?.available === true);
 
     useCloseOverlayOnBrowserBack(publicOverlayKey, () => {
         if (showClientProfileEditor) {
@@ -3707,14 +3720,7 @@ function PublicSite() {
                                         type="button"
                                         className="service-card__button"
                                         onClick={() => {
-                                            setEditingClientAppointment(null);
-                                            selectService(service.name);
-                                            const initialDate = formatDateForInput(new Date());
-                                            setSelectedDate(initialDate);
-                                            setWeekReferenceDate(initialDate);
-                                            setClientName(clientProfile?.full_name ?? "");
-                                            setClientPhone(clientProfile ? formatBrazilianPhone(clientProfile.phone) : "");
-                                            setBookingStep(2);
+                                            startNewClientBooking(service.name);
                                         }}
                                     >
                                         Escolher este serviço
@@ -4492,7 +4498,7 @@ function PublicSite() {
                 </div>
             )}
 
-            {showClientAccount && clientUserId && (
+            {showClientAccount && clientUserId && !isOpportunityBookingView && (
                 <div className="client-modal-backdrop" onMouseDown={(event) => {
                     if (event.target === event.currentTarget) setShowClientAccount(false);
                 }}>

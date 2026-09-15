@@ -30,11 +30,9 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /mark_waitlist_opportunity_opened/);
   assert.match(app, /opportunity/);
   assert.match(app, /Vaga disponível/);
-  assert.match(app, /setSelectedService\(opportunity\.service_name\)/);
-  assert.match(app, /setSelectedDate\(opportunity\.appointment_date\)/);
-  assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);
-  assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)[\s\S]*?setBookingStep\(2\)/);
-  assert.match(app, /setShowMonthCalendar\(true\);[\s\S]*?setEditingClientAppointment\(null\);/);
+  assert.match(app, /startNewClientBooking\(\s*opportunity\.service_name,\s*opportunity\.appointment_date,\s*String\(opportunity\.start_time\)/);
+  assert.match(app, /function startNewClientBooking\([\s\S]*?setShowClientAccount\(false\);[\s\S]*?setBookingStep\(2\);/);
+  assert.match(app, /startNewClientBooking\(service\.name\)/);
   assert.match(app, /Escolha data e horário/);
   assert.match(app, /Revisar agendamento/);
   assert.match(app, /if \(clientOpportunity\) \{\s*await claimClientOpportunity\(\)/);
@@ -45,9 +43,8 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
 test("deep-link de opportunity tem prioridade sobre section=appointments", () => {
   assert.match(app, /setShowClientAccount\(false\);\s*setClientOpportunityLoading\(true\);/);
   assert.match(app, /setBookingStep\(2\);/);
-  assert.match(app, /setSelectedService\(opportunity\.service_name\)/);
-  assert.match(app, /setSelectedDate\(opportunity\.appointment_date\)/);
-  assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);
+  assert.match(app, /startNewClientBooking\(\s*opportunity\.service_name/);
+  assert.match(app, /!isOpportunityBookingView/);
 });
 
 test("notificationclick mantém navegação e fallback dentro de event.waitUntil", () => {
