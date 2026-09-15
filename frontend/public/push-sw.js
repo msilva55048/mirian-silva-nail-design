@@ -33,8 +33,10 @@ self.addEventListener("notificationclick", (event) => {
 
         if (existing) {
             try {
-                await existing.navigate(targetUrl);
-                return existing.focus();
+                const navigated = await existing.navigate(targetUrl);
+                if (navigated) await navigated.focus();
+                else await existing.focus();
+                return;
             } catch {
                 // Fallback for standalone/background windows that cannot navigate.
             }

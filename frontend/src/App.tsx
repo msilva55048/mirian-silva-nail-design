@@ -1678,8 +1678,11 @@ function PublicSite() {
         const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
         const opportunityId = params.get("opportunity");
         if (!opportunityId || !clientProfile) return;
-        setClientAccountSection("appointments");
-        setShowClientAccount(true);
+        // An opportunity is a booking deep-link, not an account deep-link.
+        // Keep the account modal closed while the opportunity is being resolved;
+        // otherwise section=appointments briefly (or on a repeated auth update)
+        // wins the render before the booking state is applied.
+        setShowClientAccount(false);
         setClientOpportunityLoading(true);
         void (async () => {
             const {data, error} = await supabase.rpc("get_my_waitlist_opportunity", {p_opportunity_id: opportunityId});
@@ -1697,8 +1700,15 @@ function PublicSite() {
                     setBookingStep(4);
                 } else {
                     setClientOpportunityError("Esta vaga não está mais disponível.");
+                    setClientAccountSection("appointments");
+                    setShowClientAccount(true);
                 }
-            } else setClientOpportunity(null);
+            } else {
+                setClientOpportunity(null);
+                setClientOpportunityError("Esta vaga não está mais disponível.");
+                setClientAccountSection("appointments");
+                setShowClientAccount(true);
+            }
             setClientOpportunityLoading(false);
         })();
     }, [clientProfile]);

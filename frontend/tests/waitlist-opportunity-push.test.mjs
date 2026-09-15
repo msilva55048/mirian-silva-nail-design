@@ -5,6 +5,7 @@ import fs from "node:fs";
 const migration = fs.readFileSync("supabase/migrations/20260912140000_waitlist_opportunity_push.sql", "utf8");
 const fn = fs.readFileSync("supabase/functions/waitlist-opportunity-push/index.ts", "utf8");
 const app = fs.readFileSync("src/App.tsx", "utf8");
+const serviceWorker = fs.readFileSync("public/push-sw.js", "utf8");
 
 test("dispatcher de oportunidades é separado e idempotente", () => {
   assert.match(migration, /get_waitlist_opportunity_dispatch_targets/);
@@ -34,4 +35,22 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);
   assert.match(app, /setBookingStep\(4\)/);
   assert.match(app, /if \(clientOpportunity\) \{\s*await claimClientOpportunity\(\)/);
+  assert.match(app, /An opportunity is a booking deep-link/);
+  assert.doesNotMatch(app, /if \(!opportunityId \|\| !clientProfile\) return;\s*setClientAccountSection\("appointments"\);\s*setShowClientAccount\(true\);/);
+});
+
+test("deep-link de opportunity tem prioridade sobre section=appointments", () => {
+  assert.match(app, /setShowClientAccount\(false\);\s*setClientOpportunityLoading\(true\);/);
+  assert.match(app, /setBookingStep\(4\);/);
+  assert.match(app, /setSelectedService\(opportunity\.service_name\)/);
+  assert.match(app, /setSelectedDate\(opportunity\.appointment_date\)/);
+  assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);
+});
+
+test("notificationclick mantém navegação e fallback dentro de event.waitUntil", () => {
+  assert.match(serviceWorker, /event\.waitUntil\(\(async \(\) => \{/);
+  assert.match(serviceWorker, /new URL\(event\.notification\.data\?\.url \|\| "\/admin", self\.location\.origin\)\.href/);
+  assert.match(serviceWorker, /await existing\.navigate\(targetUrl\)/);
+  assert.match(serviceWorker, /await .*\.focus\(\)/);
+  assert.match(serviceWorker, /self\.clients\.openWindow\(targetUrl\)/);
 });
