@@ -16315,14 +16315,42 @@ function AdminPanel() {
 }
 
 
+function OpportunityDebugRootBanner() {
+    const enabled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugOpportunity") === "1";
+    if (!enabled) return null;
+
+    return (
+        <div
+            role="status"
+            aria-label="Diagnóstico Opportunity ativo"
+            style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 2147483647,
+                padding: "10px 14px",
+                background: "#5b1739",
+                color: "#fff",
+                borderBottom: "3px solid #f3c969",
+                font: "700 14px/1.35 monospace",
+                textAlign: "center",
+                pointerEvents: "none",
+            }}
+        >
+            Diagnóstico Opportunity — modo debug ativo
+        </div>
+    );
+}
+
 function App() {
     const normalizedPath = window.location.pathname.replace(/\/+$/, "");
 
     if (normalizedPath === "/admin") {
-        return <AdminPanel/>;
+        return <><OpportunityDebugRootBanner/><AdminPanel/></>;
     }
 
-    return <PublicSite/>;
+    return <><OpportunityDebugRootBanner/><PublicSite/></>;
 }
 
 export default App;
