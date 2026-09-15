@@ -33,15 +33,18 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
   assert.match(app, /setSelectedService\(opportunity\.service_name\)/);
   assert.match(app, /setSelectedDate\(opportunity\.appointment_date\)/);
   assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);
-  assert.match(app, /setBookingStep\(4\)/);
+  assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)[\s\S]*?setBookingStep\(2\)/);
+  assert.match(app, /setShowMonthCalendar\(true\);[\s\S]*?setEditingClientAppointment\(null\);/);
+  assert.match(app, /Escolha data e horário/);
+  assert.match(app, /Revisar agendamento/);
   assert.match(app, /if \(clientOpportunity\) \{\s*await claimClientOpportunity\(\)/);
-  assert.match(app, /An opportunity is a booking deep-link/);
+  assert.doesNotMatch(app, /debugOpportunity|OpportunityDebugRootBanner|Diagnóstico Opportunity/);
   assert.doesNotMatch(app, /if \(!opportunityId \|\| !clientProfile\) return;\s*setClientAccountSection\("appointments"\);\s*setShowClientAccount\(true\);/);
 });
 
 test("deep-link de opportunity tem prioridade sobre section=appointments", () => {
   assert.match(app, /setShowClientAccount\(false\);\s*setClientOpportunityLoading\(true\);/);
-  assert.match(app, /setBookingStep\(4\);/);
+  assert.match(app, /setBookingStep\(2\);/);
   assert.match(app, /setSelectedService\(opportunity\.service_name\)/);
   assert.match(app, /setSelectedDate\(opportunity\.appointment_date\)/);
   assert.match(app, /setSelectedTime\(String\(opportunity\.start_time\)/);

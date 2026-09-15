@@ -1647,16 +1647,6 @@ function PublicSite() {
     const [clientOpportunityLoading, setClientOpportunityLoading] = useState(false);
     const [clientOpportunityClaiming, setClientOpportunityClaiming] = useState(false);
     const [clientOpportunityError, setClientOpportunityError] = useState("");
-    const debugOpportunity = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugOpportunity") === "1";
-    const debugOpportunityId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("opportunity") ?? "(nenhum)" : "(server)";
-    const [opportunityDebug, setOpportunityDebug] = useState({
-        started: false,
-        finished: false,
-        error: null as {code?: string; message?: string; details?: string; hint?: string} | null,
-        dataReturned: false,
-        rowCount: 0,
-        branch: "aguardando chamada",
-    });
 
     const [showPasswordRecoveryRequest, setShowPasswordRecoveryRequest] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -1691,24 +1681,11 @@ function PublicSite() {
         const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
         const opportunityId = params.get("opportunity");
         if (!opportunityId || !clientProfile) return;
-        // An opportunity is a booking deep-link, not an account deep-link.
-        // Keep the account modal closed while the opportunity is being resolved;
-        // otherwise section=appointments briefly (or on a repeated auth update)
-        // wins the render before the booking state is applied.
         setShowClientAccount(false);
         setClientOpportunityLoading(true);
-        if (debugOpportunity) setOpportunityDebug({started: true, finished: false, error: null, dataReturned: false, rowCount: 0, branch: "RPC iniciada"});
         void (async () => {
             const {data, error} = await supabase.rpc("get_my_waitlist_opportunity", {p_opportunity_id: opportunityId});
             const opportunity = normalizeRpcRow<ClientWaitlistOpportunity>(data as ClientWaitlistOpportunity[] | ClientWaitlistOpportunity | null);
-            if (debugOpportunity) setOpportunityDebug({
-                started: true,
-                finished: true,
-                error: error ? {code: error.code, message: error.message, details: error.details, hint: error.hint} : null,
-                dataReturned: Boolean(data),
-                rowCount: Array.isArray(data) ? data.length : data ? 1 : 0,
-                branch: error ? "erro da RPC → fallback de conta" : !opportunity ? "RPC sem registro → fallback de conta" : !opportunity.available ? "registro indisponível → fallback de conta" : "registro válido → revisão",
-            });
             if (!error && opportunity) {
                 setClientOpportunity(opportunity);
                 if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
@@ -1717,9 +1694,13 @@ function PublicSite() {
                     setSelectedDate(opportunity.appointment_date);
                     setSelectedTime(String(opportunity.start_time).slice(0, 5));
                     setWeekReferenceDate(opportunity.appointment_date);
+                    setShowMonthCalendar(true);
+                    setEditingClientAppointment(null);
+                    setClientName(clientProfile.full_name);
+                    setClientPhone(formatBrazilianPhone(clientProfile.phone));
                     setBookingError("");
                     setShowClientAccount(false);
-                    setBookingStep(4);
+                    setBookingStep(2);
                 } else {
                     setClientOpportunityError("Esta vaga não está mais disponível.");
                     setClientAccountSection("appointments");
@@ -1733,31 +1714,7 @@ function PublicSite() {
             }
             setClientOpportunityLoading(false);
         })();
-    }, [clientProfile, debugOpportunity]);
-
-    const opportunityDebugPanel = debugOpportunity ? (
-        <aside style={{position: "fixed", zIndex: 10000, top: 12, left: 12, right: 12, maxWidth: 560, maxHeight: "90vh", overflow: "auto", padding: 14, border: "2px solid #8b4d66", borderRadius: 12, background: "#fff", color: "#3d2831", fontFamily: "monospace", fontSize: 12, boxShadow: "0 8px 30px rgba(0,0,0,.2)"}}>
-            <strong style={{display: "block", fontFamily: "inherit", fontSize: 15, marginBottom: 8}}>Diagnóstico Opportunity</strong>
-            <div>pathname: {typeof window !== "undefined" ? window.location.pathname : "(server)"}</div>
-            <div>opportunity ID: {debugOpportunityId}</div>
-            <div>usuário autenticado: {clientUserId ? "sim" : "não"}</div>
-            <div>auth user disponível: {clientUserId ? "sim" : "não"}</div>
-            <div>client profile carregado: {clientProfile ? "sim" : "não"}</div>
-            <div>RPC iniciou: {opportunityDebug.started ? "sim" : "não"}</div>
-            <div>RPC: get_my_waitlist_opportunity</div>
-            <div>parâmetros: {JSON.stringify({p_opportunity_id: debugOpportunityId})}</div>
-            <div>RPC terminou: {opportunityDebug.finished ? "sim" : "não"}</div>
-            <div>error existe: {opportunityDebug.error ? "sim" : "não"}</div>
-            {opportunityDebug.error && <div style={{margin: "4px 0 0 12px"}}>error: {JSON.stringify(opportunityDebug.error)}</div>}
-            <div>data retornou: {opportunityDebug.dataReturned ? "sim" : "não"}</div>
-            <div>quantidade de registros: {opportunityDebug.rowCount}</div>
-            {clientOpportunity && <div style={{marginTop: 4}}>retorno: {JSON.stringify({opportunity_id: clientOpportunity.id, service_id: clientOpportunity.service_id ?? null, service: clientOpportunity.service_name, date: clientOpportunity.appointment_date, time: clientOpportunity.start_time, duration: clientOpportunity.duration_minutes, status: clientOpportunity.status ?? null, expires_at: clientOpportunity.expires_at ?? null, available: clientOpportunity.available})}</div>}
-            <div>branch: {opportunityDebug.branch}</div>
-            <div>showClientAccount: {showClientAccount ? "true" : "false"}</div>
-            <div>bookingStep: {bookingStep}</div>
-            <div>motivo Minha Conta: {showClientAccount && debugOpportunityId !== "(nenhum)" ? clientOpportunity ? "opportunity indisponível" : opportunityDebug.error ? "erro da RPC" : opportunityDebug.finished ? "RPC sem registro" : "aguardando resultado" : "nenhum fallback de opportunity"}</div>
-        </aside>
-    ) : null;
+    }, [clientProfile]);
 
     async function toggleClientPush() {
         setClientPushError("");
@@ -3450,7 +3407,6 @@ function PublicSite() {
 
     return (
         <main className="home">
-            {opportunityDebugPanel}
             {shouldShowReminderModal && (
                 <div className="client-reminder-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) closeReminderModal(); }}>
                     <section className="client-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="client-reminder-title">
@@ -16315,42 +16271,14 @@ function AdminPanel() {
 }
 
 
-function OpportunityDebugRootBanner() {
-    const enabled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugOpportunity") === "1";
-    if (!enabled) return null;
-
-    return (
-        <div
-            role="status"
-            aria-label="Diagnóstico Opportunity ativo"
-            style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                zIndex: 2147483647,
-                padding: "10px 14px",
-                background: "#5b1739",
-                color: "#fff",
-                borderBottom: "3px solid #f3c969",
-                font: "700 14px/1.35 monospace",
-                textAlign: "center",
-                pointerEvents: "none",
-            }}
-        >
-            Diagnóstico Opportunity — modo debug ativo
-        </div>
-    );
-}
-
 function App() {
     const normalizedPath = window.location.pathname.replace(/\/+$/, "");
 
     if (normalizedPath === "/admin") {
-        return <><OpportunityDebugRootBanner/><AdminPanel/></>;
+        return <AdminPanel/>;
     }
 
-    return <><OpportunityDebugRootBanner/><PublicSite/></>;
+    return <PublicSite/>;
 }
 
 export default App;
