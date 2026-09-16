@@ -10114,7 +10114,7 @@ function AdminPanel() {
     const [password, setPassword] = useState("");
     const [loginError, setLoginError] = useState("");
     const [isLoggingIn, setIsLoggingIn] = useState(false);
-    const [adminPushState, setAdminPushState] = useState<AdminPushState>("disabled");
+    const [adminPushState, setAdminPushState] = useState<AdminPushState>("loading");
     const [isUpdatingAdminPush, setIsUpdatingAdminPush] = useState(false);
     const [adminPushMessage, setAdminPushMessage] = useState("");
 
@@ -10338,14 +10338,20 @@ function AdminPanel() {
             return;
         }
 
+        let isPushStateCurrent = true;
         void getAdminPushState().then((state) => {
+            if (!isPushStateCurrent) return;
             setAdminPushState(state);
             setAdminPushMessage(state === "configuration-error"
                 ? "Configuração Web Push indisponível."
                 : state === "blocked" ? "Permissão de notificações bloqueada no navegador."
                     : state === "unsupported" ? "Este navegador não oferece suporte a Web Push."
                         : "");
-        }).catch(() => setAdminPushState("disabled"));
+        }).catch(() => {
+            if (!isPushStateCurrent) return;
+            setAdminPushState("error");
+            setAdminPushMessage("Não foi possível confirmar o estado no backend. Toque no sino para tentar novamente.");
+        });
 
         async function loadAdminData() {
             setIsLoading(true);
@@ -10435,6 +10441,7 @@ function AdminPanel() {
         window.addEventListener("focus", refresh);
 
         return () => {
+            isPushStateCurrent = false;
             void supabase.removeChannel(appointmentsChannel);
             void supabase.removeChannel(blocksChannel);
             void supabase.removeChannel(clientProfilesChannel);
@@ -10445,24 +10452,38 @@ function AdminPanel() {
     }, [isAuthenticated]);
 
     async function toggleAdminPush() {
-        if (isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked") return;
+        if (isUpdatingAdminPush || adminPushState === "loading" || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked") return;
         setIsUpdatingAdminPush(true);
         setAdminPushMessage("");
 
         try {
-            if (adminPushState === "enabled") {
+            if (adminPushState === "error") {
+                setAdminPushState("loading");
+                const state = await getAdminPushState();
+                setAdminPushState(state);
+                setAdminPushMessage(state === "enabled" ? "Notificações confirmadas neste aparelho." : "");
+            } else if (adminPushState === "enabled") {
+                setAdminPushState("loading");
                 await disableAdminPush();
-                setAdminPushState("disabled");
+                const state = await getAdminPushState();
+                if (state === "enabled") throw new Error("O backend ainda informa que este aparelho está inscrito no escopo ADM.");
+                setAdminPushState(state);
                 setAdminPushMessage("Notificações desativadas neste aparelho.");
             } else {
+                setAdminPushState("loading");
                 await enableAdminPush();
-                setAdminPushState("enabled");
+                const state = await getAdminPushState();
+                if (state !== "enabled") throw new Error("O backend não confirmou a ativação neste aparelho.");
+                setAdminPushState(state);
                 setAdminPushMessage("Notificações ativadas neste aparelho.");
             }
         } catch (error) {
             console.error("Erro ao configurar notificações push:", error);
-            setAdminPushState(await getAdminPushState().catch((): AdminPushState => "disabled"));
-            setAdminPushMessage(error instanceof Error ? error.message : "Não foi possível configurar as notificações.");
+            const state = await getAdminPushState().catch((): AdminPushState => "error");
+            setAdminPushState(state);
+            setAdminPushMessage(state === "error"
+                ? "Não foi possível confirmar o estado no backend. Tente novamente."
+                : error instanceof Error ? error.message : "Não foi possível configurar as notificações.");
         } finally {
             setIsUpdatingAdminPush(false);
         }
@@ -13542,12 +13563,13 @@ function AdminPanel() {
                             <button
                                 className={`admin-secondary-button admin-push-button${adminPushState === "enabled" ? " is-push-enabled" : ""}`}
                                 type="button"
-                                disabled={isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked"}
+                                disabled={isUpdatingAdminPush || adminPushState === "loading" || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked"}
                                 onClick={() => void toggleAdminPush()}
-                                aria-label={adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
-                                title={adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
+                                aria-label={adminPushState === "loading" ? "Verificando notificações" : adminPushState === "error" ? "Falha ao verificar notificações; toque para tentar novamente" : adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
+                                title={adminPushState === "loading" ? "Verificando o estado real no navegador e no backend" : adminPushState === "error" ? "Não foi possível confirmar o estado; toque para tentar novamente" : adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
+                                aria-busy={adminPushState === "loading" || isUpdatingAdminPush}
                             >
-                                {adminPushState === "blocked" || adminPushState === "unsupported" || adminPushState === "configuration-error" ? "🔕" : "🔔"}
+                                {adminPushState === "loading" ? "…" : adminPushState === "blocked" || adminPushState === "unsupported" || adminPushState === "configuration-error" ? "🔕" : "🔔"}
                             </button>
                             {adminPushMessage && <span className="admin-push-status" role="status">{adminPushMessage}</span>}
                         </div>

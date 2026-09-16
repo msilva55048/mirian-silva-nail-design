@@ -1,7 +1,7 @@
 import {supabase} from "./supabase";
 import {hasWebPushConfiguration, isWebPushSupported, vapidPublicKey, webPushConfigurationError} from "./pushConfig";
 
-export type AdminPushState = "unsupported" | "configuration-error" | "disabled" | "enabled" | "blocked";
+export type AdminPushState = "loading" | "error" | "unsupported" | "configuration-error" | "disabled" | "enabled" | "blocked";
 
 function urlBase64ToUint8Array(value: string) {
     const padding = "=".repeat((4 - (value.length % 4)) % 4);
@@ -10,8 +10,19 @@ function urlBase64ToUint8Array(value: string) {
     return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
 }
 
-async function getRegistration() {
-    return navigator.serviceWorker.register("/push-sw.js", {scope: "/"});
+async function getRegistration(createIfMissing = false) {
+    let registration = await navigator.serviceWorker.getRegistration("/");
+    if (!registration && createIfMissing) {
+        registration = await navigator.serviceWorker.register("/push-sw.js", {scope: "/"});
+    }
+    if (!registration) return null;
+
+    await navigator.serviceWorker.ready;
+    const activeRegistration = await navigator.serviceWorker.getRegistration("/");
+    if (!activeRegistration?.active) {
+        throw new Error("O Service Worker de notificações ainda não está ativo.");
+    }
+    return activeRegistration;
 }
 
 async function sendSubscription(action: "subscribe" | "unsubscribe" | "status", subscription: PushSubscription) {
@@ -23,6 +34,11 @@ async function sendSubscription(action: "subscribe" | "unsubscribe" | "status", 
     return data;
 }
 
+async function isAdminSubscriptionRegistered(subscription: PushSubscription) {
+    const data = await sendSubscription("status", subscription);
+    return data?.registered === true;
+}
+
 export async function getAdminPushState(): Promise<AdminPushState> {
     if (!isWebPushSupported()) return "unsupported";
     if (!hasWebPushConfiguration()) return "configuration-error";
@@ -30,10 +46,10 @@ export async function getAdminPushState(): Promise<AdminPushState> {
     if (Notification.permission !== "granted") return "disabled";
 
     const registration = await getRegistration();
+    if (!registration) return "disabled";
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) return "disabled";
-    const data = await sendSubscription("status", subscription);
-    return data?.registered === true ? "enabled" : "disabled";
+    return await isAdminSubscriptionRegistered(subscription) ? "enabled" : "disabled";
 }
 
 export async function enableAdminPush() {
@@ -49,7 +65,8 @@ export async function enableAdminPush() {
         throw new Error("A permissão de notificações não foi concedida.");
     }
 
-    const registration = await getRegistration();
+    const registration = await getRegistration(true);
+    if (!registration) throw new Error("Não foi possível ativar o Service Worker de notificações.");
     const current = await registration.pushManager.getSubscription();
     const subscription = current ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -58,6 +75,9 @@ export async function enableAdminPush() {
 
     try {
         await sendSubscription("subscribe", subscription);
+        if (!await isAdminSubscriptionRegistered(subscription)) {
+            throw new Error("O backend não confirmou a ativação das notificações ADM neste aparelho.");
+        }
     } catch (error) {
         if (!current) await subscription.unsubscribe();
         throw error;
@@ -67,7 +87,11 @@ export async function enableAdminPush() {
 export async function disableAdminPush() {
     if (!isWebPushSupported()) return;
     const registration = await getRegistration();
+    if (!registration) return;
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) return;
     await sendSubscription("unsubscribe", subscription);
+    if (await isAdminSubscriptionRegistered(subscription)) {
+        throw new Error("O backend ainda reconhece as notificações ADM como ativas.");
+    }
 }

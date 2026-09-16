@@ -6,6 +6,7 @@ const config = await readFile(new URL("../src/lib/pushConfig.ts", import.meta.ur
 const client = await readFile(new URL("../src/lib/clientPush.ts", import.meta.url), "utf8");
 const admin = await readFile(new URL("../src/lib/adminPush.ts", import.meta.url), "utf8");
 const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+const adminFunction = await readFile(new URL("../supabase/functions/admin-web-push/index.ts", import.meta.url), "utf8");
 
 test("suporte do navegador é independente da configuração VAPID", () => {
     const supportCheck = config.match(/export function isWebPushSupported\(\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
@@ -39,4 +40,25 @@ test("Cliente e ADM reutilizam a subscription sem unsubscribe físico ao desativ
     assert.match(client, /getSubscription\(\)/);
     assert.doesNotMatch(admin.match(/export async function disableAdminPush\(\)[\s\S]*/)?.[0] ?? "", /subscription\.unsubscribe\(\)/);
     assert.doesNotMatch(client.match(/export async function disableClientPush\(\)[\s\S]*/)?.[0] ?? "", /subscription\.unsubscribe\(\)/);
+});
+
+test("ADM começa em loading e nunca transforma falha de status em falso desativado", () => {
+    assert.match(app, /useState<AdminPushState>\("loading"\)/);
+    assert.match(app, /setAdminPushState\("loading"\)/);
+    assert.match(app, /setAdminPushState\("error"\)/);
+    assert.doesNotMatch(app.match(/getAdminPushState\(\)\.then\([\s\S]*?async function loadAdminData/)?.[0] ?? "", /catch\(\(\) => setAdminPushState\("disabled"\)\)/);
+    assert.match(app, /state !== "enabled"\) throw new Error\("O backend não confirmou a ativação neste aparelho\."\)/);
+});
+
+test("ADM aguarda Service Worker ativo e confirma o escopo no backend após ativação e desativação", () => {
+    assert.match(admin, /await navigator\.serviceWorker\.ready/);
+    assert.match(admin, /getRegistration\(\)/);
+    assert.match(admin, /await isAdminSubscriptionRegistered\(subscription\)/);
+    assert.match(admin, /backend ainda reconhece as notificações ADM como ativas/);
+});
+
+test("status ADMIN consulta o escopo do usuário autenticado pela subscription física", () => {
+    const statusHandler = adminFunction.match(/if \(body\.action === "status"\) \{([\s\S]*?)\n    \}/)?.[1] ?? "";
+    assert.match(statusHandler, /eq\("endpoint", endpoint\)\.eq\("admin_user_id", user\.id\)/);
+    assert.match(statusHandler, /json\(\{registered: Boolean\(data\)\}, 200, headers\)/);
 });
