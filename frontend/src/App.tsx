@@ -13,6 +13,7 @@ import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts"
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
 import {findClientKeyForAppointment} from "./features/admin/clientNavigation";
+import {normalizeBrazilianWhatsAppNumber} from "./shared/whatsapp";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -13529,7 +13530,16 @@ function AdminPanel() {
                             </div>
                             <div>
                                 <span>Telefone</span>
-                                <strong>{appointment.client_phone}</strong>
+                                {(() => {
+                                    const whatsappNumber = normalizeBrazilianWhatsAppNumber(appointment.client_phone);
+                                    return whatsappNumber ? (
+                                        <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
+                                            <strong>{appointment.client_phone}</strong>
+                                        </a>
+                                    ) : (
+                                        <strong>{appointment.client_phone}</strong>
+                                    );
+                                })()}
                             </div>
                             <div className="admin-booking-card__music">
                                 <span>Gosto musical</span>
