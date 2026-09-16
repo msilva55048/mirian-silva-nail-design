@@ -2892,7 +2892,7 @@ export default function AdminPanel() {
                     </div>
                 </div>
                 <div className="admin-booking-card__footer" onClick={(event) => event.stopPropagation()}>
-                    <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar detalhes</button>
+                    <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar agendamento</button>
                     <button type="button" onClick={() => void cancelAppointment(appointment)}>Cancelar</button>
                     {dueTypes.map((type) => {
                         const key = getNotificationKey(appointment.id, type);
