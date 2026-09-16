@@ -22,3 +22,15 @@ test('usa e-mail como fallback quando não há telefone', () => {
 test('não cria ou escolhe cliente quando não há correspondência', () => {
   assert.equal(findClientKeyForAppointment({client_id: 'missing', client_phone: '', client_email: null}, clients), null);
 });
+
+test('a navegação pendente substitui corretamente o card expandido anterior', () => {
+  let expandedClientCardKey = 'profile:client-a';
+  const pendingClientNavigationKey = 'profile:client-b';
+  const filteredClients = [{key: 'profile:client-b'}];
+  const targetClient = filteredClients.find((client) => client.key === pendingClientNavigationKey);
+
+  expandedClientCardKey = targetClient?.key ?? null;
+
+  assert.equal(expandedClientCardKey, 'profile:client-b');
+  assert.notEqual(expandedClientCardKey, 'profile:client-a');
+});

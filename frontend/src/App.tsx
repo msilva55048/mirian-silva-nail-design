@@ -10197,6 +10197,7 @@ function AdminPanel() {
 
     const [clientSearch, setClientSearch] = useState("");
     const [clientAppointmentFilter, setClientAppointmentFilter] = useState<ClientAppointmentFilter>("all");
+    const [pendingClientNavigationKey, setPendingClientNavigationKey] = useState<string | null>(null);
     const [selectedClient, setSelectedClient] = useState<AdminClient | null>(null);
     const [editingClient, setEditingClient] = useState<AdminClient | null>(null);
     const [editClientName, setEditClientName] = useState("");
@@ -11669,6 +11670,25 @@ function AdminPanel() {
     const filteredClients = useMemo(() =>
             filterAdminClients(clients, clientSearch, clientAppointmentFilter, adminNow),
         [clients, clientSearch, clientAppointmentFilter, adminNow]);
+
+    useEffect(() => {
+        if (adminView !== "clients" || !pendingClientNavigationKey) return;
+
+        const targetClient = filteredClients.find(
+            (client) => client.key === pendingClientNavigationKey,
+        );
+        if (!targetClient) return;
+
+        setExpandedClientCardKey(targetClient.key);
+        const frame = window.requestAnimationFrame(() => {
+            document
+                .getElementById(`admin-client-card-${encodeURIComponent(targetClient.key)}`)
+                ?.scrollIntoView({behavior: "smooth", block: "center"});
+            setPendingClientNavigationKey(null);
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [adminView, filteredClients, pendingClientNavigationKey]);
 
     const manualBookingClients = useMemo<AdminBookingClient[]>(() => {
         const byPhone = new Map<string, AdminBookingClient>();
@@ -13253,7 +13273,7 @@ function AdminPanel() {
         setSelectedClient(null);
         setEditingClient(null);
         setAdminView("clients");
-        setExpandedClientCardKey(clientKey);
+        setPendingClientNavigationKey(clientKey);
     }
 
     function openNewAppointmentFromAvailableTime(time: string) {
@@ -14800,6 +14820,7 @@ function AdminPanel() {
                                     <article
                                         className={`admin-client-card admin-client-card--collapsible${isExpandedClient ? " is-expanded" : ""}`}
                                         key={client.key}
+                                        id={`admin-client-card-${encodeURIComponent(client.key)}`}
                                         role="button"
                                         tabIndex={0}
                                         aria-expanded={isExpandedClient}
