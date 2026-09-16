@@ -13499,7 +13499,7 @@ function AdminPanel() {
                                 type="button"
                                 onClick={() => openAppointmentDetails(appointment)}
                             >
-                                Editar detalhes
+                                Editar agendamento
                             </button>
 
                             <button
