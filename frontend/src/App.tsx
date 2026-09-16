@@ -2011,6 +2011,10 @@ function PublicSite() {
         void initializeClientSession();
 
         const {data: authListener} = supabase.auth.onAuthStateChange((event, session) => {
+            // Renovação silenciosa do token não é um novo login: preserve toda
+            // a navegação, seleção e modais enquanto os dados permanecem na tela.
+            if (event === "TOKEN_REFRESHED") return;
+
             if (event === "PASSWORD_RECOVERY") {
                 setRecoverySessionUserId(session?.user?.id ?? null);
                 setShowClientAuth(false);
@@ -10301,7 +10305,9 @@ function AdminPanel() {
 
         void checkSession();
 
-        const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
+        const {data: {subscription}} = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "TOKEN_REFRESHED") return;
+
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 
             if (isMirianAdminSession) {
