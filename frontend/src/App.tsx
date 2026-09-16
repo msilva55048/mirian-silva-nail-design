@@ -899,6 +899,10 @@ const clientAccountStyles = `
     font-weight: 900;
     line-height: 1;
 }
+.client-week-day.is-blocked::after,
+.client-month-calendar__day.is-blocked::after {
+    content: none;
+}
 .client-month-calendar__day.is-empty {
     visibility: hidden;
 }
@@ -2957,7 +2961,7 @@ function PublicSite() {
     }
 
     function selectBookingDate(date: string) {
-        if (date < today || isClientBookingDateBlocked(date)) return;
+        if (date < today || isBookingDateUnavailable(date)) return;
 
         setSelectedDate(date);
         setWeekReferenceDate(date);
@@ -3084,6 +3088,12 @@ function PublicSite() {
             .map(minutesToTime);
     }
 
+    function isBookingDateUnavailable(date: string) {
+        if (isClientBookingDateBlocked(date)) return true;
+        if (!selectedServiceInformation) return false;
+        return getAvailableTimes(date, selectedServiceInformation.durationMinutes).length === 0;
+    }
+
     const availableTimes = useMemo(() => {
         if (!selectedServiceInformation || !selectedDate) return [];
 
@@ -3099,6 +3109,13 @@ function PublicSite() {
         selectedServiceInformation,
         editingClientAppointment,
     ]);
+
+    useEffect(() => {
+        if (selectedDate && selectedServiceInformation && availableTimes.length === 0) {
+            setSelectedDate("");
+            setSelectedTime("");
+        }
+    }, [availableTimes, selectedDate, selectedServiceInformation]);
 
     function formatSelectedDate() {
         if (!selectedDate) return "";
@@ -3899,7 +3916,7 @@ function PublicSite() {
                                                 }
 
                                                 const isPast = date < today;
-                                                const isBlocked = isClientBookingDateBlocked(date);
+                                                const isBlocked = isBookingDateUnavailable(date);
 
                                                 return (
                                                     <button
@@ -3935,7 +3952,7 @@ function PublicSite() {
                                             {row.dates.map((date) => {
                                                 const parsed = parseLocalDate(date);
                                                 const isPast = date < today;
-                                                const isBlocked = isClientBookingDateBlocked(date);
+                                                 const isBlocked = isBookingDateUnavailable(date);
 
                                                 return (
                                                     <button
