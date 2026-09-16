@@ -1,8 +1,7 @@
 import {supabase} from "./supabase";
+import {hasWebPushConfiguration, isWebPushSupported, vapidPublicKey, webPushConfigurationError} from "./pushConfig";
 
-export type ClientPushState = "loading" | "active" | "inactive";
-
-const vapidPublicKey = import.meta.env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
+export type ClientPushState = "loading" | "active" | "inactive" | "unsupported" | "configuration-error" | "blocked";
 
 export function isIOSDevice() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -13,7 +12,7 @@ export function isStandaloneDisplay() {
 }
 
 function supported() {
-    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    return isWebPushSupported();
 }
 
 function decodeKey(value: string) {
@@ -43,18 +42,21 @@ export async function isClientPushRegistered() {
 }
 
 export async function getClientPushState(): Promise<ClientPushState> {
-    if (!supported() || !vapidPublicKey) return "inactive";
+    if (!supported()) return "unsupported";
+    if (!hasWebPushConfiguration()) return "configuration-error";
+    if (Notification.permission === "denied") return "blocked";
     if (Notification.permission !== "granted") return "inactive";
     const subscription = await (await registration()).pushManager.getSubscription();
     return subscription ? "active" : "inactive";
 }
 
 export async function enableClientPush() {
-    if (!supported() || !vapidPublicKey) throw new Error("Este navegador não oferece suporte a notificações Web Push.");
+    if (!supported()) throw new Error("Este navegador não oferece suporte a notificações Web Push.");
+    if (!hasWebPushConfiguration()) throw new Error(webPushConfigurationError);
     if (await Notification.requestPermission() !== "granted") throw new Error("A permissão de notificações não foi concedida.");
     const reg = await registration();
     const current = await reg.pushManager.getSubscription();
-    const subscription = current ?? await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey)});
+    const subscription = current ?? await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey!)});
     try { await send("subscribe", subscription); } catch (error) { if (!current) await subscription.unsubscribe(); throw error; }
 }
 

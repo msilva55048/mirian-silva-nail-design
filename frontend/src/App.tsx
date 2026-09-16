@@ -1674,7 +1674,17 @@ function PublicSite() {
     useEffect(() => {
         if (!clientProfile) { setClientPushState("inactive"); return; }
         setClientPushState("loading");
-        void (async () => { try { const state = await getClientPushState(); setClientPushState(state === "active" && await isClientPushRegistered() ? "active" : "inactive"); } catch { setClientPushState("inactive"); } })();
+        void (async () => {
+            try {
+                const state = await getClientPushState();
+                setClientPushState(state === "active" && !(await isClientPushRegistered()) ? "inactive" : state);
+                setClientPushError(state === "configuration-error"
+                    ? "As notificações estão disponíveis, mas a configuração Web Push não está publicada."
+                    : state === "blocked" ? "A permissão de notificações está bloqueada nas configurações do navegador."
+                        : state === "unsupported" ? "Este navegador não oferece suporte a notificações Web Push."
+                            : "");
+            } catch { setClientPushState("inactive"); }
+        })();
     }, [clientProfile]);
 
     useEffect(() => {
@@ -3729,11 +3739,11 @@ function PublicSite() {
                                 className={`client-push-bell${clientPushState === "active" ? " is-enabled" : ""}${clientPushState === "loading" ? " is-loading" : ""}`}
                                 type="button"
                                 onClick={() => { if (clientPushState !== "loading") void toggleClientPush(); }}
-                                disabled={clientPushState === "loading"}
-                                aria-label={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : "Ativar lembretes de horário"}
-                                title={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : "Ativar lembretes de horário"}
+                                disabled={clientPushState === "loading" || clientPushState === "unsupported" || clientPushState === "configuration-error" || clientPushState === "blocked"}
+                                aria-label={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
+                                title={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
                             >
-                                {clientPushState === "loading" ? "…" : clientPushState === "active" ? "🔔" : "🔕"}
+                                {clientPushState === "loading" ? "…" : clientPushState === "active" || clientPushState === "inactive" ? "🔔" : "🔕"}
                             </button>
                           </div>
                         </div>
@@ -10328,7 +10338,14 @@ function AdminPanel() {
             return;
         }
 
-        void getAdminPushState().then(setAdminPushState).catch(() => setAdminPushState("disabled"));
+        void getAdminPushState().then((state) => {
+            setAdminPushState(state);
+            setAdminPushMessage(state === "configuration-error"
+                ? "Configuração Web Push indisponível."
+                : state === "blocked" ? "Permissão de notificações bloqueada no navegador."
+                    : state === "unsupported" ? "Este navegador não oferece suporte a Web Push."
+                        : "");
+        }).catch(() => setAdminPushState("disabled"));
 
         async function loadAdminData() {
             setIsLoading(true);
@@ -10428,7 +10445,7 @@ function AdminPanel() {
     }, [isAuthenticated]);
 
     async function toggleAdminPush() {
-        if (isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "blocked") return;
+        if (isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked") return;
         setIsUpdatingAdminPush(true);
         setAdminPushMessage("");
 
@@ -13525,12 +13542,12 @@ function AdminPanel() {
                             <button
                                 className={`admin-secondary-button admin-push-button${adminPushState === "enabled" ? " is-push-enabled" : ""}`}
                                 type="button"
-                                disabled={isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "blocked"}
+                                disabled={isUpdatingAdminPush || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked"}
                                 onClick={() => void toggleAdminPush()}
-                                aria-label={adminPushState === "enabled" ? "Notificações ativadas" : "Ativar notificações"}
-                                title={adminPushState === "enabled" ? "Notificações ativadas" : "Ativar notificações"}
+                                aria-label={adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
+                                title={adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
                             >
-                                {adminPushState === "blocked" || adminPushState === "unsupported" ? "🔕" : "🔔"}
+                                {adminPushState === "blocked" || adminPushState === "unsupported" || adminPushState === "configuration-error" ? "🔕" : "🔔"}
                             </button>
                             {adminPushMessage && <span className="admin-push-status" role="status">{adminPushMessage}</span>}
                         </div>

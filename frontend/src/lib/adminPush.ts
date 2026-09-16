@@ -1,18 +1,13 @@
 import {supabase} from "./supabase";
+import {hasWebPushConfiguration, isWebPushSupported, vapidPublicKey, webPushConfigurationError} from "./pushConfig";
 
-export type AdminPushState = "unsupported" | "disabled" | "enabled" | "blocked";
-
-const vapidPublicKey = import.meta.env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
+export type AdminPushState = "unsupported" | "configuration-error" | "disabled" | "enabled" | "blocked";
 
 function urlBase64ToUint8Array(value: string) {
     const padding = "=".repeat((4 - (value.length % 4)) % 4);
     const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
     const bytes = window.atob(base64);
     return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
-}
-
-function isPushSupported() {
-    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }
 
 async function getRegistration() {
@@ -29,7 +24,8 @@ async function sendSubscription(action: "subscribe" | "unsubscribe" | "status", 
 }
 
 export async function getAdminPushState(): Promise<AdminPushState> {
-    if (!isPushSupported() || !vapidPublicKey) return "unsupported";
+    if (!isWebPushSupported()) return "unsupported";
+    if (!hasWebPushConfiguration()) return "configuration-error";
     if (Notification.permission === "denied") return "blocked";
     if (Notification.permission !== "granted") return "disabled";
 
@@ -41,8 +37,11 @@ export async function getAdminPushState(): Promise<AdminPushState> {
 }
 
 export async function enableAdminPush() {
-    if (!isPushSupported() || !vapidPublicKey) {
+    if (!isWebPushSupported()) {
         throw new Error("Este navegador não oferece suporte a notificações Web Push.");
+    }
+    if (!hasWebPushConfiguration()) {
+        throw new Error(webPushConfigurationError);
     }
 
     const permission = await Notification.requestPermission();
@@ -54,7 +53,7 @@ export async function enableAdminPush() {
     const current = await registration.pushManager.getSubscription();
     const subscription = current ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey!),
     });
 
     try {
@@ -66,7 +65,7 @@ export async function enableAdminPush() {
 }
 
 export async function disableAdminPush() {
-    if (!isPushSupported()) return;
+    if (!isWebPushSupported()) return;
     const registration = await getRegistration();
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) return;
