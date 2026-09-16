@@ -8,6 +8,6 @@ export function getPublicBaseStartMinutes(date: string): number[] {
     if (!date || isPublicBookingDateClosed(date)) return [];
     const day = new Date(`${date}T12:00:00`).getDay();
     if (day === 0 || day === 6) return [7 * 60, 9 * 60, 11 * 60, 13 * 60];
-    if (date <= '2026-10-20') return [7 * 60, 19 * 60 + 30, 21 * 60];
+    if (date < '2026-10-02') return [7 * 60, 19 * 60 + 30, 21 * 60];
     return [7 * 60, 9 * 60, 11 * 60, 13 * 60, 17 * 60, 19 * 60];
 }
