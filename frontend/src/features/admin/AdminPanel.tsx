@@ -607,26 +607,6 @@ export default function AdminPanel() {
         setAppointmentEditError("");
     }
 
-    function openClientFromAppointment(appointment: AdminAppointment) {
-        const profileKey = appointment.client_id ? `profile:${appointment.client_id}` : null;
-        const appointmentPhone = normalizeClientPhone(appointment.client_phone);
-        const client = clients.find((item) =>
-            (profileKey && item.key === profileKey) ||
-            (!profileKey && appointmentPhone && normalizeClientPhone(item.phone) === appointmentPhone),
-        );
-
-        if (!client) {
-            setPanelError("Não foi possível localizar a cliente vinculada a este agendamento.");
-            return;
-        }
-
-        setPanelError("");
-        setSelectedAdminAppointment(null);
-        setClientSearch("");
-        openAdminDashboardView("clients");
-        openClientHistory(client);
-    }
-
     const editVisibleWeekDates = useMemo(
         () => getManualWeekDates(editWeekReferenceDate),
         [editWeekReferenceDate],
@@ -2912,8 +2892,7 @@ export default function AdminPanel() {
                     </div>
                 </div>
                 <div className="admin-booking-card__footer" onClick={(event) => event.stopPropagation()}>
-                    <button type="button" onClick={() => openClientFromAppointment(appointment)}>Ir para cliente</button>
-                    <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar agendamento</button>
+                    <button type="button" onClick={() => openAppointmentDetails(appointment)}>Editar detalhes</button>
                     <button type="button" onClick={() => void cancelAppointment(appointment)}>Cancelar</button>
                     {dueTypes.map((type) => {
                         const key = getNotificationKey(appointment.id, type);
@@ -4983,7 +4962,6 @@ export default function AdminPanel() {
                                     </div>
                                     {appointmentEditError && <p className="admin-reschedule__message admin-edit-form__full">{appointmentEditError}</p>}
                                     <div className="admin-edit-actions">
-                                        <button className="close" type="button" onClick={() => openClientFromAppointment(selectedAdminAppointment)}>Ir para cliente</button>
                                         <button className="save" type="button" disabled={isSavingAppointment} onClick={() => void saveAppointmentChanges()}>{isSavingAppointment ? "Salvando..." : "Salvar alterações"}</button>
                                         <button className="cancel" type="button" onClick={() => void cancelAppointment(selectedAdminAppointment)}>Cancelar agendamento</button>
                                         <button className="close" type="button" onClick={() => setSelectedAdminAppointment(null)}>Fechar</button>
