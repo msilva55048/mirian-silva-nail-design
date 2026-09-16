@@ -12447,8 +12447,12 @@ function AdminPanel() {
                     appointment.status === "completed" ||
                     getAppointmentDateTime(appointment).getTime() <= adminNow.getTime(),
             })),
+            adminServices.map((service) => ({
+                name: service.name,
+                durationMinutes: service.duration_minutes,
+            })),
         );
-    }, [completedFinanceAppointments, scheduledFinanceAppointments, adminNow]);
+    }, [completedFinanceAppointments, scheduledFinanceAppointments, adminNow, adminServices]);
 
     function getNotificationKey(appointmentId: string, type: WhatsAppNotificationType) {
         return `${appointmentId}:${type}`;
