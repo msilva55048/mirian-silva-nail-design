@@ -13502,13 +13502,6 @@ function AdminPanel() {
                                 Editar agendamento
                             </button>
 
-                            <button
-                                type="button"
-                                onClick={() => void cancelAppointment(appointment)}
-                            >
-                                Cancelar
-                            </button>
-
                             {dueTypes.map((type) => {
                                 return (
                                     <div key={type}><a
