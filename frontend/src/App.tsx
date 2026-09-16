@@ -1,6 +1,7 @@
 import {getClientBookingStartContext, canServiceUseClientStart, getAgendaDurationMinutes} from "./shared/dynamicSchedule";
 import {getPublicBaseStartMinutes} from "./shared/publicSchedule";
 import {isClientBookingDateBlocked} from "./features/public/bookingDateRules";
+import {getAvailableClientStarts} from "./features/public/clientAvailability";
 import {SelectedClientCard} from "./features/admin/SelectedClientCard";
 import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
@@ -3030,37 +3031,6 @@ function PublicSite() {
         [weekReferenceDate],
     );
 
-    function getOccupiedIntervals(date: string) {
-        const appointmentIntervals = appointments
-            .filter(
-                (appointment) =>
-                    appointment.date === date &&
-                    appointment.id !== editingClientAppointment?.id &&
-                    appointment.status !== "cancelled" &&
-                    appointment.status !== "no-show",
-            )
-            .map((appointment) => {
-                const start = timeToMinutes(appointment.startTime);
-                const agendaDuration = getAgendaDurationMinutes(
-                    appointment.durationMinutes,
-                );
-
-                return {
-                    start,
-                    end: start + agendaDuration,
-                };
-            });
-
-        const blockedIntervals = scheduleBlocks
-            .filter((block) => block.date === date)
-            .map((block) => ({
-                start: timeToMinutes(block.startTime),
-                end: timeToMinutes(block.endTime),
-            }));
-
-        return mergeIntervals([...appointmentIntervals, ...blockedIntervals]);
-    }
-
     function isPastTime(date: string, startMinutes: number) {
         if (date !== today) return false;
 
@@ -3071,30 +3041,16 @@ function PublicSite() {
 
     function getAvailableTimes(date: string, serviceDurationMinutes: number) {
         if (!date || isClientBookingDateBlocked(date)) return [];
-
-        const occupiedIntervals = getOccupiedIntervals(date);
-        const startContext = getClientBookingStartContext(
+        return getAvailableClientStarts(
             date,
+            serviceDurationMinutes,
             appointments,
+            scheduleBlocks,
             scheduleTimeOverrides,
+            selectedServiceInformation?.name,
             editingClientAppointment?.id,
-        );
-        const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
-
-        return startContext.allStarts
-            .filter((start) => {
-                if (!canServiceUseClientStart(start, serviceDurationMinutes, startContext)) {
-                    return false;
-                }
-
-                const end = start + agendaDuration;
-
-                const hasConflict = occupiedIntervals.some((interval) =>
-                    intervalsOverlap(start, end, interval.start, interval.end),
-                );
-
-                return !hasConflict && !isPastTime(date, start);
-            })
+        )
+            .filter((start) => !isPastTime(date, start))
             .map(minutesToTime);
     }
 
@@ -3113,6 +3069,59 @@ function PublicSite() {
         selectedServiceInformation,
         editingClientAppointment,
     ]);
+
+    useEffect(() => {
+        if (!selectedDate) return;
+        let disposed = false;
+
+        async function refreshSelectedDateAvailability() {
+            const [
+                {data: appointmentData, error: appointmentError},
+                {data: blockData, error: blockError},
+                {data: overrideData, error: overrideError},
+            ] = await Promise.all([
+                supabase.from("occupied_appointments").select("id, appointment_date, start_time, duration_minutes, status").eq("appointment_date", selectedDate).neq("status", "cancelled"),
+                supabase.from("client_schedule_blocks").select("id, block_date, start_time, end_time").eq("block_date", selectedDate),
+                supabase.from("schedule_time_overrides").select("id, override_date, start_time, is_available, created_at, updated_at").eq("override_date", selectedDate),
+            ]);
+
+            if (disposed || appointmentError || blockError || overrideError) return;
+
+            const refreshedAppointments = (appointmentData ?? []).map((appointment) => ({
+                id: appointment.id,
+                clientName: "",
+                clientPhone: "",
+                clientEmail: "",
+                serviceName: "",
+                date: appointment.appointment_date,
+                startTime: String(appointment.start_time).slice(0, 5),
+                durationMinutes: appointment.duration_minutes,
+                status: appointment.status as Appointment["status"],
+            }));
+            const refreshedBlocks = (blockData ?? []).map((block) => ({
+                id: block.id,
+                date: block.block_date,
+                startTime: String(block.start_time).slice(0, 5),
+                endTime: String(block.end_time).slice(0, 5),
+                reason: "",
+            }));
+            const refreshedOverrides = (overrideData ?? []).map((item) => ({
+                id: item.id,
+                override_date: item.override_date,
+                start_time: String(item.start_time).slice(0, 5),
+                is_available: Boolean(item.is_available),
+                created_at: item.created_at,
+                updated_at: item.updated_at,
+            }));
+
+            setAppointments((current) => [...current.filter((item) => item.date !== selectedDate), ...refreshedAppointments]);
+            setScheduleBlocks((current) => [...current.filter((item) => item.date !== selectedDate), ...refreshedBlocks]);
+            setScheduleTimeOverrides((current) => [...current.filter((item) => item.override_date !== selectedDate), ...refreshedOverrides]);
+        }
+
+        void refreshSelectedDateAvailability();
+        return () => { disposed = true; };
+    }, [selectedDate]);
 
     function formatSelectedDate() {
         if (!selectedDate) return "";
