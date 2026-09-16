@@ -12,6 +12,7 @@ import {ServicePicker} from "./features/shared/ServicePicker";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
+import {findClientKeyForAppointment} from "./features/admin/clientNavigation";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -13239,6 +13240,22 @@ function AdminPanel() {
         }, 40);
     }
 
+    function goToClientFromAppointment(appointment: AdminAppointment) {
+        const clientKey = findClientKeyForAppointment(appointment, clients);
+        if (!clientKey) {
+            setPanelError("Não foi possível localizar o cadastro desta cliente.");
+            return;
+        }
+
+        setAppointmentSearch("");
+        setClientSearch("");
+        setClientAppointmentFilter("all");
+        setSelectedClient(null);
+        setEditingClient(null);
+        setAdminView("clients");
+        setExpandedClientCardKey(clientKey);
+    }
+
     function openNewAppointmentFromAvailableTime(time: string) {
         setManualDate(agendaDate);
         setManualWeekReferenceDate(agendaDate);
@@ -13509,6 +13526,13 @@ function AdminPanel() {
                                 onClick={() => openAppointmentDetails(appointment)}
                             >
                                 Editar agendamento
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => goToClientFromAppointment(appointment)}
+                            >
+                                Ir para cliente
                             </button>
 
                             {dueTypes.map((type) => {
