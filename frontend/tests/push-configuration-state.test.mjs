@@ -55,6 +55,8 @@ test("ADM aguarda Service Worker ativo e confirma o escopo no backend após ativ
     assert.match(admin, /getRegistration\(\)/);
     assert.match(admin, /await isAdminSubscriptionRegistered\(subscription\)/);
     assert.match(admin, /backend ainda reconhece as notificações ADM como ativas/);
+    assert.match(admin, /HTTP \$\{context\.status\}/);
+    assert.match(admin, /URL redigida/);
 });
 
 test("status ADMIN consulta o escopo do usuário autenticado pela subscription física", () => {

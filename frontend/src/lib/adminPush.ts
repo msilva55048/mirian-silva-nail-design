@@ -30,7 +30,22 @@ async function sendSubscription(action: "subscribe" | "unsubscribe" | "status", 
         body: {action, subscription: subscription.toJSON()},
     });
 
-    if (error) throw error;
+    if (error) {
+        const context = (error as {context?: unknown}).context;
+        if (context instanceof Response) {
+            const payload = await context.clone().json().catch(() => null) as {error?: unknown; message?: unknown} | null;
+            const message = typeof payload?.error === "string"
+                ? payload.error
+                : typeof payload?.message === "string" ? payload.message : "";
+            const safeMessage = message
+                .replace(/[\r\n\t]+/g, " ")
+                .replace(/Bearer\s+\S+/gi, "Bearer [redigido]")
+                .replace(/https?:\/\/\S+/gi, "[URL redigida]")
+                .slice(0, 180);
+            throw new Error(`Falha ao consultar o backend Web Push (HTTP ${context.status})${safeMessage ? `: ${safeMessage}` : "."}`);
+        }
+        throw error;
+    }
     return data;
 }
 

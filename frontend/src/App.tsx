@@ -10347,10 +10347,12 @@ function AdminPanel() {
                 : state === "blocked" ? "Permissão de notificações bloqueada no navegador."
                     : state === "unsupported" ? "Este navegador não oferece suporte a Web Push."
                         : "");
-        }).catch(() => {
+        }).catch((error: unknown) => {
             if (!isPushStateCurrent) return;
             setAdminPushState("error");
-            setAdminPushMessage("Não foi possível confirmar o estado no backend. Toque no sino para tentar novamente.");
+            setAdminPushMessage(error instanceof Error
+                ? `${error.message} Toque no sino para tentar novamente.`
+                : "Não foi possível confirmar o estado no backend. Toque no sino para tentar novamente.");
         });
 
         async function loadAdminData() {
@@ -10482,7 +10484,7 @@ function AdminPanel() {
             const state = await getAdminPushState().catch((): AdminPushState => "error");
             setAdminPushState(state);
             setAdminPushMessage(state === "error"
-                ? "Não foi possível confirmar o estado no backend. Tente novamente."
+                ? error instanceof Error ? error.message : "Não foi possível confirmar o estado no backend. Tente novamente."
                 : error instanceof Error ? error.message : "Não foi possível configurar as notificações.");
         } finally {
             setIsUpdatingAdminPush(false);
