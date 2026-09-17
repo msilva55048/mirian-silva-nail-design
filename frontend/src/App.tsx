@@ -5803,6 +5803,7 @@ const adminStyles = `
 .admin-client-card__next {
     margin-bottom: 12px;
     background: #f3e4e9;
+    cursor: pointer;
 }
 
 .admin-client-card__actions {
@@ -10175,6 +10176,7 @@ function AdminPanel() {
 
     const [selectedAdminAppointment, setSelectedAdminAppointment] = useState<AdminAppointment | null>(null);
     const [expandedAppointmentCardId, setExpandedAppointmentCardId] = useState<string | null>(null);
+    const [pendingAppointmentNavigationId, setPendingAppointmentNavigationId] = useState<string | null>(null);
     const [appointmentSearch, setAppointmentSearch] = useState("");
     const [expandedClientCardKey, setExpandedClientCardKey] = useState<string | null>(null);
     const [updatingPaymentAppointmentIds, setUpdatingPaymentAppointmentIds] = useState<string[]>([]);
@@ -12392,6 +12394,21 @@ function AdminPanel() {
                 )
                 .sort((a, b) => `${a.appointment_date}${String(a.start_time).slice(0, 5)}`.localeCompare(`${b.appointment_date}${String(b.start_time).slice(0, 5)}`)),
         [appointments, weekDates, adminNow]);
+
+    useEffect(() => {
+        if (adminView !== "agenda" || !pendingAppointmentNavigationId) return;
+        const targetAppointment = filteredAgendaAppointments.find(
+            (appointment) => appointment.id === pendingAppointmentNavigationId,
+        );
+        if (!targetAppointment) return;
+        setExpandedAppointmentCardId(targetAppointment.id);
+        const frame = window.requestAnimationFrame(() => {
+            document.getElementById(`admin-appointment-card-${targetAppointment.id}`)
+                ?.scrollIntoView({behavior: "smooth", block: "center"});
+            setPendingAppointmentNavigationId(null);
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [adminView, filteredAgendaAppointments, pendingAppointmentNavigationId]);
 
     function addMonthsToAgendaMonth(monthValue: string, amount: number) {
         const [year, month] = monthValue.split("-").map(Number);
@@ -14938,7 +14955,28 @@ function AdminPanel() {
                                                 </div>
 
                                                 {client.nextAppointment && (
-                                                    <div className="admin-client-card__next">
+                                                    <div
+                                                        className="admin-client-card__next"
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        aria-label={`Abrir agendamento de ${client.name} em ${formatAdminDate(client.nextAppointment.appointment_date)} às ${String(client.nextAppointment.start_time).slice(0, 5)}`}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            setAppointmentSearch("");
+                                                            setAgendaDate(client.nextAppointment!.appointment_date);
+                                                            setPendingAppointmentNavigationId(client.nextAppointment!.id);
+                                                            setAdminView("agenda");
+                                                        }}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key !== "Enter" && event.key !== " ") return;
+                                                            event.preventDefault();
+                                                            event.stopPropagation();
+                                                            setAppointmentSearch("");
+                                                            setAgendaDate(client.nextAppointment!.appointment_date);
+                                                            setPendingAppointmentNavigationId(client.nextAppointment!.id);
+                                                            setAdminView("agenda");
+                                                        }}
+                                                    >
                                                         <span>Próximo</span>
                                                         <strong>
                                                             {formatAdminDate(
@@ -16102,7 +16140,8 @@ function AdminPanel() {
 
                                         return (
                                             <article
-                                                key={appointment.id}
+                key={appointment.id}
+                id={`admin-appointment-card-${appointment.id}`}
                                                 className={[
                                                     canClearCancelled
                                                         ? "is-cancelled-cleanable"
