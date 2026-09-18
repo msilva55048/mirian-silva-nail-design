@@ -15,6 +15,7 @@ import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
 import {findClientKeyForAppointment} from "./features/admin/clientNavigation";
 import {normalizeBrazilianWhatsAppNumber} from "./shared/whatsapp";
 import {formatClientAppointmentDate} from "./shared/clientDate";
+import {formatClientUpcomingDate, getNextClientAppointment} from "./shared/clientNextAppointment";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -1772,6 +1773,10 @@ function PublicSite() {
     const reminderAppointment = reminderAppointmentId
         ? clientAppointments.find((appointment) => appointment.id === reminderAppointmentId) ?? null
         : null;
+    const nextClientAppointment = useMemo(
+        () => getNextClientAppointment(clientAppointments),
+        [clientAppointments],
+    );
     const shouldShowReminderModal = mockReminder || Boolean(
         reminderAppointmentId && clientUserId && clientProfile && reminderAppointment,
     );
@@ -3714,6 +3719,22 @@ function PublicSite() {
                 .client-logged-page .services {
                     padding-top: 4px;
                 }
+                .client-next-appointment {
+                    width: min(1160px, calc(100% - 32px));
+                    margin: 0 auto 18px;
+                    padding: 13px 16px;
+                    border: 1px solid #cdb57a;
+                    border-radius: 14px;
+                    background: #fffdf8;
+                    color: #5f3c47;
+                    text-align: center;
+                    box-sizing: border-box;
+                }
+                .client-next-appointment p { margin: 0 0 8px; font-size: .86rem; line-height: 1.45; }
+                .client-next-appointment > strong { display: block; font-size: .95rem; }
+                .client-next-appointment__status { display: block; margin: 9px auto 0; padding: 6px 10px; border-radius: 999px; font-size: .78rem; font-weight: 800; }
+                .client-next-appointment__status.is-scheduled { background: #fff5d9; color: #8a6500; }
+                .client-next-appointment__status.is-confirmed { background: #e7f7eb; color: #397348; }
                 .client-logged-page .services__grid {
                     gap: 18px;
                 }
@@ -3787,6 +3808,24 @@ function PublicSite() {
                     {clientOpportunityError && !clientOpportunityLoading && opportunityDeepLinkId && (
                         <p className="client-auth-message is-error">{clientOpportunityError}</p>
                     )}
+
+                    <section className="client-next-appointment" aria-live="polite">
+                        {nextClientAppointment ? (
+                            <>
+                                <p>
+                                    {nextClientAppointment.confirmation_sent_at
+                                        ? `Olá, ${clientProfile.full_name}. Seu próximo agendamento está confirmado para:`
+                                        : `Olá, ${clientProfile.full_name}. Seu próximo agendamento está marcado para:`}
+                                </p>
+                                <strong>{formatClientUpcomingDate(nextClientAppointment.appointment_date, nextClientAppointment.start_time)}</strong>
+                                <span className={`client-next-appointment__status ${nextClientAppointment.confirmation_sent_at ? "is-confirmed" : "is-scheduled"}`}>
+                                    {nextClientAppointment.confirmation_sent_at ? "Confirmado" : "Agendado"}
+                                </span>
+                            </>
+                        ) : (
+                            <p>Olá, {clientProfile.full_name}. Você está sem agendamento marcado para realizar sua manutenção. Se tiver qualquer dúvida, pode entrar em contato comigo.</p>
+                        )}
+                    </section>
 
                     <section className="services" id="servicos">
                         <div className="services__grid">
