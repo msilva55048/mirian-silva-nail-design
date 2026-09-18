@@ -3887,7 +3887,7 @@ function PublicSite() {
                         <p className="client-auth-message is-error">{clientOpportunityError}</p>
                     )}
 
-                    <section className="client-next-appointment" aria-live="polite">
+                    {nextClientAppointment && <section className="client-next-appointment" aria-live="polite">
                         {nextClientAppointment ? (
                             <>
                                 <p>
@@ -3900,10 +3900,8 @@ function PublicSite() {
                                     {nextClientAppointment.confirmation_sent_at ? "Confirmado" : "Agendado"}
                                 </span>
                             </>
-                        ) : (
-                            <p>Olá, {clientProfile.full_name}. Você está sem agendamento marcado para realizar sua manutenção. Se tiver qualquer dúvida, pode entrar em contato comigo.</p>
-                        )}
-                    </section>
+                        ) : null}
+                    </section>}
 
                     <section className="services" id="servicos">
                         <div className="services__grid">
