@@ -1428,6 +1428,18 @@ a {
   border: 1px solid var(--color-gold-border) !important;
 }
 
+/* Central de notificações da Cliente: somente acabamento visual dourado. */
+.client-modal.client-notifications-modal {
+  border: 1px solid var(--color-gold-border) !important;
+}
+
+.client-modal.client-notifications-modal .client-notification-push-control,
+.client-modal.client-notifications-modal .client-notification-item,
+.client-modal.client-notifications-modal .client-account__empty {
+  border: 1px solid var(--color-gold-border) !important;
+  border-color: var(--color-gold-border) !important;
+}
+
 .client-modal.client-modal--account .client-account__profile > div {
   border: 1px solid var(--color-gold-border) !important;
   border-radius: 14px !important;
