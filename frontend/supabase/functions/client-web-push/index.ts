@@ -71,6 +71,33 @@ async function dispatchMaintenance(h: Record<string, string>) {
     }
     return json({ok: true, created: (reminders || []).length, sent}, 200, h);
 }
+async function dispatchNotificationPushes(h: Record<string, string>) {
+    const {data: rows, error} = await admin.from("client_notification_push_dispatches").select("id, notification_id, subscription_id, client_id, attempts, client_notifications(title, message, type, entity_id, data), client_push_subscriptions(endpoint, p256dh, auth_key)").eq("status", "pending").order("created_at", {ascending: true}).limit(100);
+    if (error) return json({error: error.message}, 500, h);
+    let sent = 0;
+    for (const row of (rows || [])) {
+        const notification = row.client_notifications as {title?: string; message?: string; type?: string; entity_id?: string; data?: Record<string, unknown>} | null;
+        const sub = row.client_push_subscriptions as {endpoint?: string; p256dh?: string; auth_key?: string} | null;
+        if (!notification || !sub?.endpoint || !sub.p256dh || !sub.auth_key) continue;
+        const claimed = await admin.from("client_notification_push_dispatches").update({status: "processing", attempts: (row.attempts || 0) + 1}).eq("id", row.id).eq("status", "pending").select("id").maybeSingle();
+        if (!claimed.data) continue;
+        const type = notification.type || "notification";
+        const data = notification.data || {};
+        const url = type === "maintenance_booking_reminder" ? "/client" : type === "waitlist-opportunity" ? `/client?opportunity=${encodeURIComponent(String(data.opportunity_id || notification.entity_id || ""))}` : type.startsWith("referral-") ? "/client?section=referral" : `/client?section=appointments${notification.entity_id ? `&appointment_id=${encodeURIComponent(notification.entity_id)}` : ""}`;
+        const payload = JSON.stringify({title: notification.title, body: notification.message, type, client_notification_id: row.notification_id, entity_id: notification.entity_id || null, url});
+        try {
+            await webpush.sendNotification({endpoint: sub.endpoint, keys: {p256dh: sub.p256dh, auth: sub.auth_key}}, payload, {TTL: 86400, urgency: "normal"});
+            await admin.from("client_notification_push_dispatches").update({status: "sent", sent_at: new Date().toISOString(), last_error: null}).eq("id", row.id).eq("status", "processing");
+            await admin.from("client_push_subscriptions").update({last_success_at: new Date().toISOString()}).eq("id", row.subscription_id);
+            sent++;
+        } catch (e) {
+            const code = Number((e as {statusCode?: number}).statusCode || 0);
+            if (code === 404 || code === 410) await admin.from("client_push_subscriptions").delete().eq("id", row.subscription_id);
+            await admin.from("client_notification_push_dispatches").update({status: "failed", last_error: code ? `push_status_${code}` : "push_failed"}).eq("id", row.id).eq("status", "processing");
+        }
+    }
+    return json({ok: true, sent, attempted: (rows || []).length}, 200, h);
+}
 async function mock(body: Record<string, unknown>, h: Record<string, string>) {
     const clientId = typeof body.client_id === "string" ? body.client_id : "";
     if (!clientId) return json({error: "Cliente ausente."}, 400, h);
@@ -84,6 +111,6 @@ Deno.serve(async (req) => {
     const h = headers(req.headers.get("Origin")); if (req.method === "OPTIONS") return new Response("ok", {headers: h});
     if (req.method !== "POST") return json({error: "Método não permitido."}, 405, h);
     let body: Record<string, unknown>; try { body = await req.json(); } catch { return json({error: "JSON inválido."}, 400, h); }
-    if (body.action === "dispatch" || body.action === "maintenance-dispatch" || body.action === "mock") { if (!schedulerSecret || req.headers.get("x-client-push-secret") !== schedulerSecret) return json({error: "Não autorizado."}, 403, h); if (body.action === "mock") return mock(body, h); return body.action === "maintenance-dispatch" ? dispatchMaintenance(h) : dispatch(h); }
+    if (body.action === "dispatch" || body.action === "maintenance-dispatch" || body.action === "notification-dispatch" || body.action === "mock") { if (!schedulerSecret || req.headers.get("x-client-push-secret") !== schedulerSecret) return json({error: "Não autorizado."}, 403, h); if (body.action === "mock") return mock(body, h); if (body.action === "maintenance-dispatch") return dispatchMaintenance(h); if (body.action === "notification-dispatch") return dispatchNotificationPushes(h); return dispatch(h); }
     return manage(req, body, h);
 });
