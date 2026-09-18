@@ -1,7 +1,7 @@
 import {supabase} from "./supabase";
 import {hasWebPushConfiguration, isWebPushSupported, vapidPublicKey, webPushConfigurationError} from "./pushConfig";
 
-export type ClientPushState = "loading" | "active" | "inactive" | "unsupported" | "configuration-error" | "blocked";
+export type ClientPushState = "loading" | "active" | "inactive" | "unsupported" | "ios-home-screen" | "configuration-error" | "blocked";
 
 export function isIOSDevice() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -42,6 +42,7 @@ export async function isClientPushRegistered() {
 }
 
 export async function getClientPushState(): Promise<ClientPushState> {
+    if (isIOSDevice() && !isStandaloneDisplay()) return "ios-home-screen";
     if (!supported()) return "unsupported";
     if (!hasWebPushConfiguration()) return "configuration-error";
     if (Notification.permission === "denied") return "blocked";
@@ -51,6 +52,9 @@ export async function getClientPushState(): Promise<ClientPushState> {
 }
 
 export async function enableClientPush() {
+    if (isIOSDevice() && !isStandaloneDisplay()) {
+        throw new Error("Para receber notificações no iPhone, adicione este site à Tela de Início e abra pelo ícone criado.");
+    }
     if (!supported()) throw new Error("Este navegador não oferece suporte a notificações Web Push.");
     if (!hasWebPushConfiguration()) throw new Error(webPushConfigurationError);
     if (await Notification.requestPermission() !== "granted") throw new Error("A permissão de notificações não foi concedida.");

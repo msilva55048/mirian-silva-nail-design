@@ -1684,6 +1684,7 @@ function PublicSite() {
                 setClientPushState(state === "active" && !(await isClientPushRegistered()) ? "inactive" : state);
                 setClientPushError(state === "configuration-error"
                     ? "As notificações estão disponíveis, mas a configuração Web Push não está publicada."
+                    : state === "ios-home-screen" ? "Para receber notificações no iPhone, adicione este site à Tela de Início e abra pelo ícone criado."
                     : state === "blocked" ? "A permissão de notificações está bloqueada nas configurações do navegador."
                         : state === "unsupported" ? "Este navegador não oferece suporte a notificações Web Push."
                             : "");
@@ -3752,8 +3753,8 @@ function PublicSite() {
                                 type="button"
                                 onClick={() => { if (clientPushState !== "loading") void toggleClientPush(); }}
                                 disabled={clientPushState === "loading" || clientPushState === "unsupported" || clientPushState === "configuration-error" || clientPushState === "blocked"}
-                                aria-label={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
-                                title={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
+                                aria-label={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "ios-home-screen" ? "Adicionar à Tela de Início para ativar notificações" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
+                                title={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "ios-home-screen" ? "Adicionar à Tela de Início para ativar notificações" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
                             >
                                 {clientPushState === "loading" ? "…" : clientPushState === "active" || clientPushState === "inactive" ? "🔔" : "🔕"}
                             </button>
