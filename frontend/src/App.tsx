@@ -14,6 +14,7 @@ import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
 import {findClientKeyForAppointment} from "./features/admin/clientNavigation";
 import {normalizeBrazilianWhatsAppNumber} from "./shared/whatsapp";
+import {formatClientAppointmentDate} from "./shared/clientDate";
 import {
     disableAdminPush,
     enableAdminPush,
@@ -4675,7 +4676,7 @@ function PublicSite() {
                                                     <div>
                                                         <strong>{appointment.service_name}</strong>
                                                         <span>
-                                                            {new Date(`${appointment.appointment_date}T12:00:00`).toLocaleDateString("pt-BR")}
+                                                            {formatClientAppointmentDate(appointment.appointment_date)}
                                                             {" às "}
                                                             {String(appointment.start_time).slice(0, 5)}
                                                         </span>
