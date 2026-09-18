@@ -193,8 +193,9 @@ export function getConfiguredClientStartMinutes(
     if (!date || isPublicBookingDateClosed(date)) return [] as number[];
 
     const baseStarts = getFixedClientStartMinutes(date);
+    const lastPublicStart = isWeekendDate(date) ? 13 * 60 : 19 * 60;
     const dateOverrides = overrides.filter(
-        (item) => item.override_date === date,
+        (item) => item.override_date === date && timeToMinutes(String(item.start_time).slice(0, 5)) <= lastPublicStart,
     );
 
     const removedStarts = new Set(

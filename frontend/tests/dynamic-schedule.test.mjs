@@ -42,9 +42,16 @@ test('effective overrides change classification and the next boundary', () => {
     assert.equal(allows(510,150,context(date,appointments,[{override_date:date,start_time:'09:00',is_available:false}])),true);
 });
 
-test('repair occupation and final slot exception remain unchanged', () => {
+test('repair occupation remains unchanged and no dynamic starts follow the final public anchor', () => {
     assert.ok(context(date,[appointment('09:00',20,'Reparo de Unha (Unitário)')]).generatedStarts.includes(570));
-    assert.deepEqual(context(date,[appointment('19:00',90),appointment('20:30',30)]).generatedStarts,[1230]);
-    assert.equal(allows(1230,30,context(date,[appointment('19:00',90)])),true);
-    assert.equal(allows(1230,60,context(date,[appointment('19:00',90)])),false);
+    assert.deepEqual(context(date,[appointment('19:00',90),appointment('20:30',30)]).generatedStarts,[]);
+    assert.equal(allows(1230,30,context(date,[appointment('19:00',90)])),false);
+});
+
+test('sábado encerra os inícios públicos em 13:00', () => {
+    const saturday = '2026-10-31';
+    const c = context(saturday, [{...appointment('07:00', 90), date: saturday}]);
+    assert.deepEqual(c.generatedStarts, [510]);
+    assert.equal(c.allStarts.includes(810), false);
+    assert.equal(c.allStarts.includes(840), false);
 });

@@ -12,8 +12,8 @@ test('horários configurados viram fonte única no admin e na cliente', () => {
     const client = getConfiguredClientStartMinutes(date, overrides);
     assert.ok(admin.includes(1200));
     assert.ok(admin.includes(1230));
-    assert.ok(client.includes(1200));
-    assert.ok(client.includes(1230));
+    assert.ok(!client.includes(1200));
+    assert.ok(!client.includes(1230));
 });
 
 test('remoção explícita suprime horário-base e adicionado', () => {
@@ -28,5 +28,5 @@ test('cliente mantém horário configurado mesmo após o limite de encaixes gera
     const context = getClientBookingStartContext(date, [], overrides);
     assert.deepEqual(context.generatedStarts, []);
     assert.ok(!canServiceUseClientStart(1200, 120, context));
-    assert.ok(canServiceUseClientStart(1230, 30, context));
+    assert.ok(!canServiceUseClientStart(1230, 30, context));
 });
