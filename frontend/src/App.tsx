@@ -561,6 +561,18 @@ type ReferralSummary = {
     discounted_price_cents: number | null;
 };
 
+type ClientNotification = {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    data: Record<string, unknown>;
+    entity_type: string | null;
+    entity_id: string | null;
+    created_at: string;
+    read_at: string | null;
+};
+
 type SharedWaitlistRequest = {
     id: string;
     client_id: string;
@@ -1648,6 +1660,9 @@ function PublicSite() {
     const [clientPushState, setClientPushState] = useState<ClientPushState>("loading");
     const [clientPushError, setClientPushError] = useState("");
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
+    const [showClientNotifications, setShowClientNotifications] = useState(false);
+    const [clientNotifications, setClientNotifications] = useState<ClientNotification[]>([]);
+    const unreadClientNotificationCount = clientNotifications.filter((item) => !item.read_at).length;
     const [clientOpportunity, setClientOpportunity] = useState<ClientWaitlistOpportunity | null>(null);
     const [clientOpportunityLoading, setClientOpportunityLoading] = useState(false);
     const [clientOpportunityClaiming, setClientOpportunityClaiming] = useState(false);
@@ -1692,6 +1707,47 @@ function PublicSite() {
             } catch { setClientPushState("inactive"); }
         })();
     }, [clientProfile]);
+
+    useEffect(() => {
+        if (!clientProfile) {
+            setClientNotifications([]);
+            return;
+        }
+        let active = true;
+        const load = async () => {
+            const {data, error} = await supabase
+                .from("client_notifications")
+                .select("id, type, title, message, data, entity_type, entity_id, created_at, read_at")
+                .order("created_at", {ascending: false})
+                .limit(20);
+            if (active && !error) setClientNotifications((data ?? []) as ClientNotification[]);
+        };
+        void load();
+        const channel = supabase.channel(`client-notifications-${clientProfile.id}`)
+            .on("postgres_changes", {event: "*", schema: "public", table: "client_notifications", filter: `client_id=eq.${clientProfile.id}`}, () => void load())
+            .subscribe();
+        return () => { active = false; void supabase.removeChannel(channel); };
+    }, [clientProfile]);
+
+    async function markClientNotificationRead(notification: ClientNotification) {
+        if (notification.read_at) return;
+        await supabase.rpc("mark_client_notification_read", {p_notification_id: notification.id});
+        setClientNotifications((current) => current.map((item) => item.id === notification.id ? {...item, read_at: new Date().toISOString()} : item));
+    }
+
+    async function markAllClientNotificationsRead() {
+        await supabase.rpc("mark_all_client_notifications_read");
+        setClientNotifications((current) => current.map((item) => item.read_at ? item : {...item, read_at: new Date().toISOString()}));
+    }
+
+    function openClientNotification(notification: ClientNotification) {
+        void markClientNotificationRead(notification);
+        if (notification.type.startsWith("appointment-")) setClientAccountSection("appointments");
+        else if (notification.type.startsWith("referral-")) setClientAccountSection("referral");
+        else if (notification.type === "waitlist-opportunity") setClientAccountSection("waitlist");
+        setShowClientNotifications(false);
+        setShowClientAccount(true);
+    }
 
     useEffect(() => {
         const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
@@ -3705,6 +3761,7 @@ function PublicSite() {
                     gap: 9px;
                 }
                 .client-push-bell {
+                    position: relative;
                     flex: 0 0 auto !important;
                     width: 48px !important;
                     padding: 10px !important;
@@ -3716,6 +3773,18 @@ function PublicSite() {
                 .client-push-bell.is-enabled { background: #f0faf2 !important; border-color: #9bcaa3 !important; color: #397348; }
                 .client-push-bell.is-loading { background: #faf7f8 !important; border-color: #ead9df !important; color: #a58d96; cursor: wait; opacity: .8; }
                 .client-push-hint { margin: 6px 0 0; color: #8a7078; font-size: .75rem; text-align: right; }
+                .client-notification-badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: #b94b70; color: #fff; font-size: .68rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+                .client-notifications-modal { max-height: min(78vh, 680px); overflow: hidden; }
+                .client-notifications-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+                .client-notifications-modal__header button { border: 0; background: transparent; color: #a54870; font: inherit; font-size: .78rem; cursor: pointer; }
+                .client-notifications-list { display: grid; gap: 8px; max-height: 58vh; overflow: auto; margin-top: 14px; }
+                .client-notification-item { display: grid; gap: 4px; width: 100%; text-align: left; border: 1px solid #ead9df; border-radius: 12px; padding: 12px; background: #fff; color: #382d31; font: inherit; cursor: pointer; }
+                .client-notification-item.is-unread { background: #fff8fa; border-color: #cdb57a; }
+                .client-notification-item strong { font-size: .92rem; }
+                .client-notification-item p, .client-notification-item small { margin: 0; color: #806c74; }
+                .client-notification-item small { font-size: .72rem; }
+                .client-push-settings { display: grid; gap: 5px; border-top: 1px solid #ead9df; padding-top: 12px; }
+                .client-push-settings button { justify-self: start; border: 0; border-radius: 999px; padding: 7px 12px; background: #c95891; color: #fff; font: inherit; cursor: pointer; }
                 .client-logged-page .services {
                     padding-top: 4px;
                 }
@@ -3770,14 +3839,13 @@ function PublicSite() {
 
                           <div className="client-logged-header__actions">
                             <button
-                                className={`client-push-bell${clientPushState === "active" ? " is-enabled" : ""}${clientPushState === "loading" ? " is-loading" : ""}`}
+                                className="client-push-bell"
                                 type="button"
-                                onClick={() => { if (clientPushState !== "loading") void toggleClientPush(); }}
-                                disabled={clientPushState === "loading" || clientPushState === "unsupported" || clientPushState === "configuration-error" || clientPushState === "blocked"}
-                                aria-label={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "ios-home-screen" ? "Adicionar à Tela de Início para ativar notificações" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
-                                title={clientPushState === "loading" ? "Verificando lembretes de horário" : clientPushState === "active" ? "Lembretes ativados" : clientPushState === "ios-home-screen" ? "Adicionar à Tela de Início para ativar notificações" : clientPushState === "blocked" ? "Permissão de notificações bloqueada" : clientPushState === "unsupported" ? "Navegador sem suporte a notificações" : clientPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar lembretes de horário"}
+                                onClick={() => setShowClientNotifications(true)}
+                                aria-label="Notificações"
+                                title="Notificações"
                             >
-                                {clientPushState === "loading" ? "…" : clientPushState === "active" || clientPushState === "inactive" ? "🔔" : "🔕"}
+                                🔔{unreadClientNotificationCount > 0 && <span className="client-notification-badge">{unreadClientNotificationCount > 9 ? "9+" : unreadClientNotificationCount}</span>}
                             </button>
                           </div>
                         </div>
@@ -3803,6 +3871,7 @@ function PublicSite() {
                         </nav>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
                         {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button primary-action" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
+                        {showClientNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowClientNotifications(false); }}><section className="client-modal client-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="client-notifications-title"><button className="client-modal__close" type="button" onClick={() => setShowClientNotifications(false)}>×</button><div className="client-notifications-modal__header"><div><span className="client-modal__eyebrow">Central de notificações</span><h2 id="client-notifications-title">Notificações</h2></div>{unreadClientNotificationCount > 0 && <button type="button" onClick={() => void markAllClientNotificationsRead()}>Marcar todas como lidas</button>}</div><div className="client-notifications-list">{clientNotifications.length ? clientNotifications.map((notification) => <button key={notification.id} type="button" className={`client-notification-item${notification.read_at ? "" : " is-unread"}`} onClick={() => openClientNotification(notification)}><strong>{notification.title}</strong><p>{notification.message}</p><small>{new Date(notification.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small></button>) : <p className="client-account__empty">Nenhuma notificação por enquanto.</p>}</div></section></div>}
                     </header>
 
                     {clientOpportunityError && !clientOpportunityLoading && opportunityDeepLinkId && (
@@ -4639,6 +4708,7 @@ function PublicSite() {
                                     <div><span>Nome</span><strong>{clientProfile.full_name}</strong></div>
                                     <div><span>Telefone</span><strong>{formatBrazilianPhone(clientProfile.phone)}</strong></div>
                                     <div><span>E-mail</span><strong>{clientProfile.email || clientUserEmail}</strong></div>
+                                    <div className="client-push-settings"><strong>Notificações push</strong><span>{clientPushState === "active" ? "Ativadas" : clientPushState === "ios-home-screen" ? "Adicione à Tela de Início para ativar" : clientPushState === "unsupported" ? "Indisponíveis neste navegador" : clientPushState === "blocked" ? "Bloqueadas no navegador" : "Desativadas"}</span><button type="button" onClick={() => { if (clientPushState !== "loading") void toggleClientPush(); }}>{clientPushState === "active" ? "Desativar" : "Ativar"}</button></div>
                                 </div>
                                 )}
 

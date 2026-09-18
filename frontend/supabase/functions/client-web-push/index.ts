@@ -51,6 +51,7 @@ async function dispatch(h: Record<string, string>) {
     for (const appointment of (appointments || [])) {
         const {data: claim} = await admin.from("client_push_reminders").upsert({appointment_id: appointment.id, client_id: appointment.client_id}, {onConflict: "appointment_id,reminder_type", ignoreDuplicates: true}).select("id,status").maybeSingle();
         if (!claim || claim.status === "processed") continue;
+        await admin.rpc("create_client_notification", {p_client_id: appointment.client_id, p_type: "appointment-reminder", p_title: "Lembrete do seu agendamento", p_message: `Seu agendamento de ${appointment.service_name} é em aproximadamente 2 horas.`, p_data: {appointment_id: appointment.id}, p_entity_type: "appointment", p_entity_id: appointment.id, p_dedupe_key: `appointment-reminder:${appointment.id}`});
         const {data: subs} = await admin.from("client_push_subscriptions").select("id,endpoint,p256dh,auth_key").eq("client_id", appointment.client_id);
         const payload = JSON.stringify({title: "Lembrete de horario do seu agendamento com a Mirian", body: `Seu agendamento de ${appointment.service_name} é em aproximadamente 2 horas.`, url: `/client/reminder?appointment_id=${encodeURIComponent(appointment.id)}`});
         let failed = false;
