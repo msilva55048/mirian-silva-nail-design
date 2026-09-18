@@ -22,6 +22,7 @@ test('corrective SQL and real create/reschedule RPCs follow official dates and r
   await db.exec(await readFile(new URL('../supabase/migrations/20260908200000_correct_public_booking_schedule.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20260908220000_final_public_booking_schedule.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20260908230000_dynamic_appointment_end_slots.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20260916120000_start_client_grid_on_october_2.sql',import.meta.url),'utf8'));
   const allowed=async(date,time,duration=30,name='Normal')=>(await db.query('select client_booking_start_allowed($1,$2,$3,$4,null) as ok',[date,time,name,duration])).rows[0].ok;
   const create=async(date,time,name='Normal')=>(await db.query('select create_my_appointment($1,$2,$3) as id',[name,date,time])).rows[0].id;
   let lastId;
