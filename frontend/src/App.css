@@ -2427,3 +2427,13 @@ a {
     flex: 1 1 220px;
     min-width: 0;
 }
+.admin-restore-completed-button {
+    border: 1px solid #b58a42;
+    background: #fffaf0;
+    color: #7a5a20;
+    font-weight: 700;
+}
+
+.admin-restore-completed-button:hover {
+    background: #f7edd8;
+}

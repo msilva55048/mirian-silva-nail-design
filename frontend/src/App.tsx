@@ -10253,6 +10253,7 @@ function AdminPanel() {
     const [adminServices, setAdminServices] = useState<AdminServiceSetting[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [panelError, setPanelError] = useState("");
+    const [panelSuccess, setPanelSuccess] = useState("");
     const [notificationClock, setNotificationClock] = useState(() => Date.now());
 
     const [adminView, setAdminView] = useState<
@@ -10335,6 +10336,9 @@ function AdminPanel() {
         useState<string | null>(null);
     const [deletingConfirmedAppointmentId, setDeletingConfirmedAppointmentId] =
         useState<string | null>(null);
+    const [appointmentToRestore, setAppointmentToRestore] =
+        useState<AdminAppointment | null>(null);
+    const [isRestoringAppointment, setIsRestoringAppointment] = useState(false);
 
     const [nailRecords, setNailRecords] = useState<NailRecord[]>([]);
     const [isLoadingNailRecords, setIsLoadingNailRecords] = useState(false);
@@ -13396,6 +13400,33 @@ function AdminPanel() {
         }, 40);
     }
 
+    async function restoreCancelledAppointment() {
+        if (!appointmentToRestore || isRestoringAppointment) return;
+        setIsRestoringAppointment(true);
+        setPanelError("");
+        setPanelSuccess("");
+        const {data, error} = await supabase.rpc(
+            "admin_restore_cancelled_appointment_as_completed",
+            {p_appointment_id: appointmentToRestore.id},
+        );
+        if (error || data !== true) {
+            setPanelError(error?.message || "Este atendimento não pode mais ser restaurado. Atualize a página.");
+            setIsRestoringAppointment(false);
+            return;
+        }
+        const updated = {...appointmentToRestore, status: "completed" as const};
+        setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+        setSelectedAdminAppointment((current) => current?.id === updated.id ? updated : current);
+        setAppointmentToRestore(null);
+        setIsRestoringAppointment(false);
+        setPanelSuccess("Atendimento restaurado como realizado.");
+    }
+
+    function canRestoreCancelledAppointment(appointment: AdminAppointment) {
+        return appointment.status === "cancelled" &&
+            getAppointmentDateTime(appointment).getTime() < adminNow.getTime();
+    }
+
     function goToClientFromAppointment(appointment: AdminAppointment) {
         const clientKey = findClientKeyForAppointment(appointment, clients);
         if (!clientKey) {
@@ -13700,6 +13731,16 @@ function AdminPanel() {
                                 Ir para cliente
                             </button>
 
+                            {canRestoreCancelledAppointment(appointment) && (
+                                <button
+                                    type="button"
+                                    className="admin-restore-completed-button"
+                                    onClick={() => setAppointmentToRestore(appointment)}
+                                >
+                                    Restaurar como realizado
+                                </button>
+                            )}
+
                             {dueTypes.map((type) => {
                                 return (
                                     <div key={type}><a
@@ -13717,6 +13758,15 @@ function AdminPanel() {
                             })}
                         </div>
                     </>
+                )}
+
+                {appointmentToRestore?.id === appointment.id && (
+                    <div className="admin-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !isRestoringAppointment) setAppointmentToRestore(null); }}>
+                        <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="restore-appointment-title">
+                            <div className="admin-modal__header"><div><h2 id="restore-appointment-title">Restaurar atendimento?</h2><p>Este atendimento foi cancelado. Deseja restaurá-lo como realizado?</p></div><button className="admin-modal__close" type="button" disabled={isRestoringAppointment} onClick={() => setAppointmentToRestore(null)}>×</button></div>
+                            <div className="admin-modal__body"><p>Ele voltará a contar no histórico, nos indicadores e no financeiro conforme as regras normais de um atendimento realizado.</p><div className="admin-modal__actions"><button className="close" type="button" disabled={isRestoringAppointment} onClick={() => setAppointmentToRestore(null)}>Cancelar</button><button className="admin-primary-button" type="button" disabled={isRestoringAppointment} onClick={() => void restoreCancelledAppointment()}>{isRestoringAppointment ? "Restaurando..." : "Restaurar como realizado"}</button></div></div>
+                        </section>
+                    </div>
                 )}
             </article>
         );
@@ -14189,6 +14239,7 @@ function AdminPanel() {
                 )}
 
                 {panelError && <p className="admin-panel__error">{panelError}</p>}
+                {panelSuccess && <p className="admin-panel__success">{panelSuccess}</p>}
 
                 {adminView === "month" ? (
                     <section className="admin-month-agenda">
