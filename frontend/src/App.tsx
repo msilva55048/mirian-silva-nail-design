@@ -11063,7 +11063,15 @@ function AdminPanel() {
         const {error} = await supabase.from("appointments").update(updates).eq("id", selectedAdminAppointment.id);
         if (error) {
             console.error("Erro ao editar agendamento:", error);
-            setAppointmentEditError("Não foi possível salvar as alterações.");
+            const detail = `${error.message} ${error.details ?? ""}`.toLowerCase();
+            const friendlyMessage = detail.includes("horário ocupado") || detail.includes("conflito")
+                ? "O horário escolhido está ocupado por outro atendimento."
+                : detail.includes("horário bloqueado")
+                    ? "O horário escolhido está bloqueado."
+                    : detail.includes("já passou")
+                        ? "Não é possível mover para um horário que já passou."
+                        : "Não foi possível salvar as alterações. Tente novamente.";
+            setAppointmentEditError(friendlyMessage);
             setIsSavingAppointment(false);
             return;
         }
