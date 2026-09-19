@@ -13416,6 +13416,9 @@ function AdminPanel() {
         }
         const updated = {...appointmentToRestore, status: "completed" as const};
         setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+        setSelectedClient((current) => current
+            ? {...current, appointments: current.appointments.map((item) => item.id === updated.id ? updated : item)}
+            : current);
         setSelectedAdminAppointment((current) => current?.id === updated.id ? updated : current);
         setAppointmentToRestore(null);
         setIsRestoringAppointment(false);
@@ -13760,14 +13763,6 @@ function AdminPanel() {
                     </>
                 )}
 
-                {appointmentToRestore?.id === appointment.id && (
-                    <div className="admin-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !isRestoringAppointment) setAppointmentToRestore(null); }}>
-                        <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="restore-appointment-title">
-                            <div className="admin-modal__header"><div><h2 id="restore-appointment-title">Restaurar atendimento?</h2><p>Este atendimento foi cancelado. Deseja restaurá-lo como realizado?</p></div><button className="admin-modal__close" type="button" disabled={isRestoringAppointment} onClick={() => setAppointmentToRestore(null)}>×</button></div>
-                            <div className="admin-modal__body"><p>Ele voltará a contar no histórico, nos indicadores e no financeiro conforme as regras normais de um atendimento realizado.</p><div className="admin-modal__actions"><button className="close" type="button" disabled={isRestoringAppointment} onClick={() => setAppointmentToRestore(null)}>Cancelar</button><button className="admin-primary-button" type="button" disabled={isRestoringAppointment} onClick={() => void restoreCancelledAppointment()}>{isRestoringAppointment ? "Restaurando..." : "Restaurar como realizado"}</button></div></div>
-                        </section>
-                    </div>
-                )}
             </article>
         );
     };
@@ -16393,10 +16388,21 @@ function AdminPanel() {
                                                 {canClearCancelled ? (
                                                     <div className="admin-client-history__cancelled-action">
                                                         <strong>
-                                                            {isClearing
-                                                                ? "Limpando..."
-                                                                : "Cancelado"}
+                                                            {isClearing ? "Limpando..." : "Cancelado"}
                                                         </strong>
+                                                        {canRestoreCancelledAppointment(appointment) && (
+                                                            <button
+                                                                type="button"
+                                                                className="admin-restore-completed-button"
+                                                                disabled={isClearing}
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    setAppointmentToRestore(appointment);
+                                                                }}
+                                                            >
+                                                                Restaurar como realizado
+                                                            </button>
+                                                        )}
                                                         <small>
                                                             Toque para limpar
                                                         </small>
@@ -16422,6 +16428,15 @@ function AdminPanel() {
                                     })}
                                 </div>
                             </section>
+                        </section>
+                    </div>
+                )}
+
+                {appointmentToRestore && (
+                    <div className="admin-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !isRestoringAppointment) setAppointmentToRestore(null); }}>
+                        <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="restore-appointment-title">
+                            <div className="admin-modal__header"><div><h2 id="restore-appointment-title">Restaurar atendimento?</h2><p>Este atendimento foi cancelado. Deseja restaurá-lo como realizado?</p></div><button className="admin-modal__close" type="button" disabled={isRestoringAppointment} onClick={() => setAppointmentToRestore(null)}>×</button></div>
+                            <div className="admin-modal__body"><p>Ele voltará a contar no histórico, nos indicadores e no financeiro conforme as regras normais de um atendimento realizado.</p><div className="admin-modal__actions"><button className="close" type="button" disabled={isRestoringAppointment} onClick={() => setAppointmentToRestore(null)}>Cancelar</button><button className="admin-primary-button" type="button" disabled={isRestoringAppointment} onClick={() => void restoreCancelledAppointment()}>{isRestoringAppointment ? "Restaurando..." : "Restaurar como realizado"}</button></div></div>
                         </section>
                     </div>
                 )}
