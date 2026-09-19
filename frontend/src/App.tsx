@@ -11050,38 +11050,93 @@ function AdminPanel() {
         }
 
         setIsSavingAppointment(true);
-        const updates = {
-            client_name: editAppointmentName.trim(),
-            client_phone: formatBrazilianPhone(editAppointmentPhone),
-            client_email: editAppointmentEmail.trim() || null,
-            musical_taste: editAppointmentMusicTaste.trim() || null,
-            service_name: service.name,
-            appointment_date: editAppointmentDate,
-            start_time: editAppointmentTime,
-            duration_minutes: service.duration_minutes,
+        const logContext = {
+            appointmentId: selectedAdminAppointment.id,
+            originalDate: selectedAdminAppointment.appointment_date,
+            originalStartTime: String(selectedAdminAppointment.start_time).slice(0, 5),
+            originalStatus: selectedAdminAppointment.status,
+            nextDate: editAppointmentDate,
+            nextStartTime: editAppointmentTime,
+            durationMinutes: service.duration_minutes,
+            serviceName: service.name,
+            method: "update",
+            table: "appointments",
+            filter: {id: selectedAdminAppointment.id},
         };
-        const {error} = await supabase.from("appointments").update(updates).eq("id", selectedAdminAppointment.id);
-        if (error) {
-            console.error("Erro ao editar agendamento:", error);
-            const detail = `${error.message} ${error.details ?? ""}`.toLowerCase();
-            const friendlyMessage = detail.includes("horário ocupado") || detail.includes("conflito")
-                ? "O horário escolhido está ocupado por outro atendimento."
-                : detail.includes("horário bloqueado")
-                    ? "O horário escolhido está bloqueado."
-                    : detail.includes("já passou")
-                        ? "Não é possível mover para um horário que já passou."
-                        : "Não foi possível salvar as alterações. Tente novamente.";
-            setAppointmentEditError(friendlyMessage);
-            setIsSavingAppointment(false);
-            return;
-        }
 
-        const updated = {...selectedAdminAppointment, ...updates};
-        setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
-        setSelectedAdminAppointment(updated);
-        setAgendaDate(editAppointmentDate);
-        setIsSavingAppointment(false);
-        setAppointmentEditError("");
+        console.info("[ADMIN_APPOINTMENT_UPDATE][START]", logContext);
+
+        try {
+            const updates = {
+                client_name: editAppointmentName.trim(),
+                client_phone: formatBrazilianPhone(editAppointmentPhone),
+                client_email: editAppointmentEmail.trim() || null,
+                musical_taste: editAppointmentMusicTaste.trim() || null,
+                service_name: service.name,
+                appointment_date: editAppointmentDate,
+                start_time: editAppointmentTime,
+                duration_minutes: service.duration_minutes,
+            };
+
+            console.info("[ADMIN_APPOINTMENT_UPDATE][STEP 1][UPDATE_APPOINTMENT]", {
+                ...logContext,
+                payload: {
+                    appointment_date: updates.appointment_date,
+                    start_time: updates.start_time,
+                    duration_minutes: updates.duration_minutes,
+                    service_name: updates.service_name,
+                    hasClientEmail: Boolean(updates.client_email),
+                    hasMusicalTaste: Boolean(updates.musical_taste),
+                },
+            });
+
+            const {data, error} = await supabase
+                .from("appointments")
+                .update(updates)
+                .eq("id", selectedAdminAppointment.id);
+
+            console.info("[ADMIN_APPOINTMENT_UPDATE][SUPABASE_RESULT]", {
+                data,
+                error,
+                code: error?.code,
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                status: (error as {status?: number} | null)?.status,
+            });
+
+            if (error) {
+                console.error("[ADMIN_APPOINTMENT_UPDATE][ERROR][UPDATE_APPOINTMENT]", error);
+                const detail = `${error.message} ${error.details ?? ""}`.toLowerCase();
+                const friendlyMessage = detail.includes("horário ocupado") || detail.includes("conflito")
+                    ? "O horário escolhido está ocupado por outro atendimento."
+                    : detail.includes("horário bloqueado")
+                        ? "O horário escolhido está bloqueado."
+                        : detail.includes("já passou")
+                            ? "Não é possível mover para um horário que já passou."
+                            : "Não foi possível salvar as alterações. Tente novamente.";
+                setAppointmentEditError(friendlyMessage + (error.code ? ` Código: ${error.code}` : ""));
+                return;
+            }
+
+            const updated = {...selectedAdminAppointment, ...updates};
+            console.info("[ADMIN_APPOINTMENT_UPDATE][STEP 2][UPDATE_LOCAL_APPOINTMENTS][SUCCESS]", {appointmentId: updated.id});
+            setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+            console.info("[ADMIN_APPOINTMENT_UPDATE][STEP 3][UPDATE_SELECTED_APPOINTMENT][SUCCESS]", {appointmentId: updated.id});
+            setSelectedAdminAppointment(updated);
+            console.info("[ADMIN_APPOINTMENT_UPDATE][STEP 4][UPDATE_AGENDA_DATE][SUCCESS]", {appointmentDate: editAppointmentDate});
+            setAgendaDate(editAppointmentDate);
+            setAppointmentEditError("");
+            console.info("[ADMIN_APPOINTMENT_UPDATE][SUCCESS]", {appointmentId: updated.id});
+        } catch (error) {
+            console.error("[ADMIN_APPOINTMENT_UPDATE][ERROR][UNEXPECTED]", {
+                context: logContext,
+                error,
+            });
+            setAppointmentEditError("Não foi possível salvar as alterações. Tente novamente.");
+        } finally {
+            setIsSavingAppointment(false);
+        }
     }
 
     async function cancelAppointment(appointment: AdminAppointment) {
