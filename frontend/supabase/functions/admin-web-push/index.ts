@@ -138,6 +138,33 @@ async function manageSubscription(req: Request, body: Record<string, unknown>, h
     return error ? json({error: error.message}, 500, headers) : json({ok: true}, 200, headers);
 }
 
+async function deliverToSubscription(event: PushEvent, subscription: {id: string; endpoint: string; p256dh: string; auth_key: string}, dispatchId: string, previousAttempts: number, payload: string) {
+    let attempts = previousAttempts;
+    let lastError = "";
+
+    for (let retry = 0; retry < 3; retry++) {
+        attempts += 1;
+        await admin.from("appointment_push_dispatches").update({status: "processing", attempts, last_attempt_at: new Date().toISOString(), updated_at: new Date().toISOString()}).eq("id", dispatchId);
+        try {
+            await webpush.sendNotification({endpoint: subscription.endpoint, keys: {p256dh: subscription.p256dh, auth: subscription.auth_key}}, payload, {TTL: 60 * 60 * 24, urgency: "high"});
+            await admin.from("appointment_push_dispatches").update({status: "sent", sent_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString()}).eq("id", dispatchId);
+            await admin.from("admin_push_subscriptions").update({last_success_at: new Date().toISOString()}).eq("id", subscription.id);
+            return {status: "sent", attempts};
+        } catch (error) {
+            const statusCode = Number((error as {statusCode?: number}).statusCode || 0);
+            lastError = statusCode ? `push_status_${statusCode}` : (error instanceof Error ? error.message : String(error));
+            if (statusCode === 404 || statusCode === 410) {
+                await admin.from("appointment_push_dispatches").update({status: "invalid", last_error: lastError, updated_at: new Date().toISOString()}).eq("id", dispatchId);
+                await admin.from("admin_push_subscriptions").delete().eq("id", subscription.id);
+                return {status: "invalid", attempts};
+            }
+            await admin.from("appointment_push_dispatches").update({status: "failed", last_error: lastError, updated_at: new Date().toISOString()}).eq("id", dispatchId);
+        }
+    }
+
+    return {status: "failed", attempts, lastError};
+}
+
 async function deliverWebhook(body: Record<string, unknown>, headers: Record<string, string>) {
     const record = (body.record || body) as {id?: string};
     if (!record.id) return json({error: "Evento ausente."}, 400, headers);
@@ -156,40 +183,36 @@ async function deliverWebhook(body: Record<string, unknown>, headers: Record<str
     const {data: subscriptions, error: subscriptionError} = await admin
         .from("admin_push_subscriptions")
         .select("id, endpoint, p256dh, auth_key");
-
     if (subscriptionError) {
         await admin.from("appointment_push_events").update({status: "failed", last_error: subscriptionError.message}).eq("id", event.id);
         return json({error: subscriptionError.message}, 500, headers);
     }
+    if (!subscriptions?.length) {
+        await admin.from("appointment_push_events").update({status: "processed_with_errors", processed_at: new Date().toISOString(), last_error: "no_active_subscriptions"}).eq("id", event.id);
+        return json({ok: true, sent: 0, errors: 1}, 200, headers);
+    }
 
     const content = notificationFor(event);
     const payload = JSON.stringify({...content, eventId: event.id, url: "/admin"});
-    const errors: string[] = [];
-
-    await Promise.all((subscriptions || []).map(async (subscription) => {
-        try {
-            await webpush.sendNotification({
-                endpoint: subscription.endpoint,
-                keys: {p256dh: subscription.p256dh, auth: subscription.auth_key},
-            }, payload, {TTL: 60 * 60 * 24, urgency: "high"});
-            await admin.from("admin_push_subscriptions").update({last_success_at: new Date().toISOString()}).eq("id", subscription.id);
-        } catch (error) {
-            const statusCode = Number((error as {statusCode?: number}).statusCode || 0);
-            if (statusCode === 404 || statusCode === 410) {
-                await admin.from("admin_push_subscriptions").delete().eq("id", subscription.id);
-                return;
-            }
-            errors.push(error instanceof Error ? error.message : String(error));
+    const results: Array<{status: string; lastError?: string}> = [];
+    for (const subscription of subscriptions) {
+        const {data: dispatch, error: dispatchError} = await admin.from("appointment_push_dispatches").upsert({event_id: event.id, subscription_id: subscription.id}, {onConflict: "event_id,subscription_id", ignoreDuplicates: true}).select("id, status, attempts").maybeSingle();
+        if (dispatchError || !dispatch) {
+            results.push({status: "failed", lastError: dispatchError?.message || "dispatch_not_created"});
+            continue;
         }
-    }));
+        if (dispatch.status === "sent" || dispatch.status === "invalid") {
+            results.push({status: dispatch.status});
+            continue;
+        }
+        results.push(await deliverToSubscription(event, subscription, dispatch.id, dispatch.attempts || 0, payload));
+    }
 
-    await admin.from("appointment_push_events").update({
-        status: "processed",
-        processed_at: new Date().toISOString(),
-        last_error: errors.length ? errors.join(" | ").slice(0, 2000) : null,
-    }).eq("id", event.id);
-
-    return json({ok: true, sent: (subscriptions || []).length - errors.length, errors: errors.length}, 200, headers);
+    const failed = results.filter((result) => result.status === "failed");
+    const invalid = results.filter((result) => result.status === "invalid");
+    const finalStatus = failed.length ? "failed" : invalid.length ? "processed_with_errors" : "processed";
+    await admin.from("appointment_push_events").update({status: finalStatus, processed_at: new Date().toISOString(), last_error: failed.length || invalid.length ? results.map((result) => result.lastError).filter(Boolean).join(" | ").slice(0, 2000) || (invalid.length ? "invalid_subscription" : null) : null}).eq("id", event.id);
+    return json({ok: true, sent: results.filter((result) => result.status === "sent").length, errors: failed.length + invalid.length}, 200, headers);
 }
 
 Deno.serve(async (req) => {

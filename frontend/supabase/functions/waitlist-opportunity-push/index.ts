@@ -14,6 +14,22 @@ export default {
   try { body = await req.json(); } catch { /* default dispatch */ }
   if (body.action !== "dispatch") return json({error:"unsupported_action"}, 400);
 
+  const {data: notificationTargets, error: notificationError} = await supabase.rpc("get_waitlist_opportunity_notification_targets");
+  if (notificationError) return json({error:"notification_target_query_failed"}, 500);
+  for (const target of (notificationTargets ?? []) as Array<Record<string, any>>) {
+    const {error: createError} = await supabase.rpc("create_client_notification", {
+      p_client_id: target.client_id,
+      p_type: "waitlist-opportunity",
+      p_title: "Vaga disponível ✨",
+      p_message: `Surgiu uma vaga para ${target.service_name} em ${target.appointment_date} às ${String(target.start_time).slice(0, 5)}. A disponibilidade está sujeita a preenchimento.`,
+      p_data: {opportunity_id: target.opportunity_id},
+      p_entity_type: "waitlist-opportunity",
+      p_entity_id: target.opportunity_id,
+      p_dedupe_key: `waitlist-opportunity:${target.opportunity_id}:${target.client_id}`,
+    });
+    if (createError) return json({error:"notification_create_failed"}, 500);
+  }
+
   const {data: targets, error} = await supabase.rpc("get_waitlist_opportunity_dispatch_targets");
   if (error) return json({error:"target_query_failed"}, 500);
   let sent = 0, skipped = 0, failed = 0, invalid = 0;
