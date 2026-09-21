@@ -3,6 +3,7 @@ import {readFile} from "node:fs/promises";
 import {test} from "node:test";
 
 const migration = await readFile(new URL("../supabase/migrations/20260921220000_notification_delivery_improvements.sql", import.meta.url), "utf8");
+const pushQueueMigration = await readFile(new URL("../supabase/migrations/20260921223000_queue_referral_reward_used_push.sql", import.meta.url), "utf8");
 const waitlistFunction = await readFile(new URL("../supabase/functions/waitlist-opportunity-push/index.ts", import.meta.url), "utf8");
 const adminFunction = await readFile(new URL("../supabase/functions/admin-web-push/index.ts", import.meta.url), "utf8");
 const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -20,8 +21,13 @@ test("oportunidade cria uma notificação deduplicada por cliente", () => {
 });
 
 test("Central e pipeline próprio não duplicam Push da lista de espera", () => {
-    assert.doesNotMatch(migration.match(/create or replace function public\.queue_client_notification_push[\s\S]*?\$function\$/)?.[0] ?? "", /waitlist-opportunity/);
+    assert.doesNotMatch(pushQueueMigration, /waitlist-opportunity/);
     assert.match(waitlistFunction, /get_waitlist_opportunity_dispatch_targets/);
+});
+
+test("uso da recompensa também entra na fila Push da cliente", () => {
+    assert.match(pushQueueMigration, /'referral-reward-used'/);
+    assert.match(pushQueueMigration, /on conflict \(notification_id, subscription_id\) do nothing/);
 });
 
 test("Push ADM possui dispatch independente por subscription", () => {

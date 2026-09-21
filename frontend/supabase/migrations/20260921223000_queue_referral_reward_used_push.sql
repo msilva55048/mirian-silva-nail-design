@@ -1,0 +1,28 @@
+-- Completa o espelhamento Push da nova notificação de recompensa utilizada.
+begin;
+
+create or replace function public.queue_client_notification_push()
+returns trigger language plpgsql security definer set search_path = public, pg_temp
+as $function$
+begin
+    if new.type in (
+        'appointment-created',
+        'appointment-confirmed',
+        'appointment-rescheduled',
+        'appointment-cancelled',
+        'referral-registered',
+        'referral-scheduled',
+        'referral-qualified',
+        'referral-reward-used'
+    ) then
+        insert into public.client_notification_push_dispatches(notification_id, subscription_id, client_id)
+        select new.id, s.id, new.client_id
+          from public.client_push_subscriptions s
+         where s.client_id = new.client_id
+        on conflict (notification_id, subscription_id) do nothing;
+    end if;
+    return new;
+end;
+$function$;
+
+commit;
