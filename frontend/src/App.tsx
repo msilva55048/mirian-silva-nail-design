@@ -561,6 +561,20 @@ type ReferralSummary = {
     discounted_price_cents: number | null;
 };
 
+type ActiveReferral = {
+    referral_id: string;
+    referred_name: string;
+    referral_status: "CADASTRADA" | "AGENDADA" | "REALIZADA";
+    reward_id: string | null;
+    reward_status: "available" | "reserved" | null;
+    discount_percent: number | null;
+};
+
+type AdminReferral = ActiveReferral & {
+    referrer_id: string;
+    referrer_name: string;
+};
+
 type ClientNotification = {
     id: string;
     type: string;
@@ -1631,6 +1645,7 @@ function PublicSite() {
     const [clientWaitlistError, setClientWaitlistError] = useState("");
     const [clientWaitlistServices, setClientWaitlistServices] = useState<{id: number; name: string}[]>([]);
     const [referralSummary, setReferralSummary] = useState<ReferralSummary | null>(null);
+    const [activeReferrals, setActiveReferrals] = useState<ActiveReferral[]>([]);
     const [isLoadingReferralSummary, setIsLoadingReferralSummary] = useState(false);
     const [, setIsCheckingClientSession] = useState(true);
     const [isLoadingClientAccount, setIsLoadingClientAccount] = useState(false);
@@ -1908,6 +1923,8 @@ function PublicSite() {
             );
 
             setReferralSummary(summary);
+            const {data: referrals, error: referralsError} = await supabase.rpc("get_my_active_referrals");
+            if (!referralsError) setActiveReferrals((referrals ?? []) as ActiveReferral[]);
             return summary;
         } finally {
             setIsLoadingReferralSummary(false);
@@ -3880,7 +3897,7 @@ function PublicSite() {
                         </nav>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
                         {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button primary-action" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
-                        {showClientNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowClientNotifications(false); }}><section className="client-modal client-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="client-notifications-title"><button className="client-modal__close" type="button" onClick={() => setShowClientNotifications(false)}>×</button><div className="client-notifications-modal__header"><div><span className="client-modal__eyebrow">Central de notificações</span><h2 id="client-notifications-title">Notificações</h2></div>{unreadClientNotificationCount > 0 && <button type="button" onClick={() => void markAllClientNotificationsRead()}>Marcar todas como lidas</button>}</div><div className="client-notification-push-control"><div className="client-notification-push-control__copy"><strong>Ativar notificações</strong><span>{clientPushState === "active" ? "Notificações ativadas" : clientPushState === "loading" ? "Verificando status..." : clientPushState === "ios-home-screen" ? "Adicione à Tela de Início para ativar" : "Notificações desativadas"}</span></div><button type="button" role="switch" aria-checked={clientPushState === "active"} aria-label={clientPushState === "active" ? "Desativar notificações" : "Ativar notificações"} className={`client-notification-push-toggle${clientPushState === "active" ? " is-active" : ""}`} disabled={clientPushState === "loading"} onClick={() => void toggleClientPush()} /></div><div className="client-notifications-list">{clientNotifications.length ? clientNotifications.map((notification) => <button key={notification.id} type="button" className={`client-notification-item${notification.read_at ? "" : " is-unread"}`} onClick={() => openClientNotification(notification)}><strong>{notification.title}</strong><p>{notification.message}</p><small>{new Date(notification.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small></button>) : <p className="client-account__empty">Nenhuma notificação por enquanto.</p>}</div></section></div>}
+                        {showClientNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowClientNotifications(false); }}><section className="client-modal client-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="client-notifications-title"><button className="client-modal__close" type="button" onClick={() => setShowClientNotifications(false)}>×</button><div className="client-notifications-modal__header"><div><span className="client-modal__eyebrow">Central de notificações</span><h2 id="client-notifications-title">Notificações</h2></div>{unreadClientNotificationCount > 0 && <button type="button" onClick={() => void markAllClientNotificationsRead()}>Marcar todas como lidas</button>}</div><div className="client-notification-push-control"><div className="client-notification-push-control__copy"><strong>Ativar notificações</strong><span>{clientPushState === "active" ? "Notificações ativadas" : clientPushState === "loading" ? "Verificando status..." : clientPushState === "ios-home-screen" ? "Adicione à Tela de Início para ativar" : "Notificações desativadas"}</span></div><button type="button" role="switch" aria-checked={clientPushState === "active"} aria-label={clientPushState === "active" ? "Desativar notificações" : "Ativar notificações"} className={`client-notification-push-toggle${clientPushState === "active" ? " is-active" : ""}`} disabled={clientPushState === "loading"} onClick={() => void toggleClientPush()} /></div><section className="referral-state-card"><span className="client-modal__eyebrow">Indicações</span><h3>Acompanhe suas indicações e seus descontos.</h3>{activeReferrals.length ? activeReferrals.map((referral) => <article key={referral.referral_id} className="referral-state-card__item"><strong>{referral.referred_name}</strong><span className={`referral-state-badge referral-state-badge--${referral.referral_status.toLowerCase()}`}>{referral.referral_status}</span>{referral.referral_status === "REALIZADA" && <small>Desconto de {referral.discount_percent ?? 30}% {referral.reward_status === "reserved" ? "reservado" : "disponível"}</small>}</article>) : <p>Você ainda não possui indicações cadastradas.</p>}</section><div className="client-notifications-list">{clientNotifications.length ? clientNotifications.map((notification) => <button key={notification.id} type="button" className={`client-notification-item${notification.read_at ? "" : " is-unread"}`} onClick={() => openClientNotification(notification)}><strong>{notification.title}</strong><p>{notification.message}</p><small>{new Date(notification.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small></button>) : <p className="client-account__empty">Nenhuma notificação por enquanto.</p>}</div></section></div>}
                     </header>
 
                     {clientOpportunityError && !clientOpportunityLoading && opportunityDeepLinkId && (
@@ -4740,7 +4757,7 @@ function PublicSite() {
                                             </p>
                                         ) : referralSummary.pending_referrals > 0 ? (
                                             <p>
-                                                Você tem {referralSummary.pending_referrals === 1 ? "uma amiga" : `${referralSummary.pending_referrals} amigas`} indicada{referralSummary.pending_referrals === 1 ? "" : "s"}. O desconto será liberado quando ela fizer o primeiro agendamento.
+                                                Você tem {referralSummary.pending_referrals === 1 ? "uma amiga" : `${referralSummary.pending_referrals} amigas`} indicada{referralSummary.pending_referrals === 1 ? "" : "s"}. O desconto será liberado quando ela realizar o atendimento.
                                             </p>
                                         ) : (
                                             <p>
@@ -10258,6 +10275,19 @@ function AdminPanel() {
     const [panelError, setPanelError] = useState("");
     const [panelSuccess, setPanelSuccess] = useState("");
     const [notificationClock, setNotificationClock] = useState(() => Date.now());
+    const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        let active = true;
+        const load = async () => {
+            const {data, error} = await supabase.rpc("get_admin_referrals");
+            if (active && !error) setAdminReferrals((data ?? []) as AdminReferral[]);
+        };
+        void load();
+        const timer = window.setInterval(load, 15000);
+        return () => { active = false; window.clearInterval(timer); };
+    }, [isAuthenticated]);
 
     const [adminView, setAdminView] = useState<
         "agenda" | "week" | "month" | "new" | "waiting" | "clients" | "finance" | "schedule" | "settings" | "blocks"
@@ -13885,6 +13915,7 @@ function AdminPanel() {
                         </div>
                         {adminPushMessage && <p className="admin-notifications-message" role="status">{adminPushMessage}</p>}
                         {adminPushState === "error" && <button className="admin-notifications-retry" type="button" disabled={isUpdatingAdminPush} onClick={() => void toggleAdminPush()}>Tentar verificar novamente</button>}
+                        <section className="referral-state-card"><span className="client-modal__eyebrow">Indicações</span><h3>Acompanhe as indicações das clientes.</h3>{adminReferrals.length ? Object.values(adminReferrals.reduce<Record<string, {name: string; items: AdminReferral[]}>>((groups, referral) => { const group = groups[referral.referrer_id] ?? {name: referral.referrer_name, items: []}; group.items.push(referral); groups[referral.referrer_id] = group; return groups; }, {})).map((group) => <div key={group.name} className="referral-state-card__group"><strong>{group.name}</strong>{group.items.map((referral) => <article key={referral.referral_id} className="referral-state-card__item"><span>{referral.referred_name}</span><span className={`referral-state-badge referral-state-badge--${referral.referral_status.toLowerCase()}`}>{referral.referral_status}</span>{referral.referral_status === "REALIZADA" && <small>Desconto de {referral.discount_percent ?? 30}% {referral.reward_status === "reserved" ? "reservado" : "disponível"}</small>}</article>)}</div>) : <p>Você ainda não possui indicações cadastradas.</p>}</section>
                         <div className="client-notifications-list"><p className="client-account__empty">Nenhuma notificação por enquanto.</p></div>
                     </section>
                 </div>}
