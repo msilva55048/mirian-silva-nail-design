@@ -102,7 +102,25 @@ if (typeof window !== "undefined") {
     window.addEventListener("popstate", recordPathname);
     window.addEventListener("hashchange", recordPathname);
     window.addEventListener("error", (event) => recordDiagnostic("WINDOW_ERROR", {
-        detail: event.error?.name ?? "unknown-error",
+        detail: `${event.error?.name ?? "unknown-error"}:${String(event.message ?? "").slice(0, 120)}`,
     }));
-    window.addEventListener("unhandledrejection", () => recordDiagnostic("UNHANDLED_REJECTION"));
+    window.addEventListener("unhandledrejection", (event) => recordDiagnostic("UNHANDLED_REJECTION", {
+        detail: String(event.reason?.name ?? event.reason?.message ?? "unknown-rejection").slice(0, 120),
+    }));
+    document.addEventListener("click", (event) => {
+        const target = (event.target as HTMLElement | null)?.closest("button,a");
+        if (!target) return;
+        recordDiagnostic("CLICK", {
+            detail: `${target.tagName.toLowerCase()};type=${target instanceof HTMLButtonElement ? target.type : "link"};href=${target instanceof HTMLAnchorElement ? new URL(target.href, window.location.href).pathname : "none"};id=${target.id || "none"}`,
+        });
+    }, true);
+    document.addEventListener("submit", (event) => {
+        const form = event.target as HTMLFormElement;
+        recordDiagnostic("FORM_SUBMIT", {
+            detail: `id=${form.id || "none"};target=${form.target || "none"};action=${form.action ? new URL(form.action, window.location.href).pathname : "none"}`,
+        });
+    }, true);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === "Escape") recordDiagnostic("KEYDOWN", {detail: `key=${event.key}`});
+    }, true);
 }
