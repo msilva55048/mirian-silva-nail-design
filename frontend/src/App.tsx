@@ -2867,8 +2867,10 @@ function PublicSite() {
 
 
     useEffect(() => {
+        let hasLoadedPublicSchedule = false;
+
         async function loadAppointments() {
-            setIsLoadingAppointments(true);
+            if (!hasLoadedPublicSchedule) setIsLoadingAppointments(true);
 
             const [
                 {data: appointmentData, error: appointmentError},
@@ -2943,6 +2945,7 @@ function PublicSite() {
             setAppointments(loadedAppointments);
             setScheduleBlocks(loadedBlocks);
             setScheduleTimeOverrides(loadedOverrides);
+            hasLoadedPublicSchedule = true;
             setIsLoadingAppointments(false);
         }
 
@@ -10536,8 +10539,10 @@ function AdminPanel() {
                 : "Não foi possível confirmar o estado no backend. Toque no sino para tentar novamente.");
         });
 
+        let hasLoadedAdminData = false;
+
         async function loadAdminData() {
-            setIsLoading(true);
+            if (!hasLoadedAdminData) setIsLoading(true);
             setPanelError("");
             const [
                 {data: appointmentData, error: appointmentError},
@@ -10589,6 +10594,7 @@ function AdminPanel() {
                 })),
             );
             if (serviceData?.length) setManualServiceName(serviceData[0].name);
+            hasLoadedAdminData = true;
             setIsLoading(false);
         }
 
