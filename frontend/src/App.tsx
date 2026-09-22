@@ -10271,6 +10271,7 @@ function AdminPanel() {
     const [showAdminNotifications, setShowAdminNotifications] = useState(false);
     const [showDiagnostics, setShowDiagnostics] = useState(false);
     const [diagnosticEvents, setDiagnosticEvents] = useState(() => getDiagnosticEvents());
+    const authBootstrapRef = useRef({sessionRead: false, initialEventSeen: false});
 
     useEffect(() => {
         recordDiagnostic("ADMIN_MOUNT");
@@ -10496,21 +10497,28 @@ function AdminPanel() {
         async function checkSession() {
             const {data: {session}} = await supabase.auth.getSession();
             recordDiagnostic("AUTH_INITIAL_SESSION", {sessionPresent: Boolean(session)});
+            authBootstrapRef.current.sessionRead = true;
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 
             if (isMirianAdminSession) {
                 setMirianLastAccessMode("admin");
             }
 
-            setIsAuthenticated(isMirianAdminSession);
-            setIsCheckingSession(false);
+            if (authBootstrapRef.current.initialEventSeen) {
+                setIsAuthenticated(isMirianAdminSession);
+                setIsCheckingSession(false);
+            }
         }
 
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((event, session) => {
             recordDiagnostic(`AUTH_${event}`, {sessionPresent: Boolean(session)});
+            if (event === "INITIAL_SESSION") authBootstrapRef.current.initialEventSeen = true;
             if (event === "TOKEN_REFRESHED") return;
+
+            if (!authBootstrapRef.current.sessionRead && event === "SIGNED_OUT") return;
+            if (event === "INITIAL_SESSION" && !authBootstrapRef.current.sessionRead) return;
 
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 

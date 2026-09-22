@@ -79,6 +79,9 @@ if (typeof window !== "undefined") {
     window.addEventListener("blur", () => recordDiagnostic("WINDOW_BLUR"));
     window.addEventListener("online", () => recordDiagnostic("ONLINE"));
     window.addEventListener("offline", () => recordDiagnostic("OFFLINE"));
+    window.addEventListener("beforeunload", () => recordDiagnostic("BEFORE_UNLOAD"));
+    window.addEventListener("pagehide", (event) => recordDiagnostic("PAGE_HIDE", {detail: `persisted=${event.persisted}`}));
+    window.addEventListener("pageshow", (event) => recordDiagnostic("PAGE_SHOW", {detail: `persisted=${event.persisted}`}));
     window.addEventListener("popstate", recordPathname);
     window.addEventListener("hashchange", recordPathname);
     window.addEventListener("error", (event) => recordDiagnostic("WINDOW_ERROR", {
