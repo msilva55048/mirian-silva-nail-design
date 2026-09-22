@@ -3,6 +3,7 @@ import {readFile} from "node:fs/promises";
 import {test} from "node:test";
 
 const sql = await readFile(new URL("../supabase/migrations/20260922000000_loyalty_card.sql", import.meta.url), "utf8");
+const queueSql = await readFile(new URL("../supabase/migrations/20260922070000_fix_client_push_subscription_column.sql", import.meta.url), "utf8");
 const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
 test("fidelidade usa data oficial e fuso fixos", () => { assert.match(sql, /date '2026-10-02'/); assert.match(sql, /America\/Sao_Paulo/); });
@@ -15,3 +16,4 @@ test("cancelamento devolve recompensa e completed consome", () => { assert.match
 test("card fixo e regras aparecem na Central", () => { assert.match(app, /client-loyalty-card/); assert.match(app, /showLoyaltyRules/); assert.match(app, /A cada atendimento realizado/); });
 test("botão Ver regras é compacto, sem ícone e não quebra linha", () => { assert.match(app, /Ver regras/); assert.match(app, /white-space: nowrap/); assert.match(app, /var\(--gradient-primary-action\)/); assert.doesNotMatch(app, /📖 Ver regras/); });
 test("preview temporário foi removido e a regra usa texto comercial simples", () => { assert.doesNotMatch(app, /loyaltyPreview/); assert.match(app, /seu próximo serviço é grátis/); assert.doesNotMatch(app, /seu próximo serviço elegível é grátis/); });
+test("fila de Push não consulta coluna inexistente em client_push_subscriptions", () => { assert.doesNotMatch(queueSql, /client_push_subscriptions[\s\S]{0,180}is_active/); });
