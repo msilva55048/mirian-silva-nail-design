@@ -10295,10 +10295,12 @@ function AdminPanel() {
         if (!isAuthenticated) return;
         let active = true;
         const load = async () => {
+            recordDiagnostic("REFERRALS_FETCH_START");
             setIsLoadingAdminReferrals(true);
             const {data, error} = await supabase.rpc("get_admin_referrals");
             if (!active) return;
             if (error) {
+                recordDiagnostic("REFERRALS_FETCH_ERROR", {detail: "rpc_failed"});
                 setAdminReferralsError("Não foi possível carregar as indicações agora.");
                 console.warn("Visão administrativa de indicações indisponível:", error);
                 setIsLoadingAdminReferrals(false);
@@ -10307,9 +10309,14 @@ function AdminPanel() {
             setAdminReferralsError("");
             setAdminReferrals((data ?? []) as AdminReferral[]);
             setIsLoadingAdminReferrals(false);
+            recordDiagnostic("REFERRALS_FETCH_END");
         };
         void load();
-        const timer = window.setInterval(load, 15000);
+        const timer = window.setInterval(() => {
+            recordDiagnostic("NOTIFICATION_CENTER_TIMER_FIRE", {detail: "referrals_15000ms"});
+            void load();
+        }, 15000);
+        recordDiagnostic("NOTIFICATION_CENTER_TIMER_START", {detail: "referrals_15000ms"});
         return () => { active = false; window.clearInterval(timer); };
     }, [isAuthenticated]);
 
@@ -10698,6 +10705,7 @@ function AdminPanel() {
 
     useEffect(() => {
         if (!showAdminNotifications) return;
+        recordDiagnostic("NOTIFICATION_CENTER_MOUNT");
         adminNotificationsCloseRef.current?.focus();
         function handleEscape(event: KeyboardEvent) {
             if (event.key !== "Escape") return;
@@ -10705,29 +10713,39 @@ function AdminPanel() {
             adminNotificationsTriggerRef.current?.focus();
         }
         window.addEventListener("keydown", handleEscape);
-        return () => window.removeEventListener("keydown", handleEscape);
+        return () => {
+            window.removeEventListener("keydown", handleEscape);
+            recordDiagnostic("NOTIFICATION_CENTER_UNMOUNT");
+        };
     }, [showAdminNotifications]);
 
     function closeAdminNotifications() {
+        recordDiagnostic("NOTIFICATION_CENTER_CLOSE");
         setShowAdminNotifications(false);
         adminNotificationsTriggerRef.current?.focus();
     }
 
     function openAdminNotifications() {
+        recordDiagnostic("NOTIFICATION_CENTER_OPEN");
         setShowAdminNotifications(true);
         if (isAuthenticated) {
+            recordDiagnostic("REFERRALS_FETCH_START", {detail: "center_open"});
             void supabase.rpc("get_admin_referrals").then(({data, error}) => {
                 if (error) {
+                    recordDiagnostic("REFERRALS_FETCH_ERROR", {detail: "center_open_rpc_failed"});
                     setAdminReferralsError("Não foi possível carregar as indicações agora.");
                     return;
                 }
+                recordDiagnostic("REFERRALS_FETCH_END", {detail: "center_open"});
                 setAdminReferralsError("");
                 setAdminReferrals((data ?? []) as AdminReferral[]);
             });
         }
         setAdminPushState("loading");
         setAdminPushMessage("");
+        recordDiagnostic("PUSH_SUBSCRIPTION_CHECK_START");
         void getAdminPushState().then((state) => {
+            recordDiagnostic("PUSH_SUBSCRIPTION_CHECK_END", {detail: state});
             setAdminPushState(state);
             setAdminPushMessage(state === "configuration-error"
                 ? "Configuração Web Push indisponível."
@@ -10735,6 +10753,7 @@ function AdminPanel() {
                     : state === "unsupported" ? "Este navegador não oferece suporte a Web Push."
                         : "");
         }).catch((error: unknown) => {
+            recordDiagnostic("PUSH_SUBSCRIPTION_CHECK_ERROR", {detail: error instanceof Error ? error.name : "unknown"});
             setAdminPushState("error");
             setAdminPushMessage(error instanceof Error ? error.message : "Não foi possível confirmar o estado das notificações ADM.");
         });
