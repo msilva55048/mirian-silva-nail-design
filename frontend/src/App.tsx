@@ -10247,6 +10247,9 @@ function AdminPanel() {
     const [adminPushState, setAdminPushState] = useState<AdminPushState>("loading");
     const [isUpdatingAdminPush, setIsUpdatingAdminPush] = useState(false);
     const [adminPushMessage, setAdminPushMessage] = useState("");
+    const [showAdminNotifications, setShowAdminNotifications] = useState(false);
+    const adminNotificationsTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const adminNotificationsCloseRef = useRef<HTMLButtonElement | null>(null);
 
     const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
     const [adminBlocks, setAdminBlocks] = useState<AdminScheduleBlock[]>([]);
@@ -10625,6 +10628,40 @@ function AdminPanel() {
         } finally {
             setIsUpdatingAdminPush(false);
         }
+    }
+
+    useEffect(() => {
+        if (!showAdminNotifications) return;
+        adminNotificationsCloseRef.current?.focus();
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key !== "Escape") return;
+            setShowAdminNotifications(false);
+            adminNotificationsTriggerRef.current?.focus();
+        }
+        window.addEventListener("keydown", handleEscape);
+        return () => window.removeEventListener("keydown", handleEscape);
+    }, [showAdminNotifications]);
+
+    function closeAdminNotifications() {
+        setShowAdminNotifications(false);
+        adminNotificationsTriggerRef.current?.focus();
+    }
+
+    function openAdminNotifications() {
+        setShowAdminNotifications(true);
+        setAdminPushState("loading");
+        setAdminPushMessage("");
+        void getAdminPushState().then((state) => {
+            setAdminPushState(state);
+            setAdminPushMessage(state === "configuration-error"
+                ? "Configuração Web Push indisponível."
+                : state === "blocked" ? "Permissão de notificações bloqueada no navegador."
+                    : state === "unsupported" ? "Este navegador não oferece suporte a Web Push."
+                        : "");
+        }).catch((error: unknown) => {
+            setAdminPushState("error");
+            setAdminPushMessage(error instanceof Error ? error.message : "Não foi possível confirmar o estado das notificações ADM.");
+        });
     }
 
     async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
@@ -13816,21 +13853,41 @@ function AdminPanel() {
                     <div className="admin-header__actions">
                         <div className="admin-push-control">
                             <button
+                                ref={adminNotificationsTriggerRef}
                                 className={`admin-secondary-button admin-push-button${adminPushState === "enabled" ? " is-push-enabled" : ""}`}
                                 type="button"
-                                disabled={isUpdatingAdminPush || adminPushState === "loading" || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked"}
-                                onClick={() => void toggleAdminPush()}
-                                aria-label={adminPushState === "loading" ? "Verificando notificações" : adminPushState === "error" ? "Falha ao verificar notificações; toque para tentar novamente" : adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
-                                title={adminPushState === "loading" ? "Verificando o estado real no navegador e no backend" : adminPushState === "error" ? "Não foi possível confirmar o estado; toque para tentar novamente" : adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "blocked" ? "Permissão de notificações bloqueada" : adminPushState === "unsupported" ? "Navegador sem suporte a notificações" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : "Ativar notificações"}
+                                onClick={openAdminNotifications}
+                                aria-label="Abrir Central de Notificações"
+                                title={adminPushState === "enabled" ? "Notificações ADM ativadas — abrir Central de Notificações" : "Abrir Central de Notificações"}
                                 aria-busy={adminPushState === "loading" || isUpdatingAdminPush}
+                                aria-haspopup="dialog"
+                                aria-expanded={showAdminNotifications}
                             >
                                 {adminPushState === "loading" ? "…" : adminPushState === "blocked" || adminPushState === "unsupported" || adminPushState === "configuration-error" ? "🔕" : "🔔"}
                             </button>
-                            {adminPushMessage && <span className="admin-push-status" role="status">{adminPushMessage}</span>}
                         </div>
                         <button className="admin-secondary-button" type="button" onClick={handleLogout}>Sair</button>
                     </div>
                 </header>
+
+                {showAdminNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeAdminNotifications(); }}>
+                    <section className="client-modal client-notifications-modal admin-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="admin-notifications-title">
+                        <button ref={adminNotificationsCloseRef} className="client-modal__close" type="button" aria-label="Fechar Central de Notificações" onClick={closeAdminNotifications}>×</button>
+                        <div className="client-notifications-modal__header">
+                            <div><span className="client-modal__eyebrow">Central de notificações</span><h2 id="admin-notifications-title">Notificações</h2></div>
+                        </div>
+                        <div className="client-notification-push-control">
+                            <div className="client-notification-push-control__copy">
+                                <strong>Ativar notificações</strong>
+                                <span>{adminPushState === "enabled" ? "Notificações ativadas" : adminPushState === "loading" ? "Verificando status..." : adminPushState === "blocked" ? "Permissão de notificações bloqueada no navegador" : adminPushState === "unsupported" ? "Este navegador não oferece suporte a Web Push" : adminPushState === "configuration-error" ? "Configuração Web Push indisponível" : adminPushState === "error" ? "Não foi possível confirmar o status" : "Notificações desativadas"}</span>
+                            </div>
+                            <button type="button" role="switch" aria-checked={adminPushState === "enabled"} aria-label={adminPushState === "enabled" ? "Desativar notificações ADM" : "Ativar notificações ADM"} className={`client-notification-push-toggle${adminPushState === "enabled" ? " is-active" : ""}`} disabled={isUpdatingAdminPush || adminPushState === "loading" || adminPushState === "unsupported" || adminPushState === "configuration-error" || adminPushState === "blocked"} onClick={() => void toggleAdminPush()} />
+                        </div>
+                        {adminPushMessage && <p className="admin-notifications-message" role="status">{adminPushMessage}</p>}
+                        {adminPushState === "error" && <button className="admin-notifications-retry" type="button" disabled={isUpdatingAdminPush} onClick={() => void toggleAdminPush()}>Tentar verificar novamente</button>}
+                        <div className="client-notifications-list"><p className="client-account__empty">Nenhuma notificação por enquanto.</p></div>
+                    </section>
+                </div>}
 
                 <div className="admin-dashboard-cards">
                     <button className={`admin-dashboard-card${adminView === "agenda" ? " is-active" : ""}`} type="button" onClick={() => openAdminDashboardView("agenda")}><strong>Agendamentos</strong><span>Veja os atendimentos e horários disponíveis.</span></button>
