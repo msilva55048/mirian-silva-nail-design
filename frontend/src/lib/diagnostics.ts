@@ -11,6 +11,7 @@ export type DiagnosticEvent = {
 };
 
 const pageInstanceId = crypto.randomUUID();
+const wasDiscarded = () => (document as Document & {wasDiscarded?: boolean}).wasDiscarded === true;
 
 function safePathname() {
     return window.location.pathname || "/";
@@ -59,8 +60,8 @@ export function formatDiagnosticEvents() {
 recordDiagnostic("PAGE_INIT", {
     pathname: safePathname(),
     detail: typeof performance !== "undefined"
-        ? `navigation=${performance.getEntriesByType("navigation")[0]?.toJSON?.().type ?? "unknown"}`
-        : "navigation=unknown",
+        ? `navigation=${performance.getEntriesByType("navigation")[0]?.toJSON?.().type ?? "unknown"};wasDiscarded=${wasDiscarded()}`
+        : `navigation=unknown;wasDiscarded=${wasDiscarded()}`,
 });
 
 if (typeof window !== "undefined") {
@@ -82,6 +83,22 @@ if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", () => recordDiagnostic("BEFORE_UNLOAD"));
     window.addEventListener("pagehide", (event) => recordDiagnostic("PAGE_HIDE", {detail: `persisted=${event.persisted}`}));
     window.addEventListener("pageshow", (event) => recordDiagnostic("PAGE_SHOW", {detail: `persisted=${event.persisted}`}));
+    window.addEventListener("freeze", () => recordDiagnostic("PAGE_FREEZE"));
+    window.addEventListener("resume", () => recordDiagnostic("PAGE_RESUME"));
+    navigator.serviceWorker?.addEventListener("controllerchange", () => recordDiagnostic("SW_CONTROLLER_CHANGE"));
+    void navigator.serviceWorker?.getRegistration("/").then((registration) => {
+        if (!registration) {
+            recordDiagnostic("SW_REGISTRATION", {detail: "none"});
+            return;
+        }
+        recordDiagnostic("SW_REGISTRATION", {detail: `state=${registration.active?.state ?? "none"};waiting=${registration.waiting ? "true" : "false"}`});
+        registration.addEventListener("updatefound", () => {
+            recordDiagnostic("SW_UPDATE_FOUND");
+            registration.installing?.addEventListener("statechange", () => {
+                recordDiagnostic("SW_STATE_CHANGE", {detail: `state=${registration.installing?.state ?? "unknown"}`});
+            });
+        });
+    });
     window.addEventListener("popstate", recordPathname);
     window.addEventListener("hashchange", recordPathname);
     window.addEventListener("error", (event) => recordDiagnostic("WINDOW_ERROR", {
