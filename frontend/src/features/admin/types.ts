@@ -10,8 +10,6 @@ export type AdminAppointment = {
     start_time: string;
     duration_minutes: number;
     price_cents: number | null;
-    loyalty_original_price_cents?: number | null;
-    loyalty_reward_id?: string | null;
     client_hidden: boolean;
     status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show";
     confirmation_sent_at?: string | null;

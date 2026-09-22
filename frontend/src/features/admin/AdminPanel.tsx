@@ -326,7 +326,7 @@ export default function AdminPanel() {
                 {data: timeOverrideData, error: timeOverrideLoadError},
             ] = await Promise.all([
                 supabase.from("appointments")
-                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, loyalty_original_price_cents, loyalty_reward_id, client_hidden, status, created_at")
+                    .select("id, client_id, client_name, client_phone, client_email, musical_taste, service_name, appointment_date, start_time, duration_minutes, price_cents, client_hidden, status, created_at")
                     .order("appointment_date", {ascending: true})
                     .order("start_time", {ascending: true}),
                 supabase.from("schedule_blocks")
@@ -4548,7 +4548,6 @@ export default function AdminPanel() {
                         <section className="admin-modal">
                             <div className="admin-modal__header"><div><h2>Editar agendamento</h2><p>Altere os dados ou cancele o agendamento.</p></div><button className="admin-modal__close" type="button" onClick={() => setSelectedAdminAppointment(null)}>×</button></div>
                             <div className="admin-modal__body">
-                                {selectedAdminAppointment.loyalty_reward_id && <div className="admin-edit-form__full" style={{color: "#8a5b19", fontWeight: 700}}>🎁 GRÁTIS — CARTÃO FIDELIDADE · preço original {formatCurrency(selectedAdminAppointment.loyalty_original_price_cents ?? 0)} · valor final R$ 0,00</div>}
                                 <div className="admin-edit-form">
                                     <label>Nome da cliente<input value={editAppointmentName} onChange={(event) => setEditAppointmentName(event.target.value)}/></label>
                                     <label>Telefone<input value={editAppointmentPhone} onChange={(event) => setEditAppointmentPhone(event.target.value)}/></label>
