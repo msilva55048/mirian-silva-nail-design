@@ -2,7 +2,6 @@ import {getClientBookingStartContext, canServiceUseClientStart, getAgendaDuratio
 import {isClientBookingDateBlocked} from "./bookingDateRules";
 import {useEffect, useMemo, useState} from "react";
 import {supabase} from "../../lib/supabase";
-import {recordDiagnostic} from "../../lib/diagnostics";
 import {
     type Appointment,
     type ScheduleBlock,
@@ -23,10 +22,6 @@ import {type PublicClientAppointment, type PublicClientProfile} from "./types";
 import {clientAccountStyles} from "./styles";
 
 export default function PublicSite() {
-    useEffect(() => {
-        recordDiagnostic("CLIENT_MOUNT");
-        return () => recordDiagnostic("CLIENT_UNMOUNT");
-    }, []);
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
@@ -173,7 +168,6 @@ export default function PublicSite() {
 
         async function initializeClientSession() {
             const {data: {session}} = await supabase.auth.getSession();
-            recordDiagnostic("AUTH_INITIAL_SESSION", {sessionPresent: Boolean(session)});
 
             if (!mounted) return;
 
@@ -192,7 +186,6 @@ export default function PublicSite() {
         void initializeClientSession();
 
         const {data: authListener} = supabase.auth.onAuthStateChange((event, session) => {
-            recordDiagnostic(`AUTH_${event}`, {sessionPresent: Boolean(session)});
             if (event === "PASSWORD_RECOVERY") {
                 setRecoverySessionUserId(session?.user?.id ?? null);
                 setShowClientAuth(false);

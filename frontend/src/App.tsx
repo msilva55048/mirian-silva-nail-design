@@ -24,7 +24,6 @@ import {
 } from "./lib/adminPush";
 import {disableClientPush, enableClientPush, getClientPushState, isClientPushRegistered, isIOSDevice, isStandaloneDisplay, type ClientPushState} from "./lib/clientPush";
 import "./App.css";
-import {clearDiagnosticEvents, formatDiagnosticEvents, getDiagnosticEvents, recordDiagnostic} from "./lib/diagnostics";
 
 declare global {
     interface Navigator {
@@ -10269,14 +10268,8 @@ function AdminPanel() {
     const [isUpdatingAdminPush, setIsUpdatingAdminPush] = useState(false);
     const [adminPushMessage, setAdminPushMessage] = useState("");
     const [showAdminNotifications, setShowAdminNotifications] = useState(false);
-    const [showDiagnostics, setShowDiagnostics] = useState(false);
-    const [diagnosticEvents, setDiagnosticEvents] = useState(() => getDiagnosticEvents());
     const authBootstrapRef = useRef({sessionRead: false, initialEventSeen: false});
 
-    useEffect(() => {
-        recordDiagnostic("ADMIN_MOUNT");
-        return () => recordDiagnostic("ADMIN_UNMOUNT");
-    }, []);
     const adminNotificationsTriggerRef = useRef<HTMLButtonElement | null>(null);
     const adminNotificationsCloseRef = useRef<HTMLButtonElement | null>(null);
 
@@ -10295,12 +10288,10 @@ function AdminPanel() {
         if (!isAuthenticated) return;
         let active = true;
         const load = async () => {
-            recordDiagnostic("REFERRALS_FETCH_START");
             setIsLoadingAdminReferrals(true);
             const {data, error} = await supabase.rpc("get_admin_referrals");
             if (!active) return;
             if (error) {
-                recordDiagnostic("REFERRALS_FETCH_ERROR", {detail: "rpc_failed"});
                 setAdminReferralsError("Não foi possível carregar as indicações agora.");
                 console.warn("Visão administrativa de indicações indisponível:", error);
                 setIsLoadingAdminReferrals(false);
@@ -10309,14 +10300,11 @@ function AdminPanel() {
             setAdminReferralsError("");
             setAdminReferrals((data ?? []) as AdminReferral[]);
             setIsLoadingAdminReferrals(false);
-            recordDiagnostic("REFERRALS_FETCH_END");
         };
         void load();
         const timer = window.setInterval(() => {
-            recordDiagnostic("NOTIFICATION_CENTER_TIMER_FIRE", {detail: "referrals_15000ms"});
             void load();
         }, 15000);
-        recordDiagnostic("NOTIFICATION_CENTER_TIMER_START", {detail: "referrals_15000ms"});
         return () => { active = false; window.clearInterval(timer); };
     }, [isAuthenticated]);
 
@@ -10503,7 +10491,6 @@ function AdminPanel() {
 
         async function checkSession() {
             const {data: {session}} = await supabase.auth.getSession();
-            recordDiagnostic("AUTH_INITIAL_SESSION", {sessionPresent: Boolean(session)});
             authBootstrapRef.current.sessionRead = true;
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 
@@ -10520,7 +10507,6 @@ function AdminPanel() {
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((event, session) => {
-            recordDiagnostic(`AUTH_${event}`, {sessionPresent: Boolean(session)});
             if (event === "INITIAL_SESSION") authBootstrapRef.current.initialEventSeen = true;
             if (event === "TOKEN_REFRESHED") return;
 
@@ -10705,7 +10691,6 @@ function AdminPanel() {
 
     useEffect(() => {
         if (!showAdminNotifications) return;
-        recordDiagnostic("NOTIFICATION_CENTER_MOUNT");
         adminNotificationsCloseRef.current?.focus();
         function handleEscape(event: KeyboardEvent) {
             if (event.key !== "Escape") return;
@@ -10715,37 +10700,29 @@ function AdminPanel() {
         window.addEventListener("keydown", handleEscape);
         return () => {
             window.removeEventListener("keydown", handleEscape);
-            recordDiagnostic("NOTIFICATION_CENTER_UNMOUNT");
         };
     }, [showAdminNotifications]);
 
     function closeAdminNotifications() {
-        recordDiagnostic("NOTIFICATION_CENTER_CLOSE");
         setShowAdminNotifications(false);
         adminNotificationsTriggerRef.current?.focus();
     }
 
     function openAdminNotifications() {
-        recordDiagnostic("NOTIFICATION_CENTER_OPEN");
         setShowAdminNotifications(true);
         if (isAuthenticated) {
-            recordDiagnostic("REFERRALS_FETCH_START", {detail: "center_open"});
             void supabase.rpc("get_admin_referrals").then(({data, error}) => {
                 if (error) {
-                    recordDiagnostic("REFERRALS_FETCH_ERROR", {detail: "center_open_rpc_failed"});
                     setAdminReferralsError("Não foi possível carregar as indicações agora.");
                     return;
                 }
-                recordDiagnostic("REFERRALS_FETCH_END", {detail: "center_open"});
                 setAdminReferralsError("");
                 setAdminReferrals((data ?? []) as AdminReferral[]);
             });
         }
         setAdminPushState("loading");
         setAdminPushMessage("");
-        recordDiagnostic("PUSH_SUBSCRIPTION_CHECK_START");
         void getAdminPushState().then((state) => {
-            recordDiagnostic("PUSH_SUBSCRIPTION_CHECK_END", {detail: state});
             setAdminPushState(state);
             setAdminPushMessage(state === "configuration-error"
                 ? "Configuração Web Push indisponível."
@@ -10753,19 +10730,9 @@ function AdminPanel() {
                     : state === "unsupported" ? "Este navegador não oferece suporte a Web Push."
                         : "");
         }).catch((error: unknown) => {
-            recordDiagnostic("PUSH_SUBSCRIPTION_CHECK_ERROR", {detail: error instanceof Error ? error.name : "unknown"});
             setAdminPushState("error");
             setAdminPushMessage(error instanceof Error ? error.message : "Não foi possível confirmar o estado das notificações ADM.");
         });
-    }
-
-    function openDiagnostics() {
-        setDiagnosticEvents(getDiagnosticEvents());
-        setShowDiagnostics(true);
-    }
-
-    async function copyDiagnostics() {
-        await navigator.clipboard?.writeText(formatDiagnosticEvents());
     }
 
     async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
@@ -13970,24 +13937,10 @@ function AdminPanel() {
                                 {adminPushState === "loading" ? "…" : adminPushState === "blocked" || adminPushState === "unsupported" || adminPushState === "configuration-error" ? "🔕" : "🔔"}
                             </button>
                         </div>
-                        <button className="admin-secondary-button" type="button" onClick={openDiagnostics}>Diagnóstico</button>
                         <button className="admin-secondary-button" type="button" onClick={handleLogout}>Sair</button>
                     </div>
                 </header>
 
-                {showDiagnostics && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiagnostics(false); }}>
-                    <section className="client-modal admin-diagnostics-modal" role="dialog" aria-modal="true" aria-labelledby="admin-diagnostics-title">
-                        <button className="client-modal__close" type="button" aria-label="Fechar diagnóstico" onClick={() => setShowDiagnostics(false)}>×</button>
-                        <span className="client-modal__eyebrow">Diagnóstico temporário</span>
-                        <h2 id="admin-diagnostics-title">Eventos recentes</h2>
-                        <p>Somente eventos técnicos locais. Nenhum token ou dado pessoal é armazenado.</p>
-                        <pre>{diagnosticEvents.map((event) => JSON.stringify(event)).join("\n") || "Nenhum evento registrado."}</pre>
-                        <div className="admin-diagnostics-actions">
-                            <button type="button" onClick={() => void copyDiagnostics()}>Copiar diagnóstico</button>
-                            <button type="button" onClick={() => { clearDiagnosticEvents(); setDiagnosticEvents([]); }}>Limpar diagnóstico</button>
-                        </div>
-                    </section>
-                </div>}
 
                 {showAdminNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeAdminNotifications(); }}>
                     <section className="client-modal client-notifications-modal admin-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="admin-notifications-title">
