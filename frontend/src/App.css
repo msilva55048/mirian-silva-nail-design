@@ -1433,6 +1433,166 @@ a {
   border: 1px solid var(--color-gold-border) !important;
 }
 
+/* Shared notification-center shell. These rules also make the client modal
+   available to the separately rendered admin route. */
+.client-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(31, 19, 23, .58);
+  backdrop-filter: blur(7px);
+}
+
+.client-modal {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  box-sizing: border-box;
+  border-radius: 24px;
+  padding: 28px;
+  background: #fff;
+  color: #35272c;
+  box-shadow: 0 24px 80px rgba(33, 17, 22, .28);
+}
+
+.client-modal__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #f3e7ea;
+  color: #6d3445;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.client-modal__eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: #a05b70;
+  font-size: .75rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.client-modal h2 {
+  margin: 0;
+  color: #392a2f;
+}
+
+.client-notifications-modal {
+  max-height: min(78vh, 680px);
+  overflow: hidden;
+}
+
+.client-notifications-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.client-notifications-list {
+  display: grid;
+  gap: 8px;
+  max-height: 58vh;
+  overflow: auto;
+  margin-top: 14px;
+}
+
+.client-notification-push-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--color-gold-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  background: #fffdf9;
+}
+
+.client-notification-push-control__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.client-notification-push-control__copy strong {
+  font-size: .9rem;
+}
+
+.client-notification-push-control__copy span {
+  color: #806c74;
+  font-size: .76rem;
+}
+
+.client-notification-push-toggle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: #bd5364;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+
+.client-notification-push-toggle.is-active {
+  background: #4d9b68;
+}
+
+.client-notification-push-toggle:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.client-notification-push-toggle::after {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  content: "";
+  transition: transform .2s ease;
+}
+
+.client-notification-push-toggle.is-active::after {
+  transform: translateX(24px);
+}
+
+.client-notifications-modal .client-account__empty {
+  padding: 18px;
+  border: 1px solid var(--color-gold-border);
+  border-radius: 14px;
+  background: #faf5f7;
+  color: #80666e;
+  text-align: center;
+}
+
+.admin-notifications-modal .client-notifications-list > .client-account__empty {
+  display: grid;
+  min-height: 92px;
+  place-items: center;
+  box-sizing: border-box;
+  margin: 0;
+}
+
 .admin-notifications-modal {
   max-height: min(calc(100dvh - 32px), 680px);
 }
