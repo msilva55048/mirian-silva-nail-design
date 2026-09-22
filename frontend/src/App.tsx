@@ -10276,13 +10276,21 @@ function AdminPanel() {
     const [panelSuccess, setPanelSuccess] = useState("");
     const [notificationClock, setNotificationClock] = useState(() => Date.now());
     const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
+    const [adminReferralsError, setAdminReferralsError] = useState("");
 
     useEffect(() => {
         if (!isAuthenticated) return;
         let active = true;
         const load = async () => {
             const {data, error} = await supabase.rpc("get_admin_referrals");
-            if (active && !error) setAdminReferrals((data ?? []) as AdminReferral[]);
+            if (!active) return;
+            if (error) {
+                setAdminReferralsError("Não foi possível carregar as indicações agora.");
+                console.warn("Visão administrativa de indicações indisponível:", error);
+                return;
+            }
+            setAdminReferralsError("");
+            setAdminReferrals((data ?? []) as AdminReferral[]);
         };
         void load();
         const timer = window.setInterval(load, 15000);
@@ -10679,6 +10687,16 @@ function AdminPanel() {
 
     function openAdminNotifications() {
         setShowAdminNotifications(true);
+        if (isAuthenticated) {
+            void supabase.rpc("get_admin_referrals").then(({data, error}) => {
+                if (error) {
+                    setAdminReferralsError("Não foi possível carregar as indicações agora.");
+                    return;
+                }
+                setAdminReferralsError("");
+                setAdminReferrals((data ?? []) as AdminReferral[]);
+            });
+        }
         setAdminPushState("loading");
         setAdminPushMessage("");
         void getAdminPushState().then((state) => {
@@ -13915,7 +13933,7 @@ function AdminPanel() {
                         </div>
                         {adminPushMessage && <p className="admin-notifications-message" role="status">{adminPushMessage}</p>}
                         {adminPushState === "error" && <button className="admin-notifications-retry" type="button" disabled={isUpdatingAdminPush} onClick={() => void toggleAdminPush()}>Tentar verificar novamente</button>}
-                        <section className="referral-state-card"><span className="client-modal__eyebrow">Indicações</span><h3>Acompanhe as indicações das clientes.</h3>{adminReferrals.length ? Object.values(adminReferrals.reduce<Record<string, {name: string; items: AdminReferral[]}>>((groups, referral) => { const group = groups[referral.referrer_id] ?? {name: referral.referrer_name, items: []}; group.items.push(referral); groups[referral.referrer_id] = group; return groups; }, {})).map((group) => <div key={group.name} className="referral-state-card__group"><strong>{group.name}</strong>{group.items.map((referral) => <article key={referral.referral_id} className="referral-state-card__item"><span>{referral.referred_name}</span><span className={`referral-state-badge referral-state-badge--${referral.referral_status.toLowerCase()}`}>{referral.referral_status}</span>{referral.referral_status === "REALIZADA" && <small>Desconto de {referral.discount_percent ?? 30}% {referral.reward_status === "reserved" ? "reservado" : "disponível"}</small>}</article>)}</div>) : <p>Você ainda não possui indicações cadastradas.</p>}</section>
+                        <section className="referral-state-card"><span className="client-modal__eyebrow">Indicações</span><h3>Acompanhe as indicações das clientes.</h3>{adminReferralsError ? <p role="alert">{adminReferralsError}</p> : adminReferrals.length ? Object.values(adminReferrals.reduce<Record<string, {name: string; items: AdminReferral[]}>>((groups, referral) => { const group = groups[referral.referrer_id] ?? {name: referral.referrer_name, items: []}; group.items.push(referral); groups[referral.referrer_id] = group; return groups; }, {})).map((group) => <div key={group.name} className="referral-state-card__group"><strong>{group.name}</strong>{group.items.map((referral) => <article key={referral.referral_id} className="referral-state-card__item"><span>{referral.referred_name}</span><span className={`referral-state-badge referral-state-badge--${referral.referral_status.toLowerCase()}`}>{referral.referral_status}</span>{referral.referral_status === "REALIZADA" && <small>Desconto de {referral.discount_percent ?? 30}% {referral.reward_status === "reserved" ? "reservado" : "disponível"}</small>}</article>)}</div>) : <p>Você ainda não possui indicações cadastradas.</p>}</section>
                         <div className="client-notifications-list"><p className="client-account__empty">Nenhuma notificação por enquanto.</p></div>
                     </section>
                 </div>}

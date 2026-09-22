@@ -2638,12 +2638,12 @@ a {
  .referral-state-card {
     margin: 16px 0;
     padding: 16px;
-    border: 1px solid rgba(177, 133, 75, .35);
+    border: 1px solid #b5894b;
     border-radius: 18px;
     background: #fffaf7;
 }
 .referral-state-card h3 { margin: 4px 0 14px; font-size: 1rem; }
-.referral-state-card__item { display: grid; gap: 5px; padding: 11px 0; border-top: 1px solid rgba(177,133,75,.18); }
+.referral-state-card__item { display: grid; gap: 5px; padding: 11px 12px; margin-top: 8px; border: 1px solid #b5894b; border-radius: 12px; }
 .referral-state-card__group { margin-top: 12px; }
 .referral-state-badge { display: inline-flex; width: fit-content; padding: 4px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800; letter-spacing: .04em; }
 .referral-state-badge--cadastrada { background: #ffd9d5; color: #9c3e38; }
