@@ -24,6 +24,7 @@ import {
 } from "./lib/adminPush";
 import {disableClientPush, enableClientPush, getClientPushState, isClientPushRegistered, isIOSDevice, isStandaloneDisplay, type ClientPushState} from "./lib/clientPush";
 import "./App.css";
+import {clearDiagnosticEvents, formatDiagnosticEvents, getDiagnosticEvents, recordDiagnostic} from "./lib/diagnostics";
 
 declare global {
     interface Navigator {
@@ -10268,6 +10269,13 @@ function AdminPanel() {
     const [isUpdatingAdminPush, setIsUpdatingAdminPush] = useState(false);
     const [adminPushMessage, setAdminPushMessage] = useState("");
     const [showAdminNotifications, setShowAdminNotifications] = useState(false);
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+    const [diagnosticEvents, setDiagnosticEvents] = useState(() => getDiagnosticEvents());
+
+    useEffect(() => {
+        recordDiagnostic("ADMIN_MOUNT");
+        return () => recordDiagnostic("ADMIN_UNMOUNT");
+    }, []);
     const adminNotificationsTriggerRef = useRef<HTMLButtonElement | null>(null);
     const adminNotificationsCloseRef = useRef<HTMLButtonElement | null>(null);
 
@@ -10487,6 +10495,7 @@ function AdminPanel() {
 
         async function checkSession() {
             const {data: {session}} = await supabase.auth.getSession();
+            recordDiagnostic("AUTH_INITIAL_SESSION", {sessionPresent: Boolean(session)});
             const isMirianAdminSession = sessionIsMirianAdmin(session);
 
             if (isMirianAdminSession) {
@@ -10500,6 +10509,7 @@ function AdminPanel() {
         void checkSession();
 
         const {data: {subscription}} = supabase.auth.onAuthStateChange((event, session) => {
+            recordDiagnostic(`AUTH_${event}`, {sessionPresent: Boolean(session)});
             if (event === "TOKEN_REFRESHED") return;
 
             const isMirianAdminSession = sessionIsMirianAdmin(session);
@@ -10720,6 +10730,15 @@ function AdminPanel() {
             setAdminPushState("error");
             setAdminPushMessage(error instanceof Error ? error.message : "Não foi possível confirmar o estado das notificações ADM.");
         });
+    }
+
+    function openDiagnostics() {
+        setDiagnosticEvents(getDiagnosticEvents());
+        setShowDiagnostics(true);
+    }
+
+    async function copyDiagnostics() {
+        await navigator.clipboard?.writeText(formatDiagnosticEvents());
     }
 
     async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
@@ -13924,9 +13943,24 @@ function AdminPanel() {
                                 {adminPushState === "loading" ? "…" : adminPushState === "blocked" || adminPushState === "unsupported" || adminPushState === "configuration-error" ? "🔕" : "🔔"}
                             </button>
                         </div>
+                        <button className="admin-secondary-button" type="button" onClick={openDiagnostics}>Diagnóstico</button>
                         <button className="admin-secondary-button" type="button" onClick={handleLogout}>Sair</button>
                     </div>
                 </header>
+
+                {showDiagnostics && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiagnostics(false); }}>
+                    <section className="client-modal admin-diagnostics-modal" role="dialog" aria-modal="true" aria-labelledby="admin-diagnostics-title">
+                        <button className="client-modal__close" type="button" aria-label="Fechar diagnóstico" onClick={() => setShowDiagnostics(false)}>×</button>
+                        <span className="client-modal__eyebrow">Diagnóstico temporário</span>
+                        <h2 id="admin-diagnostics-title">Eventos recentes</h2>
+                        <p>Somente eventos técnicos locais. Nenhum token ou dado pessoal é armazenado.</p>
+                        <pre>{diagnosticEvents.map((event) => JSON.stringify(event)).join("\n") || "Nenhum evento registrado."}</pre>
+                        <div className="admin-diagnostics-actions">
+                            <button type="button" onClick={() => void copyDiagnostics()}>Copiar diagnóstico</button>
+                            <button type="button" onClick={() => { clearDiagnosticEvents(); setDiagnosticEvents([]); }}>Limpar diagnóstico</button>
+                        </div>
+                    </section>
+                </div>}
 
                 {showAdminNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeAdminNotifications(); }}>
                     <section className="client-modal client-notifications-modal admin-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="admin-notifications-title">
