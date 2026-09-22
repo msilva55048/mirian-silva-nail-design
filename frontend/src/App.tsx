@@ -2664,7 +2664,7 @@ function PublicSite() {
 
     async function logoutClient() {
         clearMirianLastAccessMode();
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({scope: "local"});
         setShowClientAccount(false);
         setShowClientProfileEditor(false);
         setClientProfile(null);
@@ -10742,7 +10742,7 @@ function AdminPanel() {
 
         if (error || data.user?.email?.trim().toLowerCase() !== MIRIAN_ADMIN_EMAIL) {
             if (data.session) {
-                await supabase.auth.signOut();
+                await supabase.auth.signOut({scope: "local"});
             }
 
             setLoginError("E-mail ou senha incorretos.");
@@ -10758,7 +10758,7 @@ function AdminPanel() {
 
     async function handleLogout() {
         clearMirianLastAccessMode();
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({scope: "local"});
         window.location.replace("/");
     }
 

@@ -423,7 +423,7 @@ export default function AdminPanel() {
 
         if (error || data.user?.email?.trim().toLowerCase() !== MIRIAN_ADMIN_EMAIL) {
             if (data.session) {
-                await supabase.auth.signOut();
+                await supabase.auth.signOut({scope: "local"});
             }
 
             setLoginError("E-mail ou senha incorretos.");
@@ -437,7 +437,7 @@ export default function AdminPanel() {
     }
 
     async function handleLogout() {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({scope: "local"});
     }
 
     function scrollAdminToTop() {

@@ -767,7 +767,7 @@ export default function PublicSite() {
     }
 
     async function logoutClient() {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({scope: "local"});
         setShowClientAccount(false);
         setShowClientProfileEditor(false);
         setClientProfile(null);
