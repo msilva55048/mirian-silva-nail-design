@@ -573,6 +573,15 @@ type ClientNotification = {
     read_at: string | null;
 };
 
+type LoyaltyCard = {
+    prelaunch: boolean;
+    stars: number;
+    reward_available: boolean;
+    last_eligible_completed_at: string | null;
+    next_due_date: string | null;
+    reward_status: "none" | "available" | "reserved";
+};
+
 type SharedWaitlistRequest = {
     id: string;
     client_id: string;
@@ -1662,6 +1671,8 @@ function PublicSite() {
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [showClientNotifications, setShowClientNotifications] = useState(false);
     const [clientNotifications, setClientNotifications] = useState<ClientNotification[]>([]);
+    const [loyaltyCard, setLoyaltyCard] = useState<LoyaltyCard | null>(null);
+    const [showLoyaltyRules, setShowLoyaltyRules] = useState(false);
     const unreadClientNotificationCount = clientNotifications.filter((item) => !item.read_at).length;
     const [clientOpportunity, setClientOpportunity] = useState<ClientWaitlistOpportunity | null>(null);
     const [clientOpportunityLoading, setClientOpportunityLoading] = useState(false);
@@ -1709,6 +1720,13 @@ function PublicSite() {
     }, [clientProfile]);
 
     useEffect(() => {
+        if (!clientProfile) { setLoyaltyCard(null); return; }
+        void supabase.rpc("get_my_loyalty_card").then(({data, error}) => {
+            if (!error && data) setLoyaltyCard(data as LoyaltyCard);
+        });
+    }, [clientProfile, clientNotifications.length]);
+
+    useEffect(() => {
         if (!clientProfile) {
             setClientNotifications([]);
             return;
@@ -1747,6 +1765,17 @@ function PublicSite() {
         else if (notification.type === "waitlist-opportunity") setClientAccountSection("waitlist");
         setShowClientNotifications(false);
         setShowClientAccount(true);
+    }
+
+    function loyaltyDate(value: string | null) {
+        if (!value) return "";
+        return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR", {day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo"});
+    }
+
+    function loyaltyDaysLeft(value: string | null) {
+        if (!value) return null;
+        const today = new Date(new Intl.DateTimeFormat("en-CA", {timeZone: "America/Sao_Paulo"}).format(new Date()) + "T12:00:00");
+        return Math.ceil((new Date(`${value}T12:00:00`).getTime() - today.getTime()) / 86400000);
     }
 
     useEffect(() => {
@@ -3792,6 +3821,12 @@ function PublicSite() {
                 .client-notification-item strong { font-size: .92rem; }
                 .client-notification-item p, .client-notification-item small { margin: 0; color: #806c74; }
                 .client-notification-item small { font-size: .72rem; }
+                .client-loyalty-card { display: grid; gap: 8px; margin-top: 14px; padding: 16px; border: 1px solid #d7b36a; border-radius: 16px; background: linear-gradient(135deg,#fffaf3,#fff1f7); color: #5f3c47; }
+                .client-loyalty-card__top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+                .client-loyalty-card__top strong { font-size: 1rem; }
+                .client-loyalty-card button { border: 0; border-radius: 999px; padding: 7px 11px; background: #a54870; color: #fff; font: inherit; cursor: pointer; }
+                .client-loyalty-card p, .client-loyalty-card span { margin: 0; line-height: 1.4; }
+                .client-loyalty-card > span { font-size: 1.25rem; letter-spacing: 1px; }
                 .client-push-settings { display: grid; gap: 5px; border-top: 1px solid #ead9df; padding-top: 12px; }
                 .client-push-settings button { justify-self: start; border: 0; border-radius: 999px; padding: 7px 12px; background: #c95891; color: #fff; font: inherit; cursor: pointer; }
                 .client-logged-page .services {
@@ -3880,7 +3915,7 @@ function PublicSite() {
                         </nav>
                         {clientPushError && <p className="client-push-hint">{clientPushError}</p>}
                         {showIosPushGuide && <div className="client-modal-backdrop"><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowIosPushGuide(false)}>×</button><span className="client-modal__eyebrow">Ative as notificações no iPhone</span><h2>Adicione este site à Tela de Início</h2><p>Toque em Compartilhar → Adicionar à Tela de Início. Depois abra pelo novo ícone e toque novamente no sino.</p><button type="button" className="booking-modal__button primary-action" onClick={() => setShowIosPushGuide(false)}>Entendi</button></section></div>}
-                        {showClientNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowClientNotifications(false); }}><section className="client-modal client-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="client-notifications-title"><button className="client-modal__close" type="button" onClick={() => setShowClientNotifications(false)}>×</button><div className="client-notifications-modal__header"><div><span className="client-modal__eyebrow">Central de notificações</span><h2 id="client-notifications-title">Notificações</h2></div>{unreadClientNotificationCount > 0 && <button type="button" onClick={() => void markAllClientNotificationsRead()}>Marcar todas como lidas</button>}</div><div className="client-notification-push-control"><div className="client-notification-push-control__copy"><strong>Ativar notificações</strong><span>{clientPushState === "active" ? "Notificações ativadas" : clientPushState === "loading" ? "Verificando status..." : clientPushState === "ios-home-screen" ? "Adicione à Tela de Início para ativar" : "Notificações desativadas"}</span></div><button type="button" role="switch" aria-checked={clientPushState === "active"} aria-label={clientPushState === "active" ? "Desativar notificações" : "Ativar notificações"} className={`client-notification-push-toggle${clientPushState === "active" ? " is-active" : ""}`} disabled={clientPushState === "loading"} onClick={() => void toggleClientPush()} /></div><div className="client-notifications-list">{clientNotifications.length ? clientNotifications.map((notification) => <button key={notification.id} type="button" className={`client-notification-item${notification.read_at ? "" : " is-unread"}`} onClick={() => openClientNotification(notification)}><strong>{notification.title}</strong><p>{notification.message}</p><small>{new Date(notification.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small></button>) : <p className="client-account__empty">Nenhuma notificação por enquanto.</p>}</div></section></div>}
+                        {showClientNotifications && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowClientNotifications(false); }}><section className="client-modal client-notifications-modal" role="dialog" aria-modal="true" aria-labelledby="client-notifications-title"><button className="client-modal__close" type="button" onClick={() => setShowClientNotifications(false)}>×</button><div className="client-notifications-modal__header"><div><span className="client-modal__eyebrow">Central de notificações</span><h2 id="client-notifications-title">Notificações</h2></div>{unreadClientNotificationCount > 0 && <button type="button" onClick={() => void markAllClientNotificationsRead()}>Marcar todas como lidas</button>}</div><div className="client-loyalty-card">{loyaltyCard?.prelaunch ? <><strong>👑 Cartão Fidelidade</strong><span>Começa em 02/10 ✨</span><span>☆☆☆☆☆☆☆☆☆☆</span><p>A partir de 02/10, cada atendimento realizado começa a valer estrelas.</p></> : loyaltyCard && <><div className="client-loyalty-card__top"><strong>👑 Cartão Fidelidade</strong><button type="button" onClick={() => setShowLoyaltyRules(true)}>📖 Regras</button></div><p>A cada atendimento realizado, você ganha 1 estrela. Complete 10 estrelas e ganhe seu próximo serviço grátis!</p><span>{Array.from({length: 10}, (_, index) => index < loyaltyCard.stars ? "⭐" : "☆").join(" ")}</span><strong>{loyaltyCard.stars}/10 estrelas</strong><p>{loyaltyCard.reward_available ? "🎁 Parabéns! Seu próximo serviço elegível é grátis!" : loyaltyCard.last_eligible_completed_at ? "Próximo atendimento até " + loyaltyDate(loyaltyCard.next_due_date) : "Faça seu primeiro atendimento para começar a acumular estrelas ✨"}</p>{loyaltyCard.last_eligible_completed_at && <small>{(loyaltyDaysLeft(loyaltyCard.next_due_date) ?? 0) <= 0 ? "Seu cartão foi atualizado após o prazo." : "Faltam " + loyaltyDaysLeft(loyaltyCard.next_due_date) + " dias"}</small>}</>}</div><div className="client-notification-push-control"><div className="client-notification-push-control__copy"><strong>Ativar notificações</strong><span>{clientPushState === "active" ? "Notificações ativadas" : clientPushState === "loading" ? "Verificando status..." : clientPushState === "ios-home-screen" ? "Adicione à Tela de Início para ativar" : "Notificações desativadas"}</span></div><button type="button" role="switch" aria-checked={clientPushState === "active"} aria-label={clientPushState === "active" ? "Desativar notificações" : "Ativar notificações"} className={`client-notification-push-toggle${clientPushState === "active" ? " is-active" : ""}`} disabled={clientPushState === "loading"} onClick={() => void toggleClientPush()} /></div><div className="client-notifications-list">{clientNotifications.length ? clientNotifications.map((notification) => <button key={notification.id} type="button" className={`client-notification-item${notification.read_at ? "" : " is-unread"}`} onClick={() => openClientNotification(notification)}><strong>{notification.title}</strong><p>{notification.message}</p><small>{new Date(notification.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small></button>) : <p className="client-account__empty">Nenhuma notificação por enquanto.</p>}</div></section></div>}{showLoyaltyRules && <div className="client-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowLoyaltyRules(false); }}><section className="client-modal" role="dialog" aria-modal="true"><button className="client-modal__close" type="button" onClick={() => setShowLoyaltyRules(false)}>×</button><h2>📖 Regras do Cartão</h2><p>⭐ A cada atendimento realizado, você ganha 1 estrela. Ao completar 10 estrelas, seu próximo serviço elegível é grátis.</p><p>📅 Faça um novo atendimento em até 21 dias. A cada período completo sem atendimento, você perde 1 estrela.</p><p>🔧 Reparo não gera estrela, não renova o prazo e não utiliza o benefício.</p><p>❌ Se cancelar o serviço gratuito, o benefício continua disponível. Depois de concluí-lo, começa um novo cartão em 0/10.</p></section></div>}
                     </header>
 
                     {clientOpportunityError && !clientOpportunityLoading && opportunityDeepLinkId && (
