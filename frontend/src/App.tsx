@@ -5115,6 +5115,8 @@ type AdminClient = {
     nextAppointment: AdminAppointment | null;
 };
 
+type AdminSwapStep = "first" | "second" | "confirm";
+
 type ClientAnamnesisForm = {
     profession: string;
     workSchedule: string;
@@ -10383,6 +10385,13 @@ function AdminPanel() {
     const [isLoadingClientAnamnesis, setIsLoadingClientAnamnesis] = useState(false);
     const [clientEditError, setClientEditError] = useState("");
     const [isSavingClient, setIsSavingClient] = useState(false);
+    const [swapStep, setSwapStep] = useState<AdminSwapStep | null>(null);
+    const [swapFirstClient, setSwapFirstClient] = useState<AdminClient | null>(null);
+    const [swapSecondClient, setSwapSecondClient] = useState<AdminClient | null>(null);
+    const [swapFirstAppointment, setSwapFirstAppointment] = useState<AdminAppointment | null>(null);
+    const [swapSecondAppointment, setSwapSecondAppointment] = useState<AdminAppointment | null>(null);
+    const [swapError, setSwapError] = useState("");
+    const [isSwapping, setIsSwapping] = useState(false);
     const [deletingClientKey, setDeletingClientKey] = useState("");
     const [clearingCancelledAppointmentId, setClearingCancelledAppointmentId] =
         useState<string | null>(null);
@@ -11920,6 +11929,66 @@ function AdminPanel() {
     const filteredClients = useMemo(() =>
             filterAdminClients(clients, clientSearch, clientAppointmentFilter, adminNow),
         [clients, clientSearch, clientAppointmentFilter, adminNow]);
+
+    function getSwappableAppointments(client: AdminClient) {
+        return client.appointments
+            .filter((item) => (item.status === "pending" || item.status === "confirmed") && getAppointmentDateTime(item).getTime() > Date.now())
+            .sort((a, b) => getAppointmentDateTime(a).getTime() - getAppointmentDateTime(b).getTime());
+    }
+
+    function beginAppointmentSwap(client: AdminClient) {
+        setSwapError("");
+        setSwapFirstClient(client);
+        setSwapSecondClient(null);
+        setSwapFirstAppointment(null);
+        setSwapSecondAppointment(null);
+        setSwapStep("first");
+    }
+
+    function chooseFirstSwapAppointment(appointment: AdminAppointment) {
+        setSwapFirstAppointment(appointment);
+        setSwapStep("second");
+    }
+
+    function chooseSecondSwapAppointment(appointment: AdminAppointment, client: AdminClient) {
+        setSwapSecondClient(client);
+        setSwapSecondAppointment(appointment);
+        setSwapStep("confirm");
+    }
+
+    function closeAppointmentSwap() {
+        if (isSwapping) return;
+        setSwapStep(null);
+        setSwapFirstClient(null);
+        setSwapSecondClient(null);
+        setSwapFirstAppointment(null);
+        setSwapSecondAppointment(null);
+        setSwapError("");
+    }
+
+    async function confirmAppointmentSwap() {
+        if (!swapFirstAppointment || !swapSecondAppointment || isSwapping) return;
+        setIsSwapping(true);
+        setSwapError("");
+        const {data, error} = await supabase.rpc("admin_swap_appointments", {
+            p_first_appointment_id: swapFirstAppointment.id,
+            p_second_appointment_id: swapSecondAppointment.id,
+        });
+        if (error) {
+            setSwapError(error.message || "Não foi possível trocar os horários.");
+            setIsSwapping(false);
+            return;
+        }
+        const result = data as {first_new_date?: string; first_new_time?: string; second_new_date?: string; second_new_time?: string} | null;
+        setAppointments((current) => current.map((item) => {
+            if (item.id === swapFirstAppointment.id) return {...item, appointment_date: result?.first_new_date ?? swapSecondAppointment.appointment_date, start_time: result?.first_new_time ?? swapSecondAppointment.start_time};
+            if (item.id === swapSecondAppointment.id) return {...item, appointment_date: result?.second_new_date ?? swapFirstAppointment.appointment_date, start_time: result?.second_new_time ?? swapFirstAppointment.start_time};
+            return item;
+        }));
+        setPanelSuccess("Horários trocados com sucesso.");
+        setIsSwapping(false);
+        closeAppointmentSwap();
+    }
 
     useEffect(() => {
         if (adminView !== "clients" || !pendingClientNavigationKey) return;
@@ -15329,6 +15398,13 @@ function AdminPanel() {
                                                     </button>
                                                     <button
                                                         type="button"
+                                                        className="is-secondary"
+                                                        onClick={() => beginAppointmentSwap(client)}
+                                                    >
+                                                        Trocar com
+                                                    </button>
+                                                    <button
+                                                        type="button"
                                                         className="is-danger"
                                                         disabled={
                                                             deletingClientKey === client.key
@@ -16575,6 +16651,33 @@ function AdminPanel() {
                                     })}
                                 </div>
                             </section>
+                        </section>
+                    </div>
+                )}
+
+                {swapStep && swapFirstClient && (
+                    <div className="admin-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeAppointmentSwap(); }}>
+                        <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="swap-appointments-title">
+                            <div className="admin-modal__header">
+                                <div><h2 id="swap-appointments-title">Trocar horário</h2><p>{swapStep === "first" ? `Selecione o agendamento de ${swapFirstClient.name}.` : swapStep === "second" ? "Agora escolha a cliente e o agendamento que participará da troca." : "Confira os horários antes de confirmar."}</p></div>
+                                <button className="admin-modal__close" type="button" disabled={isSwapping} onClick={closeAppointmentSwap}>×</button>
+                            </div>
+                            <div className="admin-modal__body">
+                                {swapStep === "first" && getSwappableAppointments(swapFirstClient).map((appointment) => (
+                                    <button key={appointment.id} type="button" className="admin-dashboard-card" onClick={() => chooseFirstSwapAppointment(appointment)}>
+                                        <strong>{formatAdminDate(appointment.appointment_date)} às {String(appointment.start_time).slice(0, 5)}</strong><span>{appointment.service_name} · {getAppointmentStatusLabel(appointment.status)}</span>
+                                    </button>
+                                ))}
+                                {swapStep === "first" && getSwappableAppointments(swapFirstClient).length === 0 && <p>Essa cliente não possui agendamento futuro elegível para troca.</p>}
+                                {swapStep === "second" && <div className="admin-client-picker__results">{filteredClients.filter((client) => client.key !== swapFirstClient.key).map((client) => <button key={client.key} type="button" onClick={() => setSwapSecondClient(client)}><strong>{client.name}</strong><small>{client.phone}</small></button>)}</div>}
+                                {swapStep === "second" && swapSecondClient && <div className="admin-modal__body"><p>Agendamentos de {swapSecondClient.name}:</p>{getSwappableAppointments(swapSecondClient).map((appointment) => <button key={appointment.id} type="button" className="admin-dashboard-card" onClick={() => chooseSecondSwapAppointment(appointment, swapSecondClient)}><strong>{formatAdminDate(appointment.appointment_date)} às {String(appointment.start_time).slice(0, 5)}</strong><span>{appointment.service_name}</span></button>)}</div>}
+                                {swapStep === "confirm" && swapSecondClient && swapFirstAppointment && swapSecondAppointment && <>
+                                    <p><strong>{swapFirstClient.name}</strong>: {formatAdminDate(swapFirstAppointment.appointment_date)} às {String(swapFirstAppointment.start_time).slice(0, 5)} → {formatAdminDate(swapSecondAppointment.appointment_date)} às {String(swapSecondAppointment.start_time).slice(0, 5)}</p>
+                                    <p><strong>{swapSecondClient.name}</strong>: {formatAdminDate(swapSecondAppointment.appointment_date)} às {String(swapSecondAppointment.start_time).slice(0, 5)} → {formatAdminDate(swapFirstAppointment.appointment_date)} às {String(swapFirstAppointment.start_time).slice(0, 5)}</p>
+                                    {swapError && <p className="admin-form-error">{swapError}</p>}
+                                    <div className="admin-modal__actions"><button className="close" type="button" onClick={closeAppointmentSwap}>Cancelar</button><button className="admin-primary-button" type="button" disabled={isSwapping} onClick={() => void confirmAppointmentSwap()}>{isSwapping ? "Trocando..." : "Confirmar troca"}</button></div>
+                                </>}
+                            </div>
                         </section>
                     </div>
                 )}
