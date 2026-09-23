@@ -6473,9 +6473,21 @@ const adminStyles = `
 .admin-modal__actions button {
     min-height: 46px;
     min-width: 148px;
-    flex: 0 1 auto;
+    flex: 1 1 0;
     padding: 12px 18px;
     white-space: nowrap;
+}
+
+.admin-modal__actions .admin-swap-cancel-button {
+    background: #f2e8eb;
+    border-color: #d7b9c2;
+    color: #6d3445;
+}
+
+.admin-modal__actions .admin-swap-cancel-button:hover {
+    background: #e9d8dd;
+    border-color: #c99eaa;
+    color: #5d2839;
 }
 
 @media (max-width: 520px) {
@@ -16725,7 +16737,7 @@ function AdminPanel() {
                                     <p><strong>{swapFirstClient.name}</strong>: {formatAdminDate(swapFirstAppointment.appointment_date)} às {String(swapFirstAppointment.start_time).slice(0, 5)} → {formatAdminDate(swapSecondAppointment.appointment_date)} às {String(swapSecondAppointment.start_time).slice(0, 5)}</p>
                                     <p><strong>{swapSecondClient.name}</strong>: {formatAdminDate(swapSecondAppointment.appointment_date)} às {String(swapSecondAppointment.start_time).slice(0, 5)} → {formatAdminDate(swapFirstAppointment.appointment_date)} às {String(swapFirstAppointment.start_time).slice(0, 5)}</p>
                                     {swapError && <p className="admin-form-error">{swapError}</p>}
-                                    <div className="admin-modal__actions"><button className="close" type="button" onClick={closeAppointmentSwap}>Cancelar troca</button><button className="admin-primary-button" type="button" disabled={isSwapping} onClick={() => void confirmAppointmentSwap()}>{isSwapping ? "Trocando..." : "Confirmar troca"}</button></div>
+                                    <div className="admin-modal__actions"><button className="close admin-swap-cancel-button" type="button" onClick={closeAppointmentSwap}>Cancelar troca</button><button className="admin-primary-button" type="button" disabled={isSwapping} onClick={() => void confirmAppointmentSwap()}>{isSwapping ? "Trocando..." : "Confirmar troca"}</button></div>
                                 </>}
                             </div>
                         </section>
