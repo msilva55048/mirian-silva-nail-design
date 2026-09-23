@@ -6462,6 +6462,34 @@ const adminStyles = `
     padding: 20px 22px 24px;
 }
 
+.admin-modal__actions {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.admin-modal__actions button {
+    min-height: 46px;
+    min-width: 148px;
+    flex: 0 1 auto;
+    padding: 12px 18px;
+    white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+    .admin-modal__actions {
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+
+    .admin-modal__actions button {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 .admin-modal__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
