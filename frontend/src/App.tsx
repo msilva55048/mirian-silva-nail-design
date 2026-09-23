@@ -6478,18 +6478,21 @@ const adminStyles = `
     white-space: nowrap;
 }
 
-.admin-modal__actions .admin-swap-cancel-button {
-    background: var(--gradient-primary-action);
-    background-image: var(--gradient-primary-action);
-    border-color: var(--color-gold-border);
-    color: #fff;
+.admin-page .admin-modal__actions .admin-swap-cancel-button {
+    background: var(--gradient-primary-action) !important;
+    background-image: var(--gradient-primary-action) !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    color: #fff !important;
+    font: inherit;
+    font-weight: 700;
 }
 
-.admin-modal__actions .admin-swap-cancel-button:hover {
-    background: var(--gradient-primary-action-hover);
-    background-image: var(--gradient-primary-action-hover);
-    border-color: var(--color-gold-border);
-    color: #fff;
+.admin-page .admin-modal__actions .admin-swap-cancel-button:hover {
+    background: var(--gradient-primary-action-hover) !important;
+    background-image: var(--gradient-primary-action-hover) !important;
+    border-color: transparent !important;
+    color: #fff !important;
 }
 
 .admin-swap-card {
