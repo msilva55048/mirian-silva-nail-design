@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const admin = fs.readFileSync(new URL('../src/features/admin/SharedWaitlist.tsx', import.meta.url), 'utf8');
+const readOnlyExpiryMigration = fs.readFileSync(new URL('../supabase/migrations/20260925130000_fix_admin_waitlist_read_only.sql', import.meta.url), 'utf8');
 
 test('cliente usa RPCs compartilhadas e calendário útil', () => {
   assert.match(app, /create_my_waitlist_request/);
@@ -26,6 +27,12 @@ test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
   assert.match(admin, /waiting_list_requests/);
   assert.match(admin, /admin-manual-form/);
   assert.match(admin, /admin-manual-month-calendar/);
+});
+
+test('RPC administrativa oculta expiradas sem atualizar o histórico durante a leitura', () => {
+  assert.doesNotMatch(readOnlyExpiryMigration, /\b(update|delete|insert)\b/i);
+  assert.match(readOnlyExpiryMigration, /r\.status = 'active'/);
+  assert.match(readOnlyExpiryMigration, /r\.week_end >= \(now\(\) at time zone 'America\/Sao_Paulo'\)::date/);
 });
 
 test('cards do Admin seguem o layout legível da lista da cliente', () => {
