@@ -20,6 +20,7 @@ test('cliente usa RPCs compartilhadas e calendário útil', () => {
 
 test('Admin usa as mesmas solicitações e RPCs administrativas', () => {
   assert.match(admin, /admin_list_waitlist_requests/);
+  assert.match(admin, /admin_list_waitlist_requests", \{p_include_history: false\}/);
   assert.match(admin, /admin_create_waitlist_request/);
   assert.match(admin, /admin_cancel_waitlist_request/);
   assert.match(admin, /waiting_list_requests/);
