@@ -10359,22 +10359,24 @@ function AdminPanel() {
     const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
     const [adminReferralsError, setAdminReferralsError] = useState("");
     const [isLoadingAdminReferrals, setIsLoadingAdminReferrals] = useState(false);
+    const hasLoadedAdminReferralsRef = useRef(false);
 
     useEffect(() => {
         if (!isAuthenticated) return;
         let active = true;
         const load = async () => {
-            setIsLoadingAdminReferrals(true);
+            if (!hasLoadedAdminReferralsRef.current) setIsLoadingAdminReferrals(true);
             const {data, error} = await supabase.rpc("get_admin_referrals");
             if (!active) return;
             if (error) {
-                setAdminReferralsError("Não foi possível carregar as indicações agora.");
+                if (!hasLoadedAdminReferralsRef.current) setAdminReferralsError("Não foi possível carregar as indicações agora.");
                 console.warn("Visão administrativa de indicações indisponível:", error);
                 setIsLoadingAdminReferrals(false);
                 return;
             }
             setAdminReferralsError("");
             setAdminReferrals((data ?? []) as AdminReferral[]);
+            hasLoadedAdminReferralsRef.current = true;
             setIsLoadingAdminReferrals(false);
         };
         void load();
