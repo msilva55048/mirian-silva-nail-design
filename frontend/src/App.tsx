@@ -3794,10 +3794,10 @@ function PublicSite() {
                 .client-push-bell.is-loading { background: #faf7f8 !important; border-color: #ead9df !important; color: #a58d96; cursor: wait; opacity: .8; }
                 .client-push-hint { margin: 6px 0 0; color: #8a7078; font-size: .75rem; text-align: right; }
                 .client-notification-badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: #b94b70; color: #fff; font-size: .68rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
-                .client-notifications-modal { max-height: min(78vh, 680px); overflow: hidden; }
+                .client-notifications-modal { max-height: min(78vh, 680px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
                 .client-notifications-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
                 .client-notifications-modal__header button { border: 0; background: transparent; color: #a54870; font: inherit; font-size: .78rem; cursor: pointer; }
-                .client-notifications-list { display: grid; gap: 8px; max-height: 58vh; overflow: auto; margin-top: 14px; }
+                .client-notifications-list { display: grid; gap: 8px; margin-top: 14px; }
                 .client-notification-push-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #cdb57a; border-radius: 12px; padding: 12px 14px; margin-top: 14px; background: #fffdf9; }
                 .client-notification-push-control__copy { display: grid; gap: 3px; }
                 .client-notification-push-control__copy strong { font-size: .9rem; }

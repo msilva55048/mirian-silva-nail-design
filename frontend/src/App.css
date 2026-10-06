@@ -1491,7 +1491,10 @@ a {
 
 .client-notifications-modal {
   max-height: min(78vh, 680px);
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .client-notifications-modal__header {
@@ -1504,8 +1507,6 @@ a {
 .client-notifications-list {
   display: grid;
   gap: 8px;
-  max-height: 58vh;
-  overflow: auto;
   margin-top: 14px;
 }
 
