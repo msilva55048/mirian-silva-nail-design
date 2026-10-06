@@ -2486,9 +2486,11 @@ function PublicSite() {
         } catch (error) {
             console.error("Erro na autenticação da cliente:", error);
             setAuthError(
-                clientAuthMode === "signup"
-                    ? "Não foi possível criar a conta. Verifique os dados ou tente outro e-mail."
-                    : "E-mail ou senha inválidos.",
+                clientAuthMode === "signup" && isExistingEmailSignupError(error)
+                    ? EXISTING_EMAIL_SIGNUP_MESSAGE
+                    : clientAuthMode === "signup"
+                        ? "Não foi possível criar a conta. Verifique os dados ou tente outro e-mail."
+                        : "E-mail ou senha inválidos.",
             );
         } finally {
             setIsSubmittingAuth(false);
@@ -9119,6 +9121,32 @@ const adminEnhancementStyles = `
 
 
 const MIRIAN_ADMIN_EMAIL = "mirian201420@gmail.com";
+const EXISTING_EMAIL_SIGNUP_MESSAGE =
+    'Você já possui uma conta cadastrada com esse e-mail. Caso não lembre a senha, você pode recuperá-la na aba Entrar, digitando seu e-mail e clicando em "Esqueci a senha" logo abaixo.';
+
+function isExistingEmailSignupError(error: unknown) {
+    if (!error || typeof error !== "object") return false;
+
+    const authError = error as {
+        code?: unknown;
+        status?: unknown;
+        message?: unknown;
+    };
+    const code = typeof authError.code === "string"
+        ? authError.code.trim().toLowerCase()
+        : "";
+
+    if (["user_already_exists", "email_exists", "user_already_registered"].includes(code)) {
+        return true;
+    }
+
+    if (authError.status !== 422 || typeof authError.message !== "string") {
+        return false;
+    }
+
+    return /already\s+(registered|exists)|email\s+(is\s+)?already\s+(registered|exists)/i.test(authError.message);
+}
+
 const MIRIAN_LAST_MODE_KEY = "mirian-last-access-mode";
 type MirianAccessMode = "admin" | "client";
 
