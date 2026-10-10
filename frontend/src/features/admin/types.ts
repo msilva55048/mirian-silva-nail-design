@@ -82,6 +82,7 @@ export type ClientProfile = {
     user_id?: string | null;
     created_at?: string;
     updated_at?: string;
+    profile_photo_path?: string | null;
 };
 
 export type AdminBookingClient = {

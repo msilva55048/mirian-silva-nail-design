@@ -46,6 +46,9 @@ import {
     adminServiceManagerStyles,
     adminStyles,
 } from "./styles";
+import ProfilePhoto from "../shared/ProfilePhoto";
+
+const PROFILE_PHOTO_STYLES = `.profile-photo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.profile-photo>img,.profile-photo>span{width:var(--profile-photo-size);height:var(--profile-photo-size);flex:0 0 var(--profile-photo-size);border-radius:50%;object-fit:cover}.profile-photo>span{display:grid;place-items:center;background:linear-gradient(135deg,#6d3445,#aa667a);color:#fff;font-weight:800}.profile-photo__controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.profile-photo__controls label,.profile-photo__controls button{border:1px solid #d9bdc6;border-radius:999px;padding:7px 11px;background:#fff;color:#6d3445;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}.profile-photo__controls input[type=file]{display:none}.profile-photo__controls .profile-photo__crop{display:flex;align-items:center;gap:4px;border:0;padding:2px;font-size:.7rem}.profile-photo__crop input[type=range]{width:68px}.profile-photo small{width:100%;color:#6d3445}`;
 
 export default function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -338,7 +341,7 @@ export default function AdminPanel() {
                     .order("price_cents", {ascending: false})
                     .order("name", {ascending: true}),
                 supabase.from("client_profiles")
-                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
+                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, profile_photo_path, created_at, updated_at")
                     .order("full_name", {ascending: true}),
                 supabase.from("schedule_time_overrides")
                     .select("id, override_date, start_time, is_available, created_at, updated_at")
@@ -1853,7 +1856,7 @@ export default function AdminPanel() {
                     })
                     .eq("id", existingProfile.id)
                     .select(
-                        "id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at",
+                        "id, full_name, phone, email, musical_taste, phone_digits, user_id, profile_photo_path, created_at, updated_at",
                     )
                     .single();
 
@@ -2919,13 +2922,13 @@ export default function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + PROFILE_PHOTO_STYLES}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + PROFILE_PHOTO_STYLES}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -2943,7 +2946,7 @@ export default function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + `
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + PROFILE_PHOTO_STYLES + `
                 .client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }
                 .client-month-calendar, .admin-manual-month-calendar { display: block !important; }
             `}</style>
@@ -4083,7 +4086,7 @@ export default function AdminPanel() {
 
                                 return (
                                     <article className="admin-client-card" key={client.key}>
-                                        <div className="admin-client-card__top"><div className="admin-client-card__avatar">{client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div><div><h3>{client.name}</h3><a href={`https://wa.me/${normalizePhoneForWhatsApp(client.phone)}`} target="_blank" rel="noopener noreferrer">{client.phone}</a><span>{client.email || "E-mail não informado"}</span></div></div>
+                                        <div className="admin-client-card__top">{(() => {const profile = adminClientProfiles.find((item) => normalizeClientPhone(item.phone ?? "") === normalizeClientPhone(client.phone)); return profile ? <ProfilePhoto profileId={profile.id} name={client.name} path={profile.profile_photo_path} editable onSaved={(path) => setAdminClientProfiles((current) => current.map((item) => item.id === profile.id ? {...item, profile_photo_path: path} : item))} size={46} /> : <div className="admin-client-card__avatar">{client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>;})()}<div><h3>{client.name}</h3><a href={`https://wa.me/${normalizePhoneForWhatsApp(client.phone)}`} target="_blank" rel="noopener noreferrer">{client.phone}</a><span>{client.email || "E-mail não informado"}</span></div></div>
                                         <div className="admin-client-card__metrics">
                                             <div>
                                                 <span>Atendimentos realizados</span>

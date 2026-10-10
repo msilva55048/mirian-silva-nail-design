@@ -9,6 +9,7 @@ import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin
 import {isClientInactive} from "./features/admin/clientWithoutAppointment";
 import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {ServicePicker} from "./features/shared/ServicePicker";
+import ProfilePhoto from "./features/shared/ProfilePhoto";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
@@ -535,6 +536,7 @@ type PublicClientProfile = {
     email: string | null;
     phone_digits: string;
     user_id: string;
+    profile_photo_path?: string | null;
 };
 
 type PublicClientAppointment = {
@@ -1044,6 +1046,7 @@ const clientAccountStyles = `
     gap: 10px;
     margin: 20px 0;
 }
+.profile-photo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.profile-photo>img,.profile-photo>span{width:var(--profile-photo-size);height:var(--profile-photo-size);flex:0 0 var(--profile-photo-size);border-radius:50%;object-fit:cover}.profile-photo>span{display:grid;place-items:center;background:linear-gradient(135deg,#6d3445,#aa667a);color:#fff;font-weight:800}.profile-photo__controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.profile-photo__controls label,.profile-photo__controls button{border:1px solid #d9bdc6;border-radius:999px;padding:7px 11px;background:#fff;color:#6d3445;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}.profile-photo__controls input[type=file]{display:none}.profile-photo__controls .profile-photo__crop{display:flex;align-items:center;gap:4px;border:0;padding:2px;font-size:.7rem}.profile-photo__crop input[type=range]{width:68px}.profile-photo small{width:100%;color:#6d3445}.admin-booking-card__client-heading{display:flex;align-items:center;gap:8px}
 .client-account__profile div {
     padding: 13px;
     border-radius: 14px;
@@ -4734,6 +4737,7 @@ function PublicSite() {
                             <>
                                 {clientAccountSection === "profile" && (
                                 <div className="client-account__profile">
+                                    <ProfilePhoto profileId={clientProfile.id} name={clientProfile.full_name} path={clientProfile.profile_photo_path} editable onSaved={(path) => setClientProfile((current) => current ? {...current, profile_photo_path: path} : current)} size={84} />
                                     <div><span>Nome</span><strong>{clientProfile.full_name}</strong></div>
                                     <div><span>Telefone</span><strong>{formatBrazilianPhone(clientProfile.phone)}</strong></div>
                                     <div><span>E-mail</span><strong>{clientProfile.email || clientUserEmail}</strong></div>
@@ -5159,6 +5163,7 @@ type ClientProfile = {
     user_id?: string | null;
     created_at?: string;
     updated_at?: string;
+    profile_photo_path?: string | null;
 };
 
 type AdminBookingClient = {
@@ -10689,7 +10694,7 @@ function AdminPanel() {
                     .order("price_cents", {ascending: false})
                     .order("name", {ascending: true}),
                 supabase.from("client_profiles")
-                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at")
+                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, profile_photo_path, created_at, updated_at")
                     .order("full_name", {ascending: true}),
                 supabase.from("schedule_time_overrides")
                     .select("id, override_date, start_time, is_available, created_at, updated_at")
@@ -13944,6 +13949,7 @@ function AdminPanel() {
             !appointment.confirmation_sent_at,
         );
         const isExpanded = expandedAppointmentCardId === appointment.id;
+        const appointmentProfile = adminClientProfiles.find((profile) => profile.id === appointment.client_id);
 
         function toggleAppointmentCard() {
             setExpandedAppointmentCardId((current) =>
@@ -13969,11 +13975,14 @@ function AdminPanel() {
                 {renderPaymentToggle(appointment)}
 
                 <div className="admin-booking-card__top">
-                    <div>
+                    <div className="admin-booking-card__client-heading">
+                        {appointmentProfile ? <ProfilePhoto profileId={appointmentProfile.id} name={appointment.client_name} path={appointmentProfile.profile_photo_path} size={38} /> : <div className="admin-client-card__avatar">{appointment.client_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>}
+                        <div>
                         <span className="admin-booking-card__time">
                             {String(appointment.start_time).slice(0, 5)}
                         </span>
                         <h3>{appointment.client_name}</h3>
+                        </div>
                     </div>
 
                     <span className={getAdminAppointmentStatusClassName(appointment)}>
@@ -15419,14 +15428,7 @@ function AdminPanel() {
                                         ) : (
                                             <>
                                                 <div className="admin-client-card__top">
-                                                    <div className="admin-client-card__avatar">
-                                                        {client.name
-                                                            .split(/\s+/)
-                                                            .slice(0, 2)
-                                                            .map((part) => part[0])
-                                                            .join("")
-                                                            .toUpperCase()}
-                                                    </div>
+                                                    {(() => {const profile = adminClientProfiles.find((item) => normalizeClientPhone(item.phone ?? "") === normalizeClientPhone(client.phone)); return profile ? <ProfilePhoto profileId={profile.id} name={client.name} path={profile.profile_photo_path} editable onSaved={(path) => setAdminClientProfiles((current) => current.map((item) => item.id === profile.id ? {...item, profile_photo_path: path} : item))} size={46} /> : <div className="admin-client-card__avatar">{client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>;})()}
 
                                                     <div>
                                                         <h3>{client.name}</h3>

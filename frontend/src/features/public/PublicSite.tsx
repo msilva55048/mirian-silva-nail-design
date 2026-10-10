@@ -20,6 +20,7 @@ import {
 } from "../../shared/domain";
 import {type PublicClientAppointment, type PublicClientProfile} from "./types";
 import {clientAccountStyles} from "./styles";
+import ProfilePhoto from "../shared/ProfilePhoto";
 
 export default function PublicSite() {
     const [bookingStep, setBookingStep] = useState(1);
@@ -2423,6 +2424,7 @@ export default function PublicSite() {
                         ) : clientProfile ? (
                             <>
                                 <div className="client-account__profile">
+                                    <ProfilePhoto profileId={clientProfile.id} name={clientProfile.full_name} path={clientProfile.profile_photo_path} editable onSaved={(path) => setClientProfile((current) => current ? {...current, profile_photo_path: path} : current)} size={84} />
                                     <div><span>Nome</span><strong>{clientProfile.full_name}</strong></div>
                                     <div><span>Telefone</span><strong>{formatBrazilianPhone(clientProfile.phone)}</strong></div>
                                     <div><span>E-mail</span><strong>{clientProfile.email || clientUserEmail}</strong></div>

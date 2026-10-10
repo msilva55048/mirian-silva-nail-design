@@ -5,6 +5,7 @@ export type PublicClientProfile = {
     email: string | null;
     phone_digits: string;
     user_id: string;
+    profile_photo_path?: string | null;
 };
 
 export type PublicClientAppointment = {
