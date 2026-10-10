@@ -1,0 +1,140 @@
+.profile-photo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.profile-photo > img,
+.profile-photo > span {
+    display: block;
+    width: var(--profile-photo-size);
+    height: var(--profile-photo-size);
+    min-width: var(--profile-photo-size);
+    max-width: var(--profile-photo-size);
+    flex: 0 0 var(--profile-photo-size);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.profile-photo > span {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #6d3445, #aa667a);
+    color: #fff;
+    font-weight: 800;
+}
+
+.profile-photo__controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.profile-photo__controls label,
+.profile-photo__controls button {
+    border: 1px solid #d9bdc6;
+    border-radius: 999px;
+    padding: 7px 11px;
+    background: #fff;
+    color: #6d3445;
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.profile-photo__controls input[type="file"] {
+    display: none;
+}
+
+.profile-photo__controls .profile-photo__crop {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 0;
+    padding: 2px;
+    font-size: .7rem;
+}
+
+.profile-photo__crop input[type="range"] {
+    width: 68px;
+}
+
+.profile-photo small {
+    width: 100%;
+    color: #6d3445;
+}
+
+/* Client list: keep the avatar fixed and place its controls in a narrow column. */
+.admin-page .admin-client-card__top {
+    min-width: 0;
+    align-items: flex-start;
+}
+
+.admin-page .admin-client-card__top > .profile-photo {
+    width: 78px;
+    min-width: 78px;
+    max-width: 78px;
+    flex: 0 0 78px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+}
+
+.admin-page .admin-client-card__top > .profile-photo > img,
+.admin-page .admin-client-card__top > .profile-photo > span {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    max-width: 46px;
+    flex: 0 0 46px;
+}
+
+.admin-page .admin-client-card__top > .profile-photo .profile-photo__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    gap: 4px;
+}
+
+.admin-page .admin-client-card__top > .profile-photo .profile-photo__controls label,
+.admin-page .admin-client-card__top > .profile-photo .profile-photo__controls button {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 4px 2px;
+    font-size: .62rem;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.admin-page .admin-client-card__top > .profile-photo .profile-photo__controls .profile-photo__crop {
+    display: grid;
+    width: 100%;
+    gap: 2px;
+    padding: 1px;
+    font-size: .58rem;
+}
+
+.admin-page .admin-client-card__top > .profile-photo .profile-photo__crop input[type="range"] {
+    width: 100%;
+    max-width: 100%;
+}
+
+.admin-page .admin-client-card__top > .profile-photo small {
+    overflow-wrap: anywhere;
+}
+
+.admin-page .admin-client-card__top > .profile-photo + div {
+    min-width: 0;
+    flex: 1 1 0;
+    overflow-wrap: anywhere;
+}

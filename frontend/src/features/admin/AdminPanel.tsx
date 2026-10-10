@@ -48,7 +48,6 @@ import {
 } from "./styles";
 import ProfilePhoto from "../shared/ProfilePhoto";
 
-const PROFILE_PHOTO_STYLES = `.profile-photo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.profile-photo>img,.profile-photo>span{width:var(--profile-photo-size);height:var(--profile-photo-size);flex:0 0 var(--profile-photo-size);border-radius:50%;object-fit:cover}.profile-photo>span{display:grid;place-items:center;background:linear-gradient(135deg,#6d3445,#aa667a);color:#fff;font-weight:800}.profile-photo__controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.profile-photo__controls label,.profile-photo__controls button{border:1px solid #d9bdc6;border-radius:999px;padding:7px 11px;background:#fff;color:#6d3445;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}.profile-photo__controls input[type=file]{display:none}.profile-photo__controls .profile-photo__crop{display:flex;align-items:center;gap:4px;border:0;padding:2px;font-size:.7rem}.profile-photo__crop input[type=range]{width:68px}.profile-photo small{width:100%;color:#6d3445}`;
 
 export default function AdminPanel() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -2922,13 +2921,13 @@ export default function AdminPanel() {
     };
 
     if (isCheckingSession) {
-        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + PROFILE_PHOTO_STYLES}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
+        return <main className="admin-page"><style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style><div className="admin-login"><div className="admin-loading">Verificando acesso...</div></div></main>;
     }
 
     if (!isAuthenticated) {
         return (
             <main className="admin-page">
-                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + PROFILE_PHOTO_STYLES}</style>
+                <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles}</style>
                 <div className="admin-login">
                     <form className="admin-login__card" onSubmit={handleLogin}>
                         <div className="admin-login__brand"><img className="admin-login__logo" src="/logo-mirian.png" alt="Logo Mirian Silva Nail Design"/><div><strong>Mirian Silva</strong><span>Painel administrativo</span></div></div>
@@ -2946,7 +2945,7 @@ export default function AdminPanel() {
 
     return (
         <main className="admin-page">
-            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + PROFILE_PHOTO_STYLES + `
+            <style>{adminStyles + adminEnhancementStyles + adminServiceManagerStyles + adminEditDateTimeStyles + adminClientScheduledMetricStyles + `
                 .client-week-days, .admin-manual-week-days, .admin-agenda-date-picker__week-days { display: none !important; }
                 .client-month-calendar, .admin-manual-month-calendar { display: block !important; }
             `}</style>

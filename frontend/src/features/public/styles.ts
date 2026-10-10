@@ -1,5 +1,5 @@
 export const clientAccountStyles = `
-.profile-photo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.profile-photo>img,.profile-photo>span{width:var(--profile-photo-size);height:var(--profile-photo-size);flex:0 0 var(--profile-photo-size);border-radius:50%;object-fit:cover}.profile-photo>span{display:grid;place-items:center;background:linear-gradient(135deg,#6d3445,#aa667a);color:#fff;font-weight:800}.profile-photo__controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.profile-photo__controls label,.profile-photo__controls button{border:1px solid #d9bdc6;border-radius:999px;padding:7px 11px;background:#fff;color:#6d3445;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}.profile-photo__controls input[type=file]{display:none}.profile-photo__controls .profile-photo__crop{display:flex;align-items:center;gap:4px;border:0;padding:2px;font-size:.7rem}.profile-photo__crop input[type=range]{width:68px}.profile-photo small{width:100%;color:#6d3445}
+
 .client-navbar-actions {
     display: flex;
     align-items: center;

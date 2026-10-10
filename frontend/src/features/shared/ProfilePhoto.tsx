@@ -1,5 +1,6 @@
 import {useEffect, useState} from "react";
 import {supabase} from "../../lib/supabase";
+import "./ProfilePhoto.css";
 
 type Props = {profileId: string; name: string; path?: string | null; editable?: boolean; onSaved?: (path: string | null) => void; size?: number};
 
