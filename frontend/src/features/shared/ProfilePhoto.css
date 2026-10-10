@@ -18,14 +18,14 @@
     aspect-ratio: 1;
     border-radius: 50%;
     object-fit: cover;
+    box-sizing: border-box;
+    border: 2px solid #c9a24a;
 }
 
 .profile-photo > span {
     display: grid;
     place-items: center;
-    background: linear-gradient(135deg, #6d3445, #aa667a);
-    color: #fff;
-    font-weight: 800;
+    background: linear-gradient(135deg, #d96f9d 0%, #f5b8d0 100%);
 }
 
 .profile-photo__controls {

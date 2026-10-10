@@ -4,8 +4,6 @@ import "./ProfilePhoto.css";
 
 type Props = {profileId: string; name: string; path?: string | null; editable?: boolean; onSaved?: (path: string | null) => void; size?: number};
 
-function initials(name: string) { return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "MS"; }
-
 function errorMessage(error: unknown): string {
     const detail = error as {message?: string; status?: number; statusCode?: string | number; code?: string};
     const message = detail?.message ?? "";
@@ -102,7 +100,7 @@ export default function ProfilePhoto({profileId, name, path, editable = false, o
         finally { setBusy(false); }
     }
     return <section className="profile-photo" style={{"--profile-photo-size": `${size}px`} as React.CSSProperties}>
-        {preview || (path && photo?.path === path && photo.url) ? <img src={preview || photo?.url || ""} alt={`Foto de ${name}`} style={preview ? {objectPosition: `${cropX}% ${cropY}%`} : undefined} /> : <span aria-label={`Iniciais de ${name}`}>{initials(name)}</span>}
+        {preview || (path && photo?.path === path && photo.url) ? <img src={preview || photo?.url || ""} alt={`Foto de ${name}`} style={preview ? {objectPosition: `${cropX}% ${cropY}%`} : undefined} /> : <span aria-hidden="true" />}
         {editable && <section className="profile-photo__controls"><label>{pendingFile ? "Escolher outra" : path ? "Alterar foto" : "Adicionar foto"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(event) => {const file = event.target.files?.[0]; if (!file) return; setMessage(""); setCropX(50); setCropY(50); setPendingFile(file); setPreview(URL.createObjectURL(file)); event.currentTarget.value = "";}} /></label>{pendingFile && <><label className="profile-photo__crop">Horizontal<input aria-label="Ajustar enquadramento horizontal" type="range" min="0" max="100" value={cropX} onChange={(event) => setCropX(Number(event.target.value))} /></label><label className="profile-photo__crop">Vertical<input aria-label="Ajustar enquadramento vertical" type="range" min="0" max="100" value={cropY} onChange={(event) => setCropY(Number(event.target.value))} /></label><button type="button" disabled={busy} onClick={() => void save(pendingFile)}>{busy ? "Enviando…" : "Salvar foto"}</button><button type="button" disabled={busy} onClick={() => {setPendingFile(null); setPreview("");}}>Cancelar</button></>}{path && !pendingFile && <button type="button" disabled={busy} onClick={() => void save()}>{busy ? "Removendo…" : "Remover"}</button>}</section>}
         {message && <small role="status">{message}</small>}
     </section>;

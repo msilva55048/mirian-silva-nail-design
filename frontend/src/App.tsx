@@ -13976,7 +13976,7 @@ function AdminPanel() {
 
                 <div className="admin-booking-card__top">
                     <div className="admin-booking-card__client-heading">
-                        {appointmentProfile ? <ProfilePhoto profileId={appointmentProfile.id} name={appointment.client_name} path={appointmentProfile.profile_photo_path} size={38} /> : <div className="admin-client-card__avatar">{appointment.client_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>}
+                        {appointmentProfile ? <ProfilePhoto profileId={appointmentProfile.id} name={appointment.client_name} path={appointmentProfile.profile_photo_path} size={38} /> : <ProfilePhoto profileId="unavailable" name={appointment.client_name} size={38} />}
                         <div>
                         <span className="admin-booking-card__time">
                             {String(appointment.start_time).slice(0, 5)}
@@ -15428,7 +15428,7 @@ function AdminPanel() {
                                         ) : (
                                             <>
                                                 <div className="admin-client-card__top">
-                                                    {(() => {const profile = adminClientProfiles.find((item) => normalizeClientPhone(item.phone ?? "") === normalizeClientPhone(client.phone)); return profile ? <ProfilePhoto profileId={profile.id} name={client.name} path={profile.profile_photo_path} editable onSaved={(path) => setAdminClientProfiles((current) => current.map((item) => item.id === profile.id ? {...item, profile_photo_path: path} : item))} size={46} /> : <div className="admin-client-card__avatar">{client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>;})()}
+                                                    {(() => {const profile = adminClientProfiles.find((item) => normalizeClientPhone(item.phone ?? "") === normalizeClientPhone(client.phone)); return profile ? <ProfilePhoto profileId={profile.id} name={client.name} path={profile.profile_photo_path} editable onSaved={(path) => setAdminClientProfiles((current) => current.map((item) => item.id === profile.id ? {...item, profile_photo_path: path} : item))} size={46} /> : <ProfilePhoto profileId="unavailable" name={client.name} size={46} />;})()}
 
                                                     <div>
                                                         <h3>{client.name}</h3>
