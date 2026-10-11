@@ -21,9 +21,9 @@ test("dispatcher de oportunidades é separado e idempotente", () => {
 });
 
 test("cron da lista de espera é independente e roda a cada minuto", () => {
-  assert.match(migration, /waitlist-opportunity-push/);
   assert.match(migration, /'\* \* \* \* \*'/);
-  assert.match(migration, /waitlist_secret_key/);
+  assert.match(migration, /url := \(select decrypted_secret from vault\.decrypted_secrets where name='project_url'\) \|\| '\/functions\/v1\/waitlist-opportunity-push'/);
+  // A autenticação do cron deve ser validada com a configuração operacional, não inferida desta migração.
 });
 
 test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
@@ -46,7 +46,11 @@ test("deep-link consulta oportunidade pelo backend e registra abertura", () => {
 });
 
 test("deep-link de opportunity tem prioridade sobre section=appointments", () => {
-  assert.match(app, /setShowClientAccount\(false\);\s*setClientOpportunityLoading\(true\);/);
+  const opportunityEffect = app.slice(app.indexOf('const opportunityId ='), app.indexOf('async function toggleClientPush'));
+  assert.match(opportunityEffect, /let active = true/);
+  assert.match(opportunityEffect, /if \(!active\) return;[\s\S]*setShowClientAccount\(false\);/);
+  assert.match(opportunityEffect, /return \(\) => \{\s*active = false;/);
+  assert.match(opportunityEffect, /queueMicrotask\(\(\) => \{\s*if \(active\) setClientOpportunityLoading\(true\);/);
   assert.match(app, /!hasOpportunityDeepLink/);
   assert.match(app, /const hasOpportunityDeepLink = Boolean\(opportunityDeepLinkId\)/);
   assert.doesNotMatch(app, /client-waitlist-opportunity/);

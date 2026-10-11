@@ -3,7 +3,7 @@ import {getPublicBaseStartMinutes} from "./shared/publicSchedule";
 import {isClientBookingDateBlocked} from "./features/public/bookingDateRules";
 import {getAvailableClientStarts} from "./features/public/clientAvailability";
 import {SelectedClientCard} from "./features/admin/SelectedClientCard";
-import {useEffect, useMemo, useRef, useState, type MouseEvent} from "react";
+import {useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type MouseEvent} from "react";
 import {supabase} from "./lib/supabase";
 import {filterAdminClients, type ClientAppointmentFilter} from "./features/admin/clientFilters";
 import {isClientInactive} from "./features/admin/clientWithoutAppointment";
@@ -296,6 +296,29 @@ function formatDateForInput(date: Date) {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+}
+
+function parseLocalDate(date: string) {
+    return new Date(`${date}T12:00:00`);
+}
+
+function addDays(date: Date, amount: number) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + amount);
+    return result;
+}
+
+function startOfCalendarWeek(date: Date) {
+    const result = new Date(date);
+    const day = result.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    result.setDate(result.getDate() + diffToMonday);
+    return result;
+}
+
+function getWeekDates(referenceDate: string) {
+    const start = startOfCalendarWeek(parseLocalDate(referenceDate));
+    return Array.from({length: 7}, (_, index) => formatDateForInput(addDays(start, index)));
 }
 
 function timeToMinutes(time: string) {
@@ -1621,6 +1644,9 @@ function PublicSite() {
     const [pendingReferralCode, setPendingReferralCode] = useState<string | null>(
         captureReferralCodeFromCurrentUrl,
     );
+    const pendingReferralCodeRef = useRef(pendingReferralCode);
+    const clientAuthRequestIdRef = useRef(0);
+    const clientAuthUserIdRef = useRef<string | null>(null);
     const [bookingStep, setBookingStep] = useState(1);
     const [clientName, setClientName] = useState("");
     const [clientPhone, setClientPhone] = useState("");
@@ -1767,34 +1793,57 @@ function PublicSite() {
         setShowClientAccount(true);
     }
 
+    const closeClientAccountForOpportunity = useEffectEvent(() => {
+        setShowClientAccount(false);
+    });
+    const clientProfileId = clientProfile?.id;
+
     useEffect(() => {
         const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
         const opportunityId = params.get("opportunity");
-        if (!opportunityId || !clientProfile) return;
-        setShowClientAccount(false);
-        setClientOpportunityLoading(true);
+        if (!opportunityId || !clientProfileId) return;
+        let active = true;
+        queueMicrotask(() => {
+            if (active) setClientOpportunityLoading(true);
+        });
         void (async () => {
-            const {data, error} = await supabase.rpc("get_my_waitlist_opportunity", {p_opportunity_id: opportunityId});
-            const opportunity = normalizeRpcRow<ClientWaitlistOpportunity>(data as ClientWaitlistOpportunity[] | ClientWaitlistOpportunity | null);
-            if (!error && opportunity) {
-                setClientOpportunity(opportunity);
-                if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
-                if (opportunity.available) {
-                    setClientOpportunityError("");
+            try {
+                const {data, error} = await supabase.rpc("get_my_waitlist_opportunity", {p_opportunity_id: opportunityId});
+                if (!active) return;
+                closeClientAccountForOpportunity();
+                const opportunity = normalizeRpcRow<ClientWaitlistOpportunity>(data as ClientWaitlistOpportunity[] | ClientWaitlistOpportunity | null);
+                if (!error && opportunity) {
+                    setClientOpportunity(opportunity);
+                    if (opportunity.available) await supabase.rpc("mark_waitlist_opportunity_opened", {p_opportunity_id: opportunityId});
+                    if (!active) return;
+                    if (opportunity.available) {
+                        setClientOpportunityError("");
+                    } else {
+                        setClientOpportunityError("Esta vaga não está mais disponível.");
+                        setShowClientAccount(false);
+                        setBookingStep(1);
+                    }
                 } else {
+                    setClientOpportunity(null);
                     setClientOpportunityError("Esta vaga não está mais disponível.");
                     setShowClientAccount(false);
                     setBookingStep(1);
                 }
-            } else {
+            } catch (error) {
+                if (!active) return;
+                console.error("Erro ao carregar oportunidade da lista de espera:", error);
                 setClientOpportunity(null);
-                setClientOpportunityError("Esta vaga não está mais disponível.");
+                setClientOpportunityError("Não foi possível carregar esta oportunidade. Tente novamente.");
                 setShowClientAccount(false);
                 setBookingStep(1);
+            } finally {
+                if (active) setClientOpportunityLoading(false);
             }
-            setClientOpportunityLoading(false);
         })();
-    }, [clientProfile]);
+        return () => {
+            active = false;
+        };
+    }, [clientProfileId]);
 
     async function toggleClientPush() {
         setClientPushError("");
@@ -1885,13 +1934,13 @@ function PublicSite() {
     }
 
     useEffect(() => {
-        if (!clientProfile || clientAccountSection !== "appointments") return;
+        if (!clientProfileId || clientAccountSection !== "appointments") return;
         let active = true;
         let revision = 0;
         const refresh = () => {
             if (document.visibilityState !== "visible") return;
             const current = ++revision;
-            void loadClientAppointments(clientProfile.id, () => active && current === revision);
+            void loadClientAppointments(clientProfileId, () => active && current === revision);
         };
         refresh();
         const timer = window.setInterval(refresh, 15000);
@@ -1903,15 +1952,16 @@ function PublicSite() {
             window.removeEventListener("focus", refresh);
             document.removeEventListener("visibilitychange", refresh);
         };
-    }, [clientProfile?.id, clientAccountSection]);
+    }, [clientProfileId, clientAccountSection]);
 
-    async function loadReferralSummary(userId = clientUserId) {
+    async function loadReferralSummary(userId = clientUserId, isCurrent = () => true) {
         if (!userId) return null;
 
         setIsLoadingReferralSummary(true);
 
         try {
             const {data, error} = await supabase.rpc("get_my_referral_summary");
+            if (!isCurrent()) return null;
 
             if (error) {
                 // A migração do programa pode ainda não ter sido aplicada no projeto.
@@ -1927,14 +1977,15 @@ function PublicSite() {
 
             setReferralSummary(summary);
             const {data: referrals, error: referralsError} = await supabase.rpc("get_my_active_referrals");
+            if (!isCurrent()) return null;
             if (!referralsError) setActiveReferrals((referrals ?? []) as ActiveReferral[]);
             return summary;
         } finally {
-            setIsLoadingReferralSummary(false);
+            if (isCurrent()) setIsLoadingReferralSummary(false);
         }
     }
 
-    async function registerPendingReferral(userId = clientUserId) {
+    async function registerPendingReferral(userId = clientUserId, isCurrent = () => true) {
         let storedReferralCode = "";
         try {
             storedReferralCode = window.localStorage.getItem(REFERRAL_STORAGE_KEY) ?? "";
@@ -1943,15 +1994,16 @@ function PublicSite() {
         }
 
         const referralCode = normalizeReferralCode(
-            pendingReferralCode || storedReferralCode,
+            pendingReferralCodeRef.current || storedReferralCode,
         );
 
-        if (!referralCode || !userId) return;
+        if (!referralCode || !userId || !isCurrent()) return;
 
         try {
             const {data, error} = await supabase.rpc("register_my_referral", {
                 p_referral_code: referralCode,
             });
+            if (!isCurrent()) return;
 
             if (error) {
                 console.warn("Não foi possível registrar a indicação:", error);
@@ -1970,6 +2022,7 @@ function PublicSite() {
                 } catch {
                     // O estado local ainda impede uma nova tentativa nesta sessão.
                 }
+                pendingReferralCodeRef.current = null;
                 setPendingReferralCode(null);
             }
         } catch (error) {
@@ -2006,8 +2059,12 @@ function PublicSite() {
         );
     }
 
-    async function resolveClientProfile(user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>}) {
+    async function resolveClientProfile(
+        user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>},
+        isCurrent = () => true,
+    ) {
         const {data: profileData, error: profileError} = await supabase.rpc("get_my_client_profile");
+        if (!isCurrent()) return null;
 
         if (profileError) {
             console.error("Erro ao carregar perfil da cliente:", profileError);
@@ -2026,6 +2083,7 @@ function PublicSite() {
                     p_phone: metadataPhone,
                     p_email: user.email ?? null,
                 });
+                if (!isCurrent()) return null;
 
                 if (claimError) {
                     console.error("Erro ao vincular perfil da cliente:", claimError);
@@ -2041,7 +2099,7 @@ function PublicSite() {
         if (profile) {
             setClientName(profile.full_name);
             setClientPhone(formatBrazilianPhone(profile.phone));
-            await loadClientAppointments(profile.id);
+            await loadClientAppointments(profile.id, isCurrent);
         } else {
             setClientAppointments([]);
         }
@@ -2049,27 +2107,63 @@ function PublicSite() {
         return profile;
     }
 
-    async function loadAuthenticatedClient(user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>}) {
+    async function loadAuthenticatedClient(
+        user: {id: string; email?: string | null; user_metadata?: Record<string, unknown>},
+        requestId = ++clientAuthRequestIdRef.current,
+    ) {
+        const isCurrent = () => requestId === clientAuthRequestIdRef.current;
+        if (!isCurrent()) return;
+        if (clientAuthUserIdRef.current && clientAuthUserIdRef.current !== user.id) {
+            setClientProfile(null);
+            setClientName("");
+            setClientPhone("");
+            setClientAppointments([]);
+            setReferralSummary(null);
+            setActiveReferrals([]);
+        }
+        clientAuthUserIdRef.current = user.id;
         setIsLoadingClientAccount(true);
         setClientUserId(user.id);
         setClientUserEmail(user.email ?? "");
-        const profile = await resolveClientProfile(user);
-        if (profile) {
-            await registerPendingReferral(user.id);
-            await loadReferralSummary(user.id);
-        } else {
+        try {
+            const profile = await resolveClientProfile(user, isCurrent);
+            if (!isCurrent()) return;
+            if (profile) {
+                await registerPendingReferral(user.id, isCurrent);
+                if (!isCurrent()) return;
+                await loadReferralSummary(user.id, isCurrent);
+            } else {
+                setReferralSummary(null);
+                setActiveReferrals([]);
+            }
+        } catch (error) {
+            if (!isCurrent()) return;
+            console.error("Erro ao carregar dados da conta da cliente:", error);
+            setAuthError("Não foi possível carregar os dados da conta. Verifique sua conexão e tente novamente.");
+            setClientProfile(null);
+            setClientName("");
+            setClientPhone("");
+            setClientAppointments([]);
             setReferralSummary(null);
+            setActiveReferrals([]);
+        } finally {
+            if (isCurrent()) setIsLoadingClientAccount(false);
         }
-        setIsLoadingClientAccount(false);
     }
+
+    const loadAuthenticatedClientRef = useRef(loadAuthenticatedClient);
+    useEffect(() => {
+        loadAuthenticatedClientRef.current = loadAuthenticatedClient;
+    });
 
     useEffect(() => {
         let mounted = true;
 
         async function initializeClientSession() {
+            const requestId = ++clientAuthRequestIdRef.current;
             const {data: {session}} = await supabase.auth.getSession();
 
-            if (!mounted) return;
+            if (!mounted || requestId !== clientAuthRequestIdRef.current) return;
 
             const sessionEmail =
                 session?.user?.email?.trim().toLowerCase() ?? "";
@@ -2088,14 +2182,18 @@ function PublicSite() {
                     setMirianLastAccessMode("client");
                 }
 
-                await loadAuthenticatedClient(session.user);
+                await loadAuthenticatedClientRef.current(session.user, requestId);
             } else {
+                clientAuthUserIdRef.current = null;
                 setClientUserId(null);
                 setClientUserEmail("");
                 setClientProfile(null);
                 setClientAppointments([]);
                 setReferralSummary(null);
-                if (pendingReferralCode) {
+                setClientName("");
+                setClientPhone("");
+                setActiveReferrals([]);
+                if (pendingReferralCodeRef.current) {
                     setClientAuthMode("signup");
                     setShowClientAuth(true);
                 }
@@ -2110,6 +2208,7 @@ function PublicSite() {
             // Renovação silenciosa do token não é um novo login: preserve toda
             // a navegação, seleção e modais enquanto os dados permanecem na tela.
             if (event === "TOKEN_REFRESHED") return;
+            const requestId = ++clientAuthRequestIdRef.current;
 
             if (event === "PASSWORD_RECOVERY") {
                 setRecoverySessionUserId(session?.user?.id ?? null);
@@ -2125,7 +2224,7 @@ function PublicSite() {
             }
 
             window.setTimeout(() => {
-                if (!mounted) return;
+                if (!mounted || requestId !== clientAuthRequestIdRef.current) return;
 
                 if (session?.user) {
                     const sessionEmail =
@@ -2135,14 +2234,19 @@ function PublicSite() {
                         setMirianLastAccessMode("client");
                     }
 
-                    void loadAuthenticatedClient(session.user);
+                    void loadAuthenticatedClientRef.current(session.user, requestId);
                 } else {
+                    clientAuthUserIdRef.current = null;
                     setClientUserId(null);
                     setClientUserEmail("");
                     setClientProfile(null);
                     setClientAppointments([]);
                     setReferralSummary(null);
+                    setClientName("");
+                    setClientPhone("");
+                    setActiveReferrals([]);
                     setShowClientAccount(false);
+                    setIsLoadingClientAccount(false);
                 }
 
                 setIsCheckingClientSession(false);
@@ -2675,7 +2779,9 @@ function PublicSite() {
         setClientProfile(null);
         setClientAppointments([]);
         setReferralSummary(null);
+        setActiveReferrals([]);
         setClientUserId(null);
+        clientAuthUserIdRef.current = null;
         setClientUserEmail("");
         setClientName("");
         setClientPhone("");
@@ -3037,29 +3143,6 @@ function PublicSite() {
             100,
         )
         : null;
-
-    function parseLocalDate(date: string) {
-        return new Date(`${date}T12:00:00`);
-    }
-
-    function addDays(date: Date, amount: number) {
-        const result = new Date(date);
-        result.setDate(result.getDate() + amount);
-        return result;
-    }
-
-    function startOfCalendarWeek(date: Date) {
-        const result = new Date(date);
-        const day = result.getDay();
-        const diffToMonday = day === 0 ? -6 : 1 - day;
-        result.setDate(result.getDate() + diffToMonday);
-        return result;
-    }
-
-    function getWeekDates(referenceDate: string) {
-        const start = startOfCalendarWeek(parseLocalDate(referenceDate));
-        return Array.from({length: 7}, (_, index) => formatDateForInput(addDays(start, index)));
-    }
 
     function selectBookingDate(date: string) {
         if (date < today || isClientBookingDateBlocked(date)) return;
@@ -10513,6 +10596,7 @@ function AdminPanel() {
 
     const [nailRecords, setNailRecords] = useState<NailRecord[]>([]);
     const [isLoadingNailRecords, setIsLoadingNailRecords] = useState(false);
+    const nailRecordLoadVersionRef = useRef(0);
     const [showNailRecordForm, setShowNailRecordForm] = useState(false);
     const [nailRecordNotes, setNailRecordNotes] = useState("");
     const [nailRecordFiles, setNailRecordFiles] = useState<File[]>([]);
@@ -10615,6 +10699,8 @@ function AdminPanel() {
 
             if (isMirianAdminSession) {
                 setMirianLastAccessMode("admin");
+            } else {
+                clearNailRecordsForSelectionChange();
             }
 
             if (authBootstrapRef.current.initialEventSeen) {
@@ -11477,7 +11563,7 @@ function AdminPanel() {
 
     function openClientHistory(client: AdminClient) {
         resetNailRecordForm();
-        setNailRecords([]);
+        clearNailRecordsForSelectionChange();
         setSelectedClient(client);
     }
 
@@ -11488,14 +11574,14 @@ function AdminPanel() {
 
     function openNailRecordForClient(client: AdminClient) {
         resetNailRecordForm();
-        setNailRecords([]);
+        clearNailRecordsForSelectionChange();
         setSelectedClient(client);
         setShowNailRecordForm(true);
     }
 
     function closeClientHistory() {
         resetNailRecordForm();
-        setNailRecords([]);
+        clearNailRecordsForSelectionChange();
         setSelectedClient(null);
     }
 
@@ -11589,12 +11675,23 @@ function AdminPanel() {
         return data as ClientProfile;
     }
 
-    async function loadNailRecordsForClient(client: AdminClient) {
+    function clearNailRecordsForSelectionChange() {
+        nailRecordLoadVersionRef.current += 1;
+        setNailRecords([]);
+        setIsLoadingNailRecords(false);
+    }
+
+    async function loadNailRecordsForClient(
+        client: AdminClient,
+        requestVersion = ++nailRecordLoadVersionRef.current,
+    ) {
+        const isCurrent = () => requestVersion === nailRecordLoadVersionRef.current;
         setIsLoadingNailRecords(true);
         setNailRecordError("");
 
         try {
             const profile = await findClientProfile(client);
+            if (!isCurrent()) return;
 
             if (!profile) {
                 setNailRecords([]);
@@ -11606,6 +11703,7 @@ function AdminPanel() {
                 .select("id, client_id, notes, created_at")
                 .eq("client_id", profile.id)
                 .order("created_at", {ascending: false});
+            if (!isCurrent()) return;
 
             if (recordError) {
                 throw recordError;
@@ -11625,6 +11723,7 @@ function AdminPanel() {
                 .select("id, nail_record_id, photo_path, created_at")
                 .in("nail_record_id", recordIds)
                 .order("created_at", {ascending: true});
+            if (!isCurrent()) return;
 
             if (photoError) {
                 throw photoError;
@@ -11648,6 +11747,7 @@ function AdminPanel() {
                     };
                 }),
             );
+            if (!isCurrent()) return;
 
             setNailRecords(
                 records.map((record) => ({
@@ -11658,11 +11758,12 @@ function AdminPanel() {
                 })),
             );
         } catch (error) {
+            if (!isCurrent()) return;
             console.error("Erro ao carregar registros das unhas:", error);
             setNailRecordError("Não foi possível carregar os registros das unhas.");
             setNailRecords([]);
         } finally {
-            setIsLoadingNailRecords(false);
+            if (isCurrent()) setIsLoadingNailRecords(false);
         }
     }
 
@@ -11873,15 +11974,23 @@ function AdminPanel() {
         }
     }
 
+    const loadNailRecordsForClientRef = useRef(loadNailRecordsForClient);
     useEffect(() => {
-        if (!isAuthenticated || !selectedClient) {
-            setNailRecords([]);
-            setIsLoadingNailRecords(false);
-            return;
-        }
+        loadNailRecordsForClientRef.current = loadNailRecordsForClient;
+    });
 
-        void loadNailRecordsForClient(selectedClient);
-    }, [isAuthenticated, selectedClient?.key]);
+    useEffect(() => {
+        if (!isAuthenticated || !selectedClient) return;
+
+        const requestVersion = ++nailRecordLoadVersionRef.current;
+        void loadNailRecordsForClientRef.current(selectedClient, requestVersion);
+
+        return () => {
+            if (nailRecordLoadVersionRef.current === requestVersion) {
+                nailRecordLoadVersionRef.current += 1;
+            }
+        };
+    }, [isAuthenticated, selectedClient]);
 
     const clients = useMemo<AdminClient[]>(() => {
         type ClientGroup = {
@@ -12563,6 +12672,7 @@ function AdminPanel() {
         const appointmentIds = client.appointments.map((appointment) => appointment.id);
 
         if (!appointmentIds.length) {
+            clearNailRecordsForSelectionChange();
             setSelectedClient(null);
             return;
         }
@@ -12588,6 +12698,7 @@ function AdminPanel() {
                 ),
             );
 
+            clearNailRecordsForSelectionChange();
             setSelectedClient(null);
         } catch (error) {
             console.error("Erro ao remover cliente da lista:", error);
@@ -13063,7 +13174,7 @@ function AdminPanel() {
         return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     }
 
-    function getDueNotificationTypes(appointment: AdminAppointment) {
+    const getDueNotificationTypes = useCallback((appointment: AdminAppointment) => {
         if (!["pending", "confirmed"].includes(appointment.status)) return [] as WhatsAppNotificationType[];
 
         const appointmentTime = getAppointmentDateTime(appointment).getTime();
@@ -13078,7 +13189,7 @@ function AdminPanel() {
         // A segunda mensagem automática, que aparecia quando faltavam
         // até 2 horas para o atendimento, foi desativada por enquanto.
         return types;
-    }
+    }, [notificationClock]);
 
     const pendingWhatsAppNotifications = useMemo(() => {
         return appointments
@@ -13095,7 +13206,7 @@ function AdminPanel() {
                     getAppointmentDateTime(first.appointment).getTime() -
                     getAppointmentDateTime(second.appointment).getTime(),
             );
-    }, [appointments, notificationClock]);
+    }, [appointments, getDueNotificationTypes]);
 
 
     const scheduleConfigVisibleWeekDates = useMemo(
@@ -13758,6 +13869,7 @@ function AdminPanel() {
         setAppointmentSearch("");
         setClientSearch("");
         setClientAppointmentFilter("all");
+        clearNailRecordsForSelectionChange();
         setSelectedClient(null);
         setEditingClient(null);
         setAdminView("clients");
@@ -13855,7 +13967,7 @@ function AdminPanel() {
     async function toggleAppointmentPayment(appointment: AdminAppointment) {
         if (updatingPaymentAppointmentIds.includes(appointment.id)) return;
 
-        const nextPaymentStatus = !Boolean(appointment.is_paid);
+        const nextPaymentStatus = !appointment.is_paid;
 
         setPanelError("");
         setUpdatingPaymentAppointmentIds((current) => [
