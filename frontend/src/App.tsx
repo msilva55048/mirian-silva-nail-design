@@ -2178,10 +2178,6 @@ function PublicSite() {
             }
 
             if (session?.user) {
-                if (sessionEmail === MIRIAN_ADMIN_EMAIL) {
-                    setMirianLastAccessMode("client");
-                }
-
                 await loadAuthenticatedClientRef.current(session.user, requestId);
             } else {
                 clientAuthUserIdRef.current = null;
@@ -2230,8 +2226,13 @@ function PublicSite() {
                     const sessionEmail =
                         session.user.email?.trim().toLowerCase() ?? "";
 
-                    if (sessionEmail === MIRIAN_ADMIN_EMAIL) {
-                        setMirianLastAccessMode("client");
+                    if (
+                        event === "INITIAL_SESSION" &&
+                        sessionEmail === MIRIAN_ADMIN_EMAIL &&
+                        getMirianLastAccessMode() === "admin"
+                    ) {
+                        window.location.replace("/admin");
+                        return;
                     }
 
                     void loadAuthenticatedClientRef.current(session.user, requestId);
@@ -2542,6 +2543,7 @@ function PublicSite() {
                         throw claimError;
                     }
 
+                    setMirianLastAccessMode("client");
                     await loadAuthenticatedClient(adminClientData.user);
                     setShowClientAuth(false);
                     setShowClientAccount(false);
@@ -2580,6 +2582,10 @@ function PublicSite() {
                 });
 
                 if (error) throw error;
+
+                if (data.user?.email?.trim().toLowerCase() === MIRIAN_ADMIN_EMAIL) {
+                    setMirianLastAccessMode("client");
+                }
 
                 if (data.user) {
                     await loadAuthenticatedClient(data.user);
