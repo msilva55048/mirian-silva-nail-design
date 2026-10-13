@@ -146,6 +146,14 @@ export default function AdminPanel() {
         useState<string | null>(null);
     const [deletingConfirmedAppointmentId, setDeletingConfirmedAppointmentId] =
         useState<string | null>(null);
+    const [passwordResetClient, setPasswordResetClient] = useState<ClientProfile | null>(null);
+    const [passwordResetPassword, setPasswordResetPassword] = useState("");
+    const [passwordResetConfirmation, setPasswordResetConfirmation] = useState("");
+    const [passwordResetVisible, setPasswordResetVisible] = useState(false);
+    const [passwordResetAuthorized, setPasswordResetAuthorized] = useState(false);
+    const [passwordResetError, setPasswordResetError] = useState("");
+    const [passwordResetSuccess, setPasswordResetSuccess] = useState("");
+    const [isSavingPasswordReset, setIsSavingPasswordReset] = useState(false);
 
     const [nailRecords, setNailRecords] = useState<NailRecord[]>([]);
     const [isLoadingNailRecords, setIsLoadingNailRecords] = useState(false);
@@ -957,6 +965,44 @@ export default function AdminPanel() {
         resetNailRecordForm();
         setNailRecords([]);
         setSelectedClient(client);
+    }
+
+    function openPasswordReset(client: AdminClient) {
+        const profile = adminClientProfiles.find((item) => item.id === client.key.replace(/^profile:/, "") && client.key.startsWith("profile:"));
+        if (!profile?.user_id) {
+            setPasswordResetError("Esta cliente não possui uma conta de acesso vinculada.");
+            setPasswordResetClient(null);
+            return;
+        }
+        setPasswordResetClient(profile);
+        setPasswordResetPassword("");
+        setPasswordResetConfirmation("");
+        setPasswordResetVisible(false);
+        setPasswordResetAuthorized(false);
+        setPasswordResetError("");
+    }
+
+    async function saveClientPasswordReset(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setPasswordResetError("");
+        if (!passwordResetClient?.user_id) return setPasswordResetError("Esta cliente não possui uma conta de acesso vinculada.");
+        if (passwordResetPassword !== passwordResetConfirmation) return setPasswordResetError("As senhas não coincidem.");
+        if (!passwordResetAuthorized || !window.confirm(`Confirma a redefinição da senha de ${passwordResetClient.full_name}? Confirme somente se a cliente solicitou ou autorizou esta alteração.`)) return;
+
+        setIsSavingPasswordReset(true);
+        const {data, error} = await supabase.functions.invoke("admin-reset-client-password", {
+            body: {clientProfileId: passwordResetClient.id, password: passwordResetPassword, clientAuthorized: true},
+        });
+        setIsSavingPasswordReset(false);
+        if (error || !data?.ok) {
+            setPasswordResetError(data?.error || "Não foi possível redefinir a senha.");
+            return;
+        }
+        setPasswordResetSuccess("Senha redefinida com sucesso! A cliente já pode acessar sua conta utilizando a nova senha.");
+        setPasswordResetClient(null);
+        setPasswordResetPassword("");
+        setPasswordResetConfirmation("");
+        window.setTimeout(() => setPasswordResetSuccess(""), 7000);
     }
 
     function openNailRecordForClient(client: AdminClient) {
@@ -4105,6 +4151,7 @@ export default function AdminPanel() {
                                             <button type="button" onClick={() => openClientHistory(client)}>Ver histórico</button>
                                             <button type="button" className="is-nail-record" onClick={() => openNailRecordForClient(client)}>📷 Registrar estado da unha</button>
                                             <button type="button" className="is-secondary" onClick={() => openClientEditor(client)}>Editar cadastro</button>
+                                            <button type="button" onClick={() => openPasswordReset(client)}>Redefinir senha</button>
                                             <button type="button" className="is-danger" disabled={deletingClientKey === client.key} onClick={() => void deleteClient(client)}>{deletingClientKey === client.key ? "Excluindo..." : "Remover da lista"}</button>
                                         </div>
                                     </article>
@@ -4973,6 +5020,26 @@ export default function AdminPanel() {
                         </section>
                     </div>
                 )}
+
+                {passwordResetSuccess && <div className="admin-password-reset__toast" role="status">{passwordResetSuccess}</div>}
+                {passwordResetClient && (
+                    <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget && !isSavingPasswordReset) setPasswordResetClient(null);}}>
+                        <section className="admin-password-reset" role="dialog" aria-modal="true" aria-labelledby="admin-password-reset-title">
+                            <div className="admin-modal__header"><div><h2 id="admin-password-reset-title">Redefinir senha</h2><p>Defina uma nova senha para a conta existente.</p></div><button className="admin-modal__close" type="button" disabled={isSavingPasswordReset} aria-label="Fechar" onClick={() => setPasswordResetClient(null)}>×</button></div>
+                            <p><strong>Cliente:</strong> {passwordResetClient.full_name}</p>
+                            <p><strong>E-mail:</strong> {passwordResetClient.email || "E-mail não informado"}</p>
+                            <form onSubmit={(event) => void saveClientPasswordReset(event)}>
+                                <label>Nova senha<input type={passwordResetVisible ? "text" : "password"} autoComplete="new-password" value={passwordResetPassword} onChange={(event) => setPasswordResetPassword(event.target.value)} required /></label>
+                                <label>Confirmar nova senha<input type={passwordResetVisible ? "text" : "password"} autoComplete="new-password" value={passwordResetConfirmation} onChange={(event) => setPasswordResetConfirmation(event.target.value)} required /></label>
+                                <button className="is-secondary" type="button" onClick={() => setPasswordResetVisible((visible) => !visible)}>{passwordResetVisible ? "Ocultar senha" : "Mostrar senha"}</button>
+                                <label className="admin-password-reset__authorization"><input type="checkbox" checked={passwordResetAuthorized} onChange={(event) => setPasswordResetAuthorized(event.target.checked)} required /> Confirmo que a cliente solicitou ou autorizou esta redefinição.</label>
+                                {passwordResetError && <p className="admin-password-reset__error" role="alert">{passwordResetError}</p>}
+                                <div className="admin-password-reset__actions"><button type="submit" disabled={isSavingPasswordReset || !passwordResetAuthorized}>{isSavingPasswordReset ? "Salvando..." : "Salvar nova senha"}</button><button type="button" className="is-secondary" disabled={isSavingPasswordReset} onClick={() => setPasswordResetClient(null)}>Cancelar</button></div>
+                            </form>
+                        </section>
+                    </div>
+                )}
+                {passwordResetError && !passwordResetClient && <div className="admin-password-reset__toast" role="alert">{passwordResetError}<button type="button" onClick={() => setPasswordResetError("")}>×</button></div>}
 
                 {selectedClient && (
                     <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget) closeClientHistory();}}>
