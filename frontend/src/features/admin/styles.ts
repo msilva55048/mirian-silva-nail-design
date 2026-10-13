@@ -545,30 +545,6 @@ export const adminStyles = `
     background: #fff;
     box-shadow: 0 22px 60px rgba(45, 25, 31, 0.22);
 }
-.admin-password-reset {
-    position: relative;
-    width: min(100%, 520px);
-    max-height: calc(100vh - 32px);
-    overflow: auto;
-    box-sizing: border-box;
-    padding: 24px;
-    border-radius: 22px;
-    background: #fff;
-    box-shadow: 0 22px 64px rgba(53, 31, 39, .22);
-}
-.admin-password-reset form { display: grid; gap: 13px; }
-.admin-password-reset form > label:not(.admin-password-reset__authorization) { display: grid; gap: 6px; color: #5e424b; font-size: .84rem; font-weight: 800; }
-.admin-password-reset input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; border: 1px solid #dbc8ce; border-radius: 11px; padding: 11px 12px; font: inherit; }
-.admin-password-reset__authorization { display: flex; gap: 9px; align-items: flex-start; color: #5e424b; font-size: .82rem; line-height: 1.4; }
-.admin-password-reset__authorization input { margin-top: 2px; accent-color: #6d3445; }
-.admin-password-reset__actions { display: flex; gap: 9px; }
-.admin-password-reset__actions button, .admin-password-reset form > button { border: 0; border-radius: 10px; padding: 11px 14px; background: #6d3445; color: #fff; font: inherit; font-weight: 850; cursor: pointer; }
-.admin-password-reset__actions button { flex: 1; }
-.admin-password-reset__actions button.is-secondary, .admin-password-reset form > button.is-secondary { background: #eadde1; color: #6d3445; }
-.admin-password-reset__error { margin: 0; color: #a32642; font-size: .86rem; }
-.admin-password-reset__toast { position: fixed; z-index: 1200; right: 18px; bottom: 18px; max-width: min(560px, calc(100vw - 36px)); padding: 15px 18px; border-radius: 14px; background: #315d47; color: #fff; box-shadow: 0 12px 32px rgba(0,0,0,.18); line-height: 1.45; }
-.admin-password-reset__toast[role="alert"] { background: #8d3348; }
-@media (max-width: 520px) { .admin-password-reset { padding: 18px; border-radius: 18px; } .admin-password-reset__actions { flex-direction: column; } }
 
 .admin-client-editor {
     width: min(100%, 470px);

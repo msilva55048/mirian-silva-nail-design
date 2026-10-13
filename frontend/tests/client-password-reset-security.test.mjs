@@ -4,7 +4,7 @@ import test from "node:test";
 
 const edge = await readFile(new URL("../supabase/functions/admin-reset-client-password/index.ts", import.meta.url), "utf8");
 const migration = await readFile(new URL("../supabase/migrations/20261013000000_client_password_reset_audit.sql", import.meta.url), "utf8");
-const panel = await readFile(new URL("../src/features/admin/AdminPanel.tsx", import.meta.url), "utf8");
+const panel = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
 test("redefinição valida token e confere a conta Admin pelo ID configurado", () => {
     assert.match(edge, /admin\.auth\.getUser\(token\)/);

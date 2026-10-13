@@ -6083,6 +6083,21 @@ const adminStyles = `
     box-shadow: 0 22px 60px rgba(45, 25, 31, 0.22);
 }
 
+.admin-password-reset { position: relative; width: min(100%, 520px); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box; padding: 24px; border-radius: 22px; background: #fff; box-shadow: 0 22px 64px rgba(53, 31, 39, .22); }
+.admin-password-reset form { display: grid; gap: 13px; }
+.admin-password-reset form > label:not(.admin-password-reset__authorization) { display: grid; gap: 6px; color: #5e424b; font-size: .84rem; font-weight: 800; }
+.admin-password-reset input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; border: 1px solid #dbc8ce; border-radius: 11px; padding: 11px 12px; font: inherit; }
+.admin-password-reset__authorization { display: flex; gap: 9px; align-items: flex-start; color: #5e424b; font-size: .82rem; line-height: 1.4; }
+.admin-password-reset__authorization input { margin-top: 2px; accent-color: #6d3445; }
+.admin-password-reset__actions { display: flex; gap: 9px; }
+.admin-password-reset__actions button, .admin-password-reset form > button { border: 0; border-radius: 10px; padding: 11px 14px; background: #6d3445; color: #fff; font: inherit; font-weight: 850; cursor: pointer; }
+.admin-password-reset__actions button { flex: 1; }
+.admin-password-reset__actions button.is-secondary, .admin-password-reset form > button.is-secondary { background: #eadde1; color: #6d3445; }
+.admin-password-reset__error { margin: 0; color: #a32642; font-size: .86rem; }
+.admin-password-reset__toast { position: fixed; z-index: 1200; right: 18px; bottom: 18px; max-width: min(560px, calc(100vw - 36px)); padding: 15px 18px; border-radius: 14px; background: #315d47; color: #fff; box-shadow: 0 12px 32px rgba(0,0,0,.18); line-height: 1.45; }
+.admin-password-reset__toast[role="alert"] { background: #8d3348; }
+@media (max-width: 520px) { .admin-password-reset { padding: 18px; border-radius: 18px; } .admin-password-reset__actions { flex-direction: column; } }
+
 .admin-client-editor {
     width: min(100%, 470px);
     display: grid;
@@ -10583,6 +10598,14 @@ function AdminPanel() {
     const [isLoadingClientAnamnesis, setIsLoadingClientAnamnesis] = useState(false);
     const [clientEditError, setClientEditError] = useState("");
     const [isSavingClient, setIsSavingClient] = useState(false);
+    const [passwordResetClient, setPasswordResetClient] = useState<ClientProfile | null>(null);
+    const [passwordResetPassword, setPasswordResetPassword] = useState("");
+    const [passwordResetConfirmation, setPasswordResetConfirmation] = useState("");
+    const [passwordResetVisible, setPasswordResetVisible] = useState(false);
+    const [passwordResetAuthorized, setPasswordResetAuthorized] = useState(false);
+    const [passwordResetError, setPasswordResetError] = useState("");
+    const [passwordResetSuccess, setPasswordResetSuccess] = useState("");
+    const [isSavingPasswordReset, setIsSavingPasswordReset] = useState(false);
     const [swapStep, setSwapStep] = useState<AdminSwapStep | null>(null);
     const [swapFirstClient, setSwapFirstClient] = useState<AdminClient | null>(null);
     const [swapSecondClient, setSwapSecondClient] = useState<AdminClient | null>(null);
@@ -11573,6 +11596,44 @@ function AdminPanel() {
         setSelectedClient(client);
     }
 
+    function openPasswordReset(client: AdminClient) {
+        const profileId = client.key.startsWith("profile:") ? client.key.slice("profile:".length) : "";
+        const profile = adminClientProfiles.find((item) => item.id === profileId);
+        setPasswordResetError("");
+        if (!profile?.user_id) {
+            setPasswordResetError("Esta cliente não possui uma conta de acesso vinculada.");
+            return;
+        }
+        setPasswordResetClient(profile);
+        setPasswordResetPassword("");
+        setPasswordResetConfirmation("");
+        setPasswordResetVisible(false);
+        setPasswordResetAuthorized(false);
+    }
+
+    async function saveClientPasswordReset(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setPasswordResetError("");
+        if (!passwordResetClient?.user_id) return setPasswordResetError("Esta cliente não possui uma conta de acesso vinculada.");
+        if (passwordResetPassword !== passwordResetConfirmation) return setPasswordResetError("As senhas não coincidem.");
+        if (!passwordResetAuthorized || !window.confirm(`Confirma a redefinição da senha de ${passwordResetClient.full_name}? Confirme somente se a cliente solicitou ou autorizou esta alteração.`)) return;
+
+        setIsSavingPasswordReset(true);
+        const {data, error} = await supabase.functions.invoke("admin-reset-client-password", {
+            body: {clientProfileId: passwordResetClient.id, password: passwordResetPassword, clientAuthorized: true},
+        });
+        setIsSavingPasswordReset(false);
+        if (error || !data?.ok) {
+            setPasswordResetError(data?.error || "Não foi possível redefinir a senha.");
+            return;
+        }
+        setPasswordResetSuccess("Senha redefinida com sucesso! A cliente já pode acessar sua conta utilizando a nova senha.");
+        setPasswordResetClient(null);
+        setPasswordResetPassword("");
+        setPasswordResetConfirmation("");
+        window.setTimeout(() => setPasswordResetSuccess(""), 7000);
+    }
+
     function openAppointmentFromClientHistory(appointment: AdminAppointment) {
         closeClientHistory();
         openAppointmentDetails(appointment);
@@ -11591,11 +11652,15 @@ function AdminPanel() {
         setSelectedClient(null);
     }
 
-    const adminOverlayKey = selectedAdminAppointment || selectedClient || editingClient
+    const adminOverlayKey = selectedAdminAppointment || selectedClient || editingClient || passwordResetClient
         ? "admin-overlay"
         : null;
 
     useCloseOverlayOnBrowserBack(adminOverlayKey, () => {
+        if (passwordResetClient) {
+            if (!isSavingPasswordReset) setPasswordResetClient(null);
+            return;
+        }
         if (editingClient) {
             setEditingClient(null);
             return;
@@ -15641,6 +15706,7 @@ function AdminPanel() {
                                                     >
                                                         Editar cadastro
                                                     </button>
+                                                    <button type="button" onClick={() => openPasswordReset(client)}>Redefinir senha</button>
                                                     <button
                                                         type="button"
                                                         className="is-secondary"
@@ -16570,6 +16636,26 @@ function AdminPanel() {
                                     </div>
                                 </div>
                             </div>
+                        </section>
+                    </div>
+                )}
+
+                {passwordResetSuccess && <div className="admin-password-reset__toast" role="status">{passwordResetSuccess}</div>}
+                {passwordResetError && !passwordResetClient && <div className="admin-password-reset__toast" role="alert">{passwordResetError}<button type="button" onClick={() => setPasswordResetError("")}>×</button></div>}
+                {passwordResetClient && (
+                    <div className="admin-modal-backdrop" onMouseDown={(event) => {if (event.target === event.currentTarget && !isSavingPasswordReset) setPasswordResetClient(null);}}>
+                        <section className="admin-password-reset" role="dialog" aria-modal="true" aria-labelledby="admin-password-reset-title">
+                            <div className="admin-modal__header"><div><h2 id="admin-password-reset-title">Redefinir senha</h2><p>Defina uma nova senha para a conta existente.</p></div><button className="admin-modal__close" type="button" disabled={isSavingPasswordReset} aria-label="Fechar" onClick={() => setPasswordResetClient(null)}>×</button></div>
+                            <p><strong>Cliente:</strong> {passwordResetClient.full_name}</p>
+                            <p><strong>E-mail:</strong> {passwordResetClient.email || "E-mail não informado"}</p>
+                            <form onSubmit={(event) => void saveClientPasswordReset(event)}>
+                                <label>Nova senha<input type={passwordResetVisible ? "text" : "password"} autoComplete="new-password" value={passwordResetPassword} onChange={(event) => setPasswordResetPassword(event.target.value)} required /></label>
+                                <label>Confirmar nova senha<input type={passwordResetVisible ? "text" : "password"} autoComplete="new-password" value={passwordResetConfirmation} onChange={(event) => setPasswordResetConfirmation(event.target.value)} required /></label>
+                                <button className="is-secondary" type="button" onClick={() => setPasswordResetVisible((visible) => !visible)}>{passwordResetVisible ? "Ocultar senha" : "Mostrar senha"}</button>
+                                <label className="admin-password-reset__authorization"><input type="checkbox" checked={passwordResetAuthorized} onChange={(event) => setPasswordResetAuthorized(event.target.checked)} required /> Confirmo que a cliente solicitou ou autorizou esta redefinição.</label>
+                                {passwordResetError && <p className="admin-password-reset__error" role="alert">{passwordResetError}</p>}
+                                <div className="admin-password-reset__actions"><button type="submit" disabled={isSavingPasswordReset || !passwordResetAuthorized}>{isSavingPasswordReset ? "Salvando..." : "Salvar nova senha"}</button><button type="button" className="is-secondary" disabled={isSavingPasswordReset} onClick={() => setPasswordResetClient(null)}>Cancelar</button></div>
+                            </form>
                         </section>
                     </div>
                 )}
