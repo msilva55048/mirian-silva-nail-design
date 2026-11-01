@@ -2419,6 +2419,17 @@ a {
   border-color: var(--color-gold-border) !important;
 }
 
+/* Status real dos atendimentos, somente nos cards do histórico administrativo. */
+.admin-page .admin-client-history .admin-client-history__list article.is-scheduled-status {
+  background-color: #eaf6ed !important;
+  border-color: #a7cdb0 !important;
+}
+
+.admin-page .admin-client-history .admin-client-history__list article.is-completed-status {
+  background-color: #fff5cf !important;
+  border-color: #e2c96f !important;
+}
+
 /* Elementos pontuais do formulário: fundo neutro e borda dourada no próprio controle. */
 .admin-page .admin-client-history .admin-nail-form__actions .cancel {
   background: #eadde1 !important;

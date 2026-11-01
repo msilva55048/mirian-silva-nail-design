@@ -16895,6 +16895,11 @@ function AdminPanel() {
                                         const canEditAppointment =
                                             appointment.status === "confirmed" ||
                                             appointment.status === "pending";
+                                        const isScheduledStatus =
+                                            appointment.status === "pending" ||
+                                            appointment.status === "confirmed";
+                                        const isCompletedStatus =
+                                            appointment.status === "completed";
 
                                         const isClearing =
                                             clearingCancelledAppointmentId ===
@@ -16914,6 +16919,12 @@ function AdminPanel() {
                                                         : "",
                                                     canEditAppointment
                                                         ? "is-confirmed-deletable"
+                                                        : "",
+                                                    isScheduledStatus
+                                                        ? "is-scheduled-status"
+                                                        : "",
+                                                    isCompletedStatus
+                                                        ? "is-completed-status"
                                                         : "",
                                                     isClearing
                                                         ? "is-clearing"
