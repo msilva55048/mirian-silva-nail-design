@@ -1,4 +1,5 @@
 import {getConfiguredClientStartMinutes, timeToMinutes, type Appointment, type ScheduleTimeOverride} from './domain.ts';
+import {usesTuesday2027Schedule} from './publicSchedule.ts';
 const REPAIR_AGENDA_SLOT_MINUTES = 30;
 export function getAgendaDurationMinutes(durationMinutes: number) {
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 0;
@@ -10,6 +11,7 @@ export function getAgendaDurationMinutes(durationMinutes: number) {
 
 
 export type ClientBookingStartContext = {
+    date: string;
     fixedStarts: number[];
     generatedStarts: number[];
     allStarts: number[];
@@ -74,6 +76,7 @@ export function getClientBookingStartContext(
     }
 
     return {
+        date,
         fixedStarts,
         generatedStarts: [...generatedStarts].sort((a, b) => a - b),
         allStarts: [...reachableStarts].sort((a, b) => a - b),
@@ -88,6 +91,10 @@ export function canServiceUseClientStart(
 ) {
     if (!Number.isFinite(serviceDurationMinutes) || serviceDurationMinutes <= 0) return false;
     const agendaDuration = getAgendaDurationMinutes(serviceDurationMinutes);
+    if (usesTuesday2027Schedule(context.date) && start >= 19 * 60 + 30 &&
+        start + agendaDuration > 21 * 60 + 30) {
+        return false;
+    }
     if (start === 13 * 60 && serviceName !== undefined) {
         const normalizedName = serviceName.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         if (!normalizedName.startsWith('esmaltacao') && !normalizedName.startsWith('alongamento')) return false;

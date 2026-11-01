@@ -110,8 +110,15 @@ export function isPublicBookingDateClosed(date: string): boolean {
     return false;
 }
 
+export function usesTuesday2027Schedule(date: string): boolean {
+    return date >= "2027-01-01" && new Date(`${date}T12:00:00`).getDay() === 2;
+}
+
 export function getPublicBaseStartMinutes(date: string): number[] {
     if (!date || isPublicBookingDateClosed(date)) return [];
+    if (usesTuesday2027Schedule(date)) {
+        return [8 * 60 + 30, 10 * 60 + 30, 13 * 60 + 30, 15 * 60 + 30, 17 * 60 + 30, 19 * 60 + 30];
+    }
     const day = new Date(`${date}T12:00:00`).getDay();
     if (day === 0 || day === 6) return [7 * 60, 9 * 60, 11 * 60, 13 * 60];
     if (date < "2026-10-02") return [7 * 60, 19 * 60 + 30, 21 * 60];
