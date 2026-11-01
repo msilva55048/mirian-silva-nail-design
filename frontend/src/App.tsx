@@ -11,6 +11,11 @@ import {SharedWaitlist} from "./features/admin/SharedWaitlist";
 import {ServicePicker} from "./features/shared/ServicePicker";
 import ProfilePhoto from "./features/shared/ProfilePhoto";
 import {hasScheduleBlockConflict} from "./features/admin/scheduleBlockConflicts";
+import {
+    formatAdminBlockReason,
+    mergeAdminAgendaItems,
+    type AdminAgendaEntry,
+} from "./features/admin/adminAgendaBlocks";
 import {buildWhatsAppMessage} from "./features/admin/whatsappMessage";
 import {summarizeFinanceServices} from "./features/admin/financeServiceGroups";
 import {findClientKeyForAppointment} from "./features/admin/clientNavigation";
@@ -12943,6 +12948,15 @@ function AdminPanel() {
             );
     }, [agendaAppointments, filteredAppointmentSearchClients, appointmentSearch, adminNow]);
 
+    const dailyAgendaEntries = useMemo(
+        () => mergeAdminAgendaItems(
+            filteredAgendaAppointments,
+            adminBlocks.filter((block) => block.block_date === agendaDate),
+            !appointmentSearch.trim(),
+        ),
+        [filteredAgendaAppointments, adminBlocks, agendaDate, appointmentSearch],
+    );
+
     const agendaAvailableTimes = useMemo(() => {
         if (!agendaDate) return [] as string[];
 
@@ -14127,6 +14141,37 @@ function AdminPanel() {
         );
     }
 
+    const renderBlockCard = (block: AdminScheduleBlock) => {
+        const reason = formatAdminBlockReason(block.reason);
+
+        return (
+            <article
+                key={`schedule-block-${block.id}`}
+                className="admin-booking-card admin-block-card"
+                aria-label={`Bloqueado de ${String(block.start_time).slice(0, 5)} a ${String(block.end_time).slice(0, 5)}, ${formatAdminDate(block.block_date)}`}
+            >
+                <div className="admin-block-card__top">
+                    <span className="admin-block-card__time">
+                        {String(block.start_time).slice(0, 5)}–{String(block.end_time).slice(0, 5)}
+                    </span>
+                    <span className="admin-block-card__badge">Horário bloqueado</span>
+                </div>
+                <h3>Bloqueado</h3>
+                {reason && <p className="admin-block-card__reason">{reason}</p>}
+                <div className="admin-booking-card__compact-date">
+                    <span>Data:</span>
+                    <strong>{formatAdminDate(block.block_date)}</strong>
+                </div>
+            </article>
+        );
+    };
+
+    const renderAdminAgendaEntry = (
+        entry: AdminAgendaEntry<AdminAppointment, AdminScheduleBlock>,
+    ) => entry.kind === "block"
+        ? renderBlockCard(entry.block)
+        : renderAppointmentCard(entry.appointment);
+
     const renderAppointmentCard = (appointment: AdminAppointment) => {
         const dueTypes = getDueNotificationTypes(appointment).filter(() =>
             !appointment.confirmation_sent_at,
@@ -14734,19 +14779,21 @@ function AdminPanel() {
                             <div className="admin-loading">Carregando...</div>
                         ) : adminView === "agenda" ? (
                             <div className="admin-card-list">
-                                {filteredAgendaAppointments.length
-                                    ? filteredAgendaAppointments.map(renderAppointmentCard)
-                                    : appointmentSearch.trim()
-                                        ? filteredAppointmentSearchClients.length === 0
+                                {appointmentSearch.trim()
+                                    ? filteredAgendaAppointments.length
+                                        ? filteredAgendaAppointments.map(renderAppointmentCard)
+                                        : filteredAppointmentSearchClients.length === 0
                                             ? (
                                                 <div className="admin-empty admin-empty--top">
                                                     Nenhuma cliente cadastrada encontrada.
                                                 </div>
                                             )
                                             : null
+                                    : dailyAgendaEntries.length
+                                        ? dailyAgendaEntries.map(renderAdminAgendaEntry)
                                         : (
                                             <div className="admin-empty admin-empty--top">
-                                                Nenhum agendamento nesta data.
+                                                Nenhum agendamento ou bloqueio nesta data.
                                             </div>
                                         )}
                             </div>

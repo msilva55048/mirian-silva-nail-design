@@ -2650,3 +2650,60 @@ a {
 .referral-state-badge--cadastrada { background: #ffd9d5; color: #9c3e38; }
 .referral-state-badge--agendada { background: #fff0b8; color: #856200; }
 .referral-state-badge--realizada { background: #d6e7ff; color: #245b9b; }
+
+/* Bloqueios aparecem na agenda ADM com o mesmo card, sem ações de atendimento. */
+.admin-block-card {
+    border-left-color: #a99aa0;
+    background: linear-gradient(135deg, #fff, #f7f4f5);
+    cursor: default;
+}
+.admin-block-card:hover {
+    transform: none;
+    box-shadow: 0 9px 26px rgba(83, 48, 58, 0.07);
+}
+.admin-block-card .admin-block-card__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 0;
+}
+.admin-block-card__time {
+    color: #796b70;
+    font-size: 1.02rem;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+.admin-block-card__badge {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border: 1px solid #d7cdd0;
+    border-radius: 999px;
+    background: #f4eff1;
+    color: #6f6066;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+.admin-block-card h3 {
+    margin-top: 9px;
+}
+.admin-block-card__reason {
+    margin: 5px 0 0;
+    color: #71646a;
+    font-size: .86rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.admin-page .admin-top-agenda .admin-block-card {
+    border-left-color: #a99aa0 !important;
+}
+@media (max-width: 520px) {
+    .admin-block-card .admin-block-card__top {
+        flex-wrap: wrap;
+    }
+    .admin-block-card__badge {
+        font-size: .62rem;
+    }
+}
