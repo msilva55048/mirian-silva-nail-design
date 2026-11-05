@@ -5258,6 +5258,7 @@ type ClientProfile = {
     created_at?: string;
     updated_at?: string;
     profile_photo_path?: string | null;
+    admin_hidden_at?: string | null;
 };
 
 type AdminBookingClient = {
@@ -10814,7 +10815,7 @@ function AdminPanel() {
                     .order("price_cents", {ascending: false})
                     .order("name", {ascending: true}),
                 supabase.from("client_profiles")
-                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, profile_photo_path, created_at, updated_at")
+                    .select("id, full_name, phone, email, musical_taste, phone_digits, user_id, profile_photo_path, admin_hidden_at, created_at, updated_at")
                     .order("full_name", {ascending: true}),
                 supabase.from("schedule_time_overrides")
                     .select("id, override_date, start_time, is_available, created_at, updated_at")
@@ -12138,14 +12139,21 @@ function AdminPanel() {
         return Array.from(groups.values())
             .map((group): AdminClient | null => {
                 /*
-                 * Preserva a função "Remover da lista":
-                 * se a cliente possui agendamentos e todos foram marcados como ocultos,
-                 * ela continua escondida. Perfil recém-cadastrado, sem agendamentos,
-                 * aparece normalmente.
+                 * A data de remoção esconde os agendamentos anteriores sem alterá-los.
+                 * Um novo agendamento, criado depois dela, faz a cliente reaparecer.
+                 * O marcador também oculta perfis que ainda não têm agendamentos.
                  */
-                const visibleAppointments = group.appointments.filter(
-                    (appointment) => !appointment.client_hidden,
+                const removedAt = group.profile?.admin_hidden_at
+                    ? new Date(group.profile.admin_hidden_at).getTime()
+                    : Number.NEGATIVE_INFINITY;
+                const visibleAppointments = group.appointments.filter((appointment) =>
+                    !appointment.client_hidden &&
+                    new Date(appointment.created_at).getTime() > removedAt,
                 );
+
+                if (group.profile?.admin_hidden_at && visibleAppointments.length === 0) {
+                    return null;
+                }
 
                 if (
                     group.appointments.length > 0 &&
@@ -12670,7 +12678,7 @@ function AdminPanel() {
                     })
                     .eq("id", existingProfile.id)
                     .select(
-                        "id, full_name, phone, email, musical_taste, phone_digits, user_id, created_at, updated_at",
+                        "id, full_name, phone, email, musical_taste, phone_digits, user_id, admin_hidden_at, created_at, updated_at",
                     )
                     .single();
 
@@ -12745,40 +12753,62 @@ function AdminPanel() {
     async function deleteClient(client: AdminClient) {
         if (!window.confirm(`Remover ${client.name} da lista de clientes? O histórico financeiro e os agendamentos serão preservados.`)) return;
 
+        const profileId = client.key.startsWith("profile:")
+            ? client.key.slice("profile:".length)
+            : null;
         const appointmentIds = client.appointments.map((appointment) => appointment.id);
-
-        if (!appointmentIds.length) {
-            clearNailRecordsForSelectionChange();
-            setSelectedClient(null);
-            return;
-        }
 
         setDeletingClientKey(client.key);
         setPanelError("");
 
         try {
-            const {error} = await supabase
-                .from("appointments")
-                .update({client_hidden: true})
-                .in("id", appointmentIds);
+            if (profileId) {
+                const removedAt = new Date().toISOString();
+                const {data, error} = await supabase
+                    .from("client_profiles")
+                    .update({admin_hidden_at: removedAt})
+                    .eq("id", profileId)
+                    .select("id, admin_hidden_at");
 
-            if (error) {
-                throw error;
-            }
+                if (error) throw error;
+                const updatedProfile = data?.find((profile) => profile.id === profileId);
+                if (!updatedProfile) {
+                    throw new Error("Nenhum cadastro foi atualizado. Atualize a página e tente novamente.");
+                }
 
-            setAppointments((current) =>
-                current.map((appointment) =>
-                    appointmentIds.includes(appointment.id)
+                setAdminClientProfiles((current) => current.map((profile) =>
+                    profile.id === profileId ? {...profile, admin_hidden_at: updatedProfile.admin_hidden_at} : profile,
+                ));
+            } else if (appointmentIds.length) {
+                // Registros antigos sem perfil só podem ser ocultados pelo próprio agendamento.
+                const {data, error} = await supabase
+                    .from("appointments")
+                    .update({client_hidden: true})
+                    .in("id", appointmentIds)
+                    .select("id");
+
+                if (error) throw error;
+                const updatedIds = new Set((data ?? []).map((appointment) => appointment.id));
+                if (appointmentIds.some((id) => !updatedIds.has(id))) {
+                    throw new Error("Nem todos os registros foram atualizados. Atualize a página e tente novamente.");
+                }
+
+                setAppointments((current) => current.map((appointment) =>
+                    updatedIds.has(appointment.id)
                         ? {...appointment, client_hidden: true}
                         : appointment,
-                ),
-            );
+                ));
+            } else {
+                throw new Error("Não foi possível identificar o cadastro para remoção. Atualize a página e tente novamente.");
+            }
 
             clearNailRecordsForSelectionChange();
             setSelectedClient(null);
         } catch (error) {
             console.error("Erro ao remover cliente da lista:", error);
-            setPanelError("Não foi possível remover a cliente da lista.");
+            setPanelError(error instanceof Error && error.message
+                ? `Não foi possível remover a cliente da lista. ${error.message}`
+                : "Não foi possível remover a cliente da lista. Atualize a página e tente novamente.");
         } finally {
             setDeletingClientKey("");
         }
