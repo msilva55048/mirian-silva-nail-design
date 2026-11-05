@@ -6127,6 +6127,11 @@ const adminStyles = `
     background: #faf6f7;
 }
 
+.admin-client-history__list article > div:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .admin-client-history__list article.is-cancelled-cleanable {
     cursor: pointer;
     border-color: rgba(162, 63, 77, .24);
@@ -6191,8 +6196,10 @@ const adminStyles = `
 }
 
 .admin-client-history__confirmed-action small {
-    color: #72867a;
-    font-size: .68rem;
+    color: #a23f4d;
+    font-size: .78rem;
+    line-height: 1.3;
+    white-space: nowrap;
 }
 
 .admin-client-history__list article.is-clearing {
