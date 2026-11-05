@@ -6202,6 +6202,24 @@ const adminStyles = `
     white-space: nowrap;
 }
 
+.admin-client-history__list article.is-completed-status > span,
+.admin-client-history__cancelled-action > small {
+    color: #a23f4d;
+    font-size: .78rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.admin-client-history__list article.is-completed-status > div:first-child,
+.admin-client-history__list article.is-cancelled-cleanable > div:first-child {
+    overflow-wrap: anywhere;
+}
+
+.admin-client-history__list article.is-cancelled-cleanable > .admin-client-history__cancelled-action {
+    flex-shrink: 0;
+}
+
 .admin-client-history__list article.is-clearing {
     opacity: .55;
     pointer-events: none;
